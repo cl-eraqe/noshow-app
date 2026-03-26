@@ -64,11 +64,13 @@ export default function NewReport({ prefill }) {
 
   const [files, setFiles] = useState([]);
   const [prevStatus, setPrevStatus]   = useState('idle');
+  const [newLookupStatus, setNewLookupStatus] = useState('idle');
+  const [reportStatus, setReportStatus] = useState(seed.status || 'under_process');
   const [submitting, setSubmitting]   = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess]         = useState(null);
 
-  // Days at airport not calculated at submit time anymore — calculated when new flight is added via status update
+  const daysAtAirport = calcDaysAtAirport(form.pax_id_datetime, form.new_datetime);
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -94,17 +96,43 @@ export default function NewReport({ prefill }) {
     }
   }, [form.prev_flight]);
 
+  // ── New flight auto-fill (only used when status = flight_confirmed)
+  const lookupNew = useCallback(async () => {
+    const fn = form.new_flight.trim();
+    if (!fn) return;
+    setNewLookupStatus('loading');
+    try {
+      const data = await lookupFlight(fn);
+      setForm(prev => ({
+        ...prev,
+        new_datetime:    stdToDatetime(data.std),
+        new_destination: `${data.city} (${data.destination})`,
+        new_airline:     airlineFromFlightNumber(fn),
+      }));
+      setNewLookupStatus('found');
+    } catch {
+      setNewLookupStatus('notfound');
+    }
+  }, [form.new_flight]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     setSubmitError('');
     try {
       const fd = new FormData();
-      // Only send relevant fields (no new flight info at creation time)
-      const fieldsToSend = ['pax_id_datetime', 'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline', 'nationality', 'pax_type', 'pax_count'];
-      fieldsToSend.forEach(k => fd.append(k, form[k] || ''));
-      fd.append('status', 'under_process');
+      const baseFields = ['pax_id_datetime', 'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline', 'nationality', 'pax_type', 'pax_count'];
+      baseFields.forEach(k => fd.append(k, form[k] || ''));
+      fd.append('status', reportStatus);
       fd.append('submitted_by', getRole());
+      // Include new flight fields if status is flight_confirmed
+      if (reportStatus === 'flight_confirmed') {
+        fd.append('new_flight', form.new_flight || '');
+        fd.append('new_datetime', form.new_datetime || '');
+        fd.append('new_destination', form.new_destination || '');
+        fd.append('new_airline', form.new_airline || '');
+        fd.append('days_at_airport', daysAtAirport);
+      }
       files.forEach(f => fd.append('files', f));
 
       const report = await createReport(fd);
@@ -139,7 +167,7 @@ export default function NewReport({ prefill }) {
             </button>
             <button
               className="btn btn-secondary"
-              onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'' }); setFiles([]); setPrevStatus('idle'); }}
+              onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'' }); setFiles([]); setPrevStatus('idle'); setNewLookupStatus('idle'); setReportStatus('under_process'); }}
             >
               New Report
             </button>
@@ -242,8 +270,84 @@ export default function NewReport({ prefill }) {
           </div>
         </div>
 
-        {/* ── New Flight (only shown when not in "under_process" mode, i.e. user chose to add flight) */}
-        {/* This section is now optional — report can be submitted without it */}
+        {/* ── Status */}
+        <div className="form-section">
+          <h2 className="section-title">Passenger Status</h2>
+          <div className="field">
+            <label className="field-label">Status <span className="req">*</span></label>
+            <div className="status-picker">
+              {[
+                { value: 'under_process', label: 'Under Process', color: '#e67e22' },
+                { value: 'flight_confirmed', label: 'Flight Confirmed', color: '#27ae60' },
+                { value: 'closed', label: 'Closed', color: '#95a5a6' },
+              ].map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`status-option ${reportStatus === opt.value ? 'active' : ''}`}
+                  style={reportStatus === opt.value ? { borderColor: opt.color, background: opt.color + '15', color: opt.color } : {}}
+                  onClick={() => setReportStatus(opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── New Flight (shown only when status is flight_confirmed) */}
+        {reportStatus === 'flight_confirmed' && (
+          <div className="form-section">
+            <h2 className="section-title">New Flight</h2>
+
+            <div className="field">
+              <label className="field-label">New Flight Number <span className="req">*</span></label>
+              <div className="lookup-row">
+                <input
+                  type="text"
+                  className="field-input"
+                  placeholder="e.g. SV309"
+                  value={form.new_flight}
+                  onChange={e => { set('new_flight', e.target.value.toUpperCase()); setNewLookupStatus('idle'); }}
+                  onBlur={lookupNew}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupNew())}
+                  required
+                />
+                <button type="button" className="btn btn-lookup" onClick={lookupNew}
+                  disabled={newLookupStatus === 'loading'}>
+                  {newLookupStatus === 'loading' ? '…' : 'Look up'}
+                </button>
+                {newLookupStatus === 'found'    && <span className="badge badge-found">Found</span>}
+                {newLookupStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
+              </div>
+            </div>
+
+            <div className="field-grid">
+              <div className="field">
+                <label className="field-label">New Flight Date & Time</label>
+                <input type="datetime-local" className="field-input autofilled"
+                  value={form.new_datetime} onChange={e => set('new_datetime', e.target.value)} />
+              </div>
+              <div className="field">
+                <label className="field-label">New Destination</label>
+                <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+                  value={form.new_destination} onChange={e => set('new_destination', e.target.value)} />
+              </div>
+              <div className="field">
+                <label className="field-label">New Airline</label>
+                <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+                  value={form.new_airline} onChange={e => set('new_airline', e.target.value)} />
+              </div>
+            </div>
+
+            <div className="field">
+              <label className="field-label">Days at Airport</label>
+              <input type="text" className="field-input readonly" readOnly
+                value={daysAtAirport !== '' ? `${daysAtAirport} day(s)` : '—'} />
+              <p className="field-hint">Calculated from Pax ID date to New Flight date</p>
+            </div>
+          </div>
+        )}
 
         {/* ── Attachments */}
         <div className="form-section">
