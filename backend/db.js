@@ -34,10 +34,32 @@ function initDb() {
       file_paths       TEXT DEFAULT '[]',
       whatsapp_text    TEXT,
       submitted_by     TEXT,
+      status           TEXT DEFAULT 'under_process',
       created_at       TEXT DEFAULT (datetime('now'))
     )
   `);
+  // Migration: add status column if missing (for existing databases)
+  const cols = database.prepare("PRAGMA table_info(reports)").all();
+  if (!cols.find(c => c.name === 'status')) {
+    database.exec("ALTER TABLE reports ADD COLUMN status TEXT DEFAULT 'under_process'");
+    console.log('Migrated: added status column');
+  }
+
   console.log('Database ready:', DB_PATH);
 }
 
-module.exports = { getDb, initDb };
+// Auto-close reports whose new flight departure has passed
+function autoCloseReports() {
+  const database = getDb();
+  const now = new Date().toISOString();
+  database.prepare(`
+    UPDATE reports
+    SET status = 'closed'
+    WHERE status = 'flight_confirmed'
+      AND new_datetime IS NOT NULL
+      AND new_datetime != ''
+      AND new_datetime < ?
+  `).run(now);
+}
+
+module.exports = { getDb, initDb, autoCloseReports };

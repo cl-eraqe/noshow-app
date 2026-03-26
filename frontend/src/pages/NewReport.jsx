@@ -13,6 +13,14 @@ const PAX_TYPES = [
   'Final Exit',
 ];
 
+const NATIONALITIES = [
+  'Algerian','American','Bahraini','Bangladeshi','British','Egyptian','Emirati',
+  'Ethiopian','Filipino','French','German','Ghanaian','Indian','Indonesian',
+  'Iranian','Iraqi','Jordanian','Kenyan','Lebanese','Libyan','Malaysian',
+  'Maldivian','Moroccan','Nepali','Nigerian','Omani','Pakistani','Qatari',
+  'Saudi','Singaporean','Sri Lankan','Sudanese','Syrian','Thai','Tunisian','Turkish',
+];
+
 function useFlightLookup() {
   const [status, setStatus] = useState('idle'); // idle | loading | found | notfound
   return { status, setStatus };
@@ -56,12 +64,11 @@ export default function NewReport({ prefill }) {
 
   const [files, setFiles] = useState([]);
   const [prevStatus, setPrevStatus]   = useState('idle');
-  const [newStatus,  setNewStatus]    = useState('idle');
   const [submitting, setSubmitting]   = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess]         = useState(null);
 
-  const daysAtAirport = calcDaysAtAirport(form.pax_id_datetime, form.new_datetime);
+  // Days at airport not calculated at submit time anymore — calculated when new flight is added via status update
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -87,33 +94,16 @@ export default function NewReport({ prefill }) {
     }
   }, [form.prev_flight]);
 
-  // ── New flight auto-fill
-  const lookupNew = useCallback(async () => {
-    const fn = form.new_flight.trim();
-    if (!fn) return;
-    setNewStatus('loading');
-    try {
-      const data = await lookupFlight(fn);
-      setForm(prev => ({
-        ...prev,
-        new_datetime:    stdToDatetime(data.std),
-        new_destination: `${data.city} (${data.destination})`,
-        new_airline:     airlineFromFlightNumber(fn),
-      }));
-      setNewStatus('found');
-    } catch {
-      setNewStatus('notfound');
-    }
-  }, [form.new_flight]);
-
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     setSubmitError('');
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
-      fd.append('days_at_airport', daysAtAirport);
+      // Only send relevant fields (no new flight info at creation time)
+      const fieldsToSend = ['pax_id_datetime', 'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline', 'nationality', 'pax_type', 'pax_count'];
+      fieldsToSend.forEach(k => fd.append(k, form[k] || ''));
+      fd.append('status', 'under_process');
       fd.append('submitted_by', getRole());
       files.forEach(f => fd.append('files', f));
 
@@ -149,7 +139,7 @@ export default function NewReport({ prefill }) {
             </button>
             <button
               className="btn btn-secondary"
-              onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'' }); setFiles([]); setPrevStatus('idle'); setNewStatus('idle'); }}
+              onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'' }); setFiles([]); setPrevStatus('idle'); }}
             >
               New Report
             </button>
@@ -230,8 +220,11 @@ export default function NewReport({ prefill }) {
           <div className="field-grid">
             <div className="field">
               <label className="field-label">6. Nationality</label>
-              <input type="text" className="field-input autofilled" placeholder="Auto-filled or type"
-                value={form.nationality} onChange={e => set('nationality', e.target.value)} />
+              <select className="field-input autofilled" value={form.nationality}
+                onChange={e => set('nationality', e.target.value)}>
+                <option value="">Select nationality…</option>
+                {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
             </div>
             <div className="field">
               <label className="field-label">7. Passenger Type <span className="req">*</span></label>
@@ -249,57 +242,8 @@ export default function NewReport({ prefill }) {
           </div>
         </div>
 
-        {/* ── New Flight */}
-        <div className="form-section">
-          <h2 className="section-title">New Flight</h2>
-
-          <div className="field">
-            <label className="field-label">8. New Flight Number <span className="req">*</span></label>
-            <div className="lookup-row">
-              <input
-                type="text"
-                className="field-input"
-                placeholder="e.g. SV309"
-                value={form.new_flight}
-                onChange={e => { set('new_flight', e.target.value.toUpperCase()); setNewStatus('idle'); }}
-                onBlur={lookupNew}
-                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupNew())}
-                required
-              />
-              <button type="button" className="btn btn-lookup" onClick={lookupNew}
-                disabled={newStatus === 'loading'}>
-                {newStatus === 'loading' ? '…' : 'Look up'}
-              </button>
-              {newStatus === 'found'    && <span className="badge badge-found">✓ Found</span>}
-              {newStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
-            </div>
-          </div>
-
-          <div className="field-grid">
-            <div className="field">
-              <label className="field-label">9. New Flight Date & Time</label>
-              <input type="datetime-local" className="field-input autofilled"
-                value={form.new_datetime} onChange={e => set('new_datetime', e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="field-label">10. New Destination</label>
-              <input type="text" className="field-input autofilled" placeholder="Auto-filled"
-                value={form.new_destination} onChange={e => set('new_destination', e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="field-label">11. New Airline</label>
-              <input type="text" className="field-input autofilled" placeholder="Auto-filled"
-                value={form.new_airline} onChange={e => set('new_airline', e.target.value)} />
-            </div>
-          </div>
-
-          <div className="field">
-            <label className="field-label">12. Days at Airport</label>
-            <input type="text" className="field-input readonly" readOnly
-              value={daysAtAirport !== '' ? `${daysAtAirport} day(s)` : '—'} />
-            <p className="field-hint">Calculated from Pax ID date to New Flight date</p>
-          </div>
-        </div>
+        {/* ── New Flight (only shown when not in "under_process" mode, i.e. user chose to add flight) */}
+        {/* This section is now optional — report can be submitted without it */}
 
         {/* ── Attachments */}
         <div className="form-section">

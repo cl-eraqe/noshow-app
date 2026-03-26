@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { initDb } = require('./db');
+const { initDb, autoCloseReports } = require('./db');
 
 const authRoutes = require('./routes/auth');
 const flightRoutes = require('./routes/flights');
@@ -36,4 +36,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().to
 
 app.listen(PORT, () => {
   console.log(`JEDCO No-Show API running on port ${PORT}`);
+  // Auto-close flight_confirmed reports whose departure has passed — check every 5 minutes
+  autoCloseReports();
+  setInterval(autoCloseReports, 5 * 60 * 1000);
 });

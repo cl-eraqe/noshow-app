@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { getDb } = require('../db');
+const { getDb, autoCloseReports } = require('../db');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 
@@ -59,8 +59,9 @@ router.get('/analytics/summary', (_req, res) => {
   res.json({ thisWeek: thisWeek.count, thisMonth: thisMonth.count, topDestinations, byNationality, byPaxType });
 });
 
-// ── GET all reports
+// ── GET all reports (auto-close expired ones first)
 router.get('/', (_req, res) => {
+  autoCloseReports();
   const reports = getDb().prepare('SELECT * FROM reports ORDER BY created_at DESC').all();
   res.json(reports);
 });
@@ -81,7 +82,7 @@ router.post('/', upload.array('files', 10), (req, res) => {
     nationality, pax_type,
     new_flight, new_datetime, new_destination, new_airline,
     days_at_airport, pax_count,
-    submitted_by,
+    submitted_by, status,
   } = req.body;
 
   const filePaths = req.files
@@ -89,26 +90,29 @@ router.post('/', upload.array('files', 10), (req, res) => {
     : [];
 
   // Insert first to get the auto-increment ID
+  const reportStatus = status || 'under_process';
+
   const stmt = db.prepare(`
     INSERT INTO reports
       (pax_id_datetime,
        prev_flight, prev_datetime, prev_destination, prev_airline,
        nationality, pax_type,
        new_flight, new_datetime, new_destination, new_airline,
-       days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
     pax_id_datetime,
     prev_flight, prev_datetime, prev_destination, prev_airline,
     nationality, pax_type,
-    new_flight, new_datetime, new_destination, new_airline,
+    new_flight || null, new_datetime || null, new_destination || null, new_airline || null,
     parseFloat(days_at_airport) || null,
     parseInt(pax_count) || 0,
     JSON.stringify(filePaths),
     '', // placeholder
     submitted_by,
+    reportStatus,
   );
 
   const id = result.lastInsertRowid;
@@ -124,6 +128,83 @@ router.post('/', upload.array('files', 10), (req, res) => {
 
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id);
   res.status(201).json(report);
+});
+
+// ── PATCH update report status (and optionally new flight info)
+router.patch('/:id', express.json(), (req, res) => {
+  const db = getDb();
+  const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  if (!report) return res.status(404).json({ error: 'Report not found' });
+
+  const { status, new_flight, new_datetime, new_destination, new_airline } = req.body;
+
+  // Validate status
+  const validStatuses = ['under_process', 'flight_confirmed', 'closed'];
+  if (status && !validStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+
+  // Build dynamic update
+  const updates = [];
+  const values = [];
+
+  if (status) {
+    updates.push('status = ?');
+    values.push(status);
+  }
+  if (new_flight !== undefined) {
+    updates.push('new_flight = ?');
+    values.push(new_flight);
+  }
+  if (new_datetime !== undefined) {
+    updates.push('new_datetime = ?');
+    values.push(new_datetime);
+  }
+  if (new_destination !== undefined) {
+    updates.push('new_destination = ?');
+    values.push(new_destination);
+  }
+  if (new_airline !== undefined) {
+    updates.push('new_airline = ?');
+    values.push(new_airline);
+  }
+
+  // Recalculate days_at_airport if we have both dates
+  const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
+  if (report.pax_id_datetime && finalNewDatetime) {
+    const diff = (new Date(finalNewDatetime) - new Date(report.pax_id_datetime)) / (1000 * 60 * 60 * 24);
+    if (!isNaN(diff)) {
+      updates.push('days_at_airport = ?');
+      values.push(parseFloat(Math.max(0, diff).toFixed(2)));
+    }
+  }
+
+  // Regenerate whatsapp text
+  const finalPrevFlight = report.prev_flight;
+  const finalPrevDest = report.prev_destination;
+  const finalPaxCount = report.pax_count;
+  const finalPaxType = report.pax_type;
+  const finalNationality = report.nationality;
+  const finalNewFlight = new_flight !== undefined ? new_flight : report.new_flight;
+
+  const whatsapp_text =
+    `No-Show Report #${report.id}\n` +
+    `Flight: ${finalPrevFlight || '—'} → ${finalPrevDest || '—'}\n` +
+    `Pax: ${finalPaxCount} × ${finalPaxType || '—'}\n` +
+    `Nationality: ${finalNationality || '—'}\n` +
+    `New Flight: ${finalNewFlight || '—'} on ${finalNewDatetime || '—'}`;
+  updates.push('whatsapp_text = ?');
+  values.push(whatsapp_text);
+
+  if (updates.length === 0) {
+    return res.json(report);
+  }
+
+  values.push(req.params.id);
+  db.prepare(`UPDATE reports SET ${updates.join(', ')} WHERE id = ?`).run(...values);
+
+  const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  res.json(updated);
 });
 
 // ── DELETE report

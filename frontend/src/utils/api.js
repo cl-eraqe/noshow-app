@@ -46,6 +46,14 @@ export async function createReport(formData) {
   return res.json();
 }
 
+export async function updateReport(id, data) {
+  return request(`/api/reports/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
 export async function deleteReport(id) {
   return request(`/api/reports/${id}`, { method: 'DELETE' });
 }
