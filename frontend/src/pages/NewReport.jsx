@@ -288,18 +288,18 @@ export default function NewReport({ editMode }) {
 
           <div className="field-grid">
             <div className="field">
-              <label className="field-label">3. Previous Flight Date & Time</label>
-              <input type="datetime-local" className="field-input autofilled"
+              <label className="field-label">3. Previous Flight Date & Time <span className="req">*</span></label>
+              <input type="datetime-local" className="field-input autofilled" required
                 value={form.prev_datetime} onChange={e => set('prev_datetime', e.target.value)} />
             </div>
             <div className="field">
-              <label className="field-label">4. Previous Destination</label>
-              <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+              <label className="field-label">4. Previous Destination <span className="req">*</span></label>
+              <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
                 value={form.prev_destination} onChange={e => set('prev_destination', e.target.value)} />
             </div>
             <div className="field">
-              <label className="field-label">5. Previous Airline</label>
-              <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+              <label className="field-label">5. Previous Airline <span className="req">*</span></label>
+              <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
                 value={form.prev_airline} onChange={e => set('prev_airline', e.target.value)} />
             </div>
           </div>
@@ -311,8 +311,8 @@ export default function NewReport({ editMode }) {
 
           <div className="field-grid">
             <div className="field">
-              <label className="field-label">6. Nationality</label>
-              <select className="field-input autofilled" value={form.nationality}
+              <label className="field-label">6. Nationality <span className="req">*</span></label>
+              <select className="field-input autofilled" required value={form.nationality}
                 onChange={e => set('nationality', e.target.value)}>
                 <option value="">Select nationality…</option>
                 {NATIONALITIES.map(n => <option key={n} value={n}>{n}</option>)}
@@ -388,18 +388,18 @@ export default function NewReport({ editMode }) {
 
             <div className="field-grid">
               <div className="field">
-                <label className="field-label">New Flight Date & Time</label>
-                <input type="datetime-local" className="field-input autofilled"
+                <label className="field-label">New Flight Date & Time <span className="req">*</span></label>
+                <input type="datetime-local" className="field-input autofilled" required
                   value={form.new_datetime} onChange={e => set('new_datetime', e.target.value)} />
               </div>
               <div className="field">
-                <label className="field-label">New Destination</label>
-                <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+                <label className="field-label">New Destination <span className="req">*</span></label>
+                <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
                   value={form.new_destination} onChange={e => set('new_destination', e.target.value)} />
               </div>
               <div className="field">
-                <label className="field-label">New Airline</label>
-                <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+                <label className="field-label">New Airline <span className="req">*</span></label>
+                <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
                   value={form.new_airline} onChange={e => set('new_airline', e.target.value)} />
               </div>
             </div>

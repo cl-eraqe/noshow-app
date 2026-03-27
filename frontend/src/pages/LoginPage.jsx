@@ -28,10 +28,7 @@ export default function LoginPage() {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-logo">
-          <svg viewBox="0 0 64 64" width="56" height="56">
-            <rect width="64" height="64" rx="12" fill="#1a3a5c"/>
-            <text x="32" y="45" fontSize="36" textAnchor="middle" fill="white" fontFamily="Arial,sans-serif" fontWeight="bold">✈</text>
-          </svg>
+          <img src="/jedco-logo-en.png" alt="JEDCO" style={{ height: 64, width: 'auto', objectFit: 'contain' }} />
         </div>
         <h1 className="login-title">No-Show App</h1>
         <p className="login-subtitle">JEDCO Terminal Operations<br />King Abdulaziz International Airport</p>

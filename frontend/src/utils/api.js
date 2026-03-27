@@ -87,8 +87,9 @@ export async function getCeoReport() {
 }
 
 // ── Handover Report
-export async function getHandoverReport() {
-  return request('/api/reports/handover');
+export async function getHandoverReport(shift) {
+  const params = shift ? `?shift=${shift}` : '';
+  return request(`/api/reports/handover${params}`);
 }
 
 // ── Airline code → name mapping (client-side, no API call needed)
@@ -159,6 +160,20 @@ export function getTerminal(flightNumber) {
 export function needsBus(flightNumber) {
   const terminal = getTerminal(flightNumber);
   return terminal === 'North' || terminal === 'Hajj';
+}
+
+export function getAirlineCode(flightNumber) {
+  if (!flightNumber) return '';
+  const fn = flightNumber.toUpperCase().trim();
+  const twoChar = fn.replace(/[0-9]/g, '').trim();
+  return twoChar || fn.slice(0, 2);
+}
+
+export function airlineLogo(flightNumber) {
+  const code = getAirlineCode(flightNumber);
+  if (!code) return null;
+  // Kiwi.com airline logo CDN – small PNGs, widely available
+  return `https://images.kiwi.com/airlines/64/${code}.png`;
 }
 
 export function airlineFromFlightNumber(flightNumber) {

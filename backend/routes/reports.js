@@ -108,20 +108,26 @@ function fmtTimeShort(dt) {
 }
 
 // ── Handover Report (must be before /:id)
-router.get('/handover', (_req, res) => {
+router.get('/handover', (req, res) => {
   const db = getDb();
   autoCloseReports();
   const now = new Date();
-  const hour = now.getHours();
 
-  // Detect current shift and next shift
-  let currentShift, nextShift, shiftEnd;
-  if (hour >= 6 && hour < 14) {
-    currentShift = 'A'; nextShift = 'B'; shiftEnd = 14;
-  } else if (hour >= 14 && hour < 22) {
-    currentShift = 'B'; nextShift = 'C'; shiftEnd = 22;
+  // Use Jeddah time (UTC+3) for auto-detect
+  const jeddahHour = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })).getHours();
+
+  // Allow caller to pick the shift, otherwise auto-detect from Jeddah time
+  const shiftParam = (req.query.shift || '').toUpperCase();
+  let currentShift, nextShift;
+  if (['A','B','C'].includes(shiftParam)) {
+    currentShift = shiftParam;
+    nextShift = shiftParam === 'A' ? 'B' : shiftParam === 'B' ? 'C' : 'A';
+  } else if (jeddahHour >= 6 && jeddahHour < 14) {
+    currentShift = 'A'; nextShift = 'B';
+  } else if (jeddahHour >= 14 && jeddahHour < 22) {
+    currentShift = 'B'; nextShift = 'C';
   } else {
-    currentShift = 'C'; nextShift = 'A'; shiftEnd = 6;
+    currentShift = 'C'; nextShift = 'A';
   }
 
   // All active reports

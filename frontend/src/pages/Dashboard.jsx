@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal, getAirlineCode } from '../utils/api';
 import { getRole, isSupervisor, clearRole } from '../utils/auth';
 
 function fmt(dt) {
@@ -84,6 +84,13 @@ export default function Dashboard() {
   const [handoverLoading, setHandoverLoading] = useState(false);
   const [handoverNotes, setHandoverNotes] = useState('');
   const [handoverCopied, setHandoverCopied] = useState(false);
+  const [handoverShift, setHandoverShift] = useState(() => {
+    // Default based on Jeddah time (UTC+3)
+    const jeddahHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })).getHours();
+    if (jeddahHour >= 6 && jeddahHour < 14) return 'A';
+    if (jeddahHour >= 14 && jeddahHour < 22) return 'B';
+    return 'C';
+  });
 
   const role = getRole();
 
@@ -390,17 +397,26 @@ export default function Dashboard() {
   // ── Handover
   async function openHandover() {
     setHandoverModal(true);
-    setHandoverLoading(true);
     setHandoverCopied(false);
     setHandoverNotes('');
+    await loadHandover(handoverShift);
+  }
+
+  async function loadHandover(shift) {
+    setHandoverLoading(true);
     try {
-      const data = await getHandoverReport();
+      const data = await getHandoverReport(shift);
       setHandoverData(data);
     } catch (err) {
       alert('Failed to generate handover: ' + err.message);
     } finally {
       setHandoverLoading(false);
     }
+  }
+
+  async function changeHandoverShift(shift) {
+    setHandoverShift(shift);
+    await loadHandover(shift);
   }
 
   function copyHandover() {
@@ -493,10 +509,7 @@ export default function Dashboard() {
       {/* ── Header */}
       <div className="dashboard-header">
         <div className="header-brand">
-          <svg viewBox="0 0 64 64" width="32" height="32">
-            <rect width="64" height="64" rx="8" fill="#1a3a5c"/>
-            <text x="32" y="44" fontSize="32" textAnchor="middle" fill="white" fontFamily="Arial" fontWeight="bold">✈</text>
-          </svg>
+          <img src="/jedco-logo-en.png" alt="JEDCO" className="header-logo" />
           <span className="header-title">No-Show App</span>
           <span className="header-role">{role}</span>
         </div>
@@ -907,10 +920,25 @@ export default function Dashboard() {
       {handoverModal && (
         <div className="modal-overlay" onClick={() => setHandoverModal(false)}>
           <div className="modal-content handover-modal" onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">
-              Shift Handover
-              {handoverData && <span className="handover-shift"> {handoverData.shift.current} → {handoverData.shift.next}</span>}
-            </h2>
+            <h2 className="modal-title">Shift Handover</h2>
+
+            <div className="handover-shift-picker">
+              {[
+                { value: 'A', label: 'A → B', hours: '06–14' },
+                { value: 'B', label: 'B → C', hours: '14–22' },
+                { value: 'C', label: 'C → A', hours: '22–06' },
+              ].map(s => (
+                <button
+                  key={s.value}
+                  className={`shift-pick-btn ${handoverShift === s.value ? 'active' : ''}`}
+                  onClick={() => changeHandoverShift(s.value)}
+                  disabled={handoverLoading}
+                >
+                  <span className="shift-pick-label">{s.label}</span>
+                  <span className="shift-pick-hours">{s.hours}</span>
+                </button>
+              ))}
+            </div>
 
             {handoverLoading && <p className="state-msg">Generating handover…</p>}
 

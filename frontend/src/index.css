@@ -200,6 +200,13 @@ html, body, #root {
   gap: 10px;
 }
 
+.header-logo {
+  height: 36px;
+  width: auto;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
 .header-title {
   font-size: 1.1rem;
   font-weight: 700;
