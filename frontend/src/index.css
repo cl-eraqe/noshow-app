@@ -852,6 +852,82 @@ html, body, #root {
 .handover-modal { max-width: 640px; }
 .handover-shift { font-weight: 400; color: var(--text-muted); font-size: 0.9rem; margin-left: 8px; }
 
+.handover-shift-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.shift-pick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.shift-pick-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 60%, rgba(44,62,80,0.04));
+  pointer-events: none;
+}
+
+.shift-pick-btn:hover:not(:disabled) {
+  border-color: #2c3e50;
+  background: #f4f6f8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(44,62,80,0.12);
+}
+
+.shift-pick-btn.active {
+  border-color: #2c3e50;
+  background: #2c3e50;
+  box-shadow: 0 4px 16px rgba(44,62,80,0.3);
+  transform: translateY(-2px);
+}
+
+.shift-pick-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shift-pick-label {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+}
+
+.shift-pick-btn.active .shift-pick-label {
+  color: #fff;
+}
+
+.shift-pick-hours {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: rgba(44,62,80,0.07);
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+.shift-pick-btn.active .shift-pick-hours {
+  background: rgba(255,255,255,0.18);
+  color: rgba(255,255,255,0.85);
+}
+
 .handover-text {
   font-family: monospace;
   font-size: 0.8rem;
