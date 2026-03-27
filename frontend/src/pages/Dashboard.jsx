@@ -509,7 +509,7 @@ export default function Dashboard() {
       {/* ── Header */}
       <div className="dashboard-header">
         <div className="header-brand">
-          <img src="/jedco-logo-en.png" alt="JEDCO" className="header-logo" />
+          <img src="/jedco-logo.png" alt="JEDCO" className="header-logo" />
           <span className="header-title">No-Show App</span>
           <span className="header-role">{role}</span>
         </div>
