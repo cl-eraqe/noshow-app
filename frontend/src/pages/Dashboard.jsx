@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary } from '../utils/api';
 import { getRole, isSupervisor, clearRole } from '../utils/auth';
 
 function fmt(dt) {
@@ -13,6 +13,14 @@ function stdToDatetime(std) {
   if (!std) return '';
   const today = new Date().toISOString().slice(0, 10);
   return `${today}T${std}`;
+}
+
+// Calculate live days since prev_flight datetime
+function liveDays(prevDatetime) {
+  if (!prevDatetime) return null;
+  const diff = (Date.now() - new Date(prevDatetime).getTime()) / (1000 * 60 * 60 * 24);
+  if (isNaN(diff) || diff < 0) return null;
+  return parseFloat(diff.toFixed(1));
 }
 
 const STATUS_LABELS = {
@@ -36,12 +44,24 @@ export default function Dashboard() {
   const [deleting, setDeleting]   = useState(null);
   const [search, setSearch]       = useState('');
   const [activeTab, setActiveTab] = useState('under_process');
+  const [airlineFilter, setAirlineFilter] = useState('');
+
+  // Bulk select
+  const [selected, setSelected] = useState(new Set());
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // Flight confirmed modal state
-  const [confirmModal, setConfirmModal] = useState(null); // report being confirmed
+  const [confirmModal, setConfirmModal] = useState(null);
   const [newFlightForm, setNewFlightForm] = useState({ new_flight: '', new_datetime: '', new_destination: '', new_airline: '' });
   const [lookupStatus, setLookupStatus] = useState('idle');
   const [saving, setSaving] = useState(false);
+
+  // Shift summary modal
+  const [shiftModal, setShiftModal] = useState(false);
+  const [shiftData, setShiftData] = useState(null);
+  const [shiftDate, setShiftDate] = useState(new Date().toISOString().slice(0, 10));
+  const [shiftLoading, setShiftLoading] = useState(false);
+  const [shiftCopied, setShiftCopied] = useState(null);
 
   const role = getRole();
 
@@ -59,6 +79,9 @@ export default function Dashboard() {
       setLoading(false);
     }
   }
+
+  // ── Get unique airlines from reports for filter dropdown
+  const airlines = [...new Set(reports.map(r => r.prev_airline).filter(Boolean))].sort();
 
   function copyWhatsApp(report) {
     const text = report.whatsapp_text || buildWhatsApp(report);
@@ -176,15 +199,104 @@ export default function Dashboard() {
     }
   }
 
+  // ── Bulk status update
+  function toggleSelect(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map(r => r.id)));
+    }
+  }
+
+  async function bulkConfirmFlight() {
+    // For bulk, we just move to flight_confirmed without new flight details (can add later per report)
+    if (!confirm(`Move ${selected.size} report(s) to Flight Confirmed? You can add flight details individually later.`)) return;
+    setBulkUpdating(true);
+    try {
+      const updates = [...selected].map(id => updateReport(id, { status: 'flight_confirmed' }));
+      const results = await Promise.all(updates);
+      setReports(prev => {
+        const map = new Map(results.map(r => [r.id, r]));
+        return prev.map(r => map.get(r.id) || r);
+      });
+      setSelected(new Set());
+    } catch (err) {
+      alert('Bulk update failed: ' + err.message);
+    } finally {
+      setBulkUpdating(false);
+    }
+  }
+
+  async function bulkClose() {
+    if (!confirm(`Close ${selected.size} report(s)?`)) return;
+    setBulkUpdating(true);
+    try {
+      const updates = [...selected].map(id => updateReport(id, { status: 'closed' }));
+      const results = await Promise.all(updates);
+      setReports(prev => {
+        const map = new Map(results.map(r => [r.id, r]));
+        return prev.map(r => map.get(r.id) || r);
+      });
+      setSelected(new Set());
+    } catch (err) {
+      alert('Bulk update failed: ' + err.message);
+    } finally {
+      setBulkUpdating(false);
+    }
+  }
+
+  // ── Shift summary
+  async function openShiftSummary() {
+    setShiftModal(true);
+    setShiftLoading(true);
+    try {
+      const data = await getShiftSummary(shiftDate);
+      setShiftData(data);
+    } catch (err) {
+      alert('Failed to load shift summary: ' + err.message);
+    } finally {
+      setShiftLoading(false);
+    }
+  }
+
+  async function loadShiftForDate(date) {
+    setShiftDate(date);
+    setShiftLoading(true);
+    try {
+      const data = await getShiftSummary(date);
+      setShiftData(data);
+    } catch (err) {
+      alert('Failed: ' + err.message);
+    } finally {
+      setShiftLoading(false);
+    }
+  }
+
+  function copyShiftText(shiftName, text) {
+    navigator.clipboard.writeText(text).then(() => {
+      setShiftCopied(shiftName);
+      setTimeout(() => setShiftCopied(null), 2000);
+    });
+  }
+
   function logout() {
     clearRole();
     navigate('/login');
   }
 
-  // ── Filter by search + status tab
+  // ── Filter by search + status tab + airline
   const filtered = reports.filter(r => {
     const status = r.status || 'under_process';
     if (status !== activeTab) return false;
+    if (airlineFilter && r.prev_airline !== airlineFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -196,6 +308,9 @@ export default function Dashboard() {
       (r.prev_destination || '').toLowerCase().includes(q)
     );
   });
+
+  // Clear selection when tab changes
+  useEffect(() => { setSelected(new Set()); }, [activeTab]);
 
   // Count per status
   const counts = {
@@ -217,6 +332,9 @@ export default function Dashboard() {
           <span className="header-role">{role}</span>
         </div>
         <div className="header-actions">
+          <button className="btn btn-secondary btn-sm" onClick={openShiftSummary} title="Shift Summary">
+            Shift Summary
+          </button>
           {isSupervisor() && (
             <button className="btn btn-secondary btn-sm" onClick={() => navigate('/analytics')}>
               Analytics
@@ -246,7 +364,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── Search + count */}
+      {/* ── Search + Airline Filter + count */}
       <div className="dashboard-toolbar">
         <input
           type="search"
@@ -255,9 +373,35 @@ export default function Dashboard() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        <select
+          className="airline-filter"
+          value={airlineFilter}
+          onChange={e => setAirlineFilter(e.target.value)}
+        >
+          <option value="">All Airlines</option>
+          {airlines.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
         <span className="report-count">{filtered.length} report{filtered.length !== 1 ? 's' : ''}</span>
         <button className="btn btn-ghost btn-sm" onClick={load} title="Refresh">↻ Refresh</button>
       </div>
+
+      {/* ── Bulk actions */}
+      {selected.size > 0 && (
+        <div className="bulk-bar">
+          <span>{selected.size} selected</span>
+          {activeTab === 'under_process' && (
+            <button className="btn btn-xs btn-confirm" onClick={bulkConfirmFlight} disabled={bulkUpdating}>
+              {bulkUpdating ? '…' : '✈ Bulk Confirm Flight'}
+            </button>
+          )}
+          {activeTab === 'flight_confirmed' && (
+            <button className="btn btn-xs btn-close-report" onClick={bulkClose} disabled={bulkUpdating}>
+              {bulkUpdating ? '…' : '✓ Bulk Close'}
+            </button>
+          )}
+          <button className="btn btn-xs btn-secondary" onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      )}
 
       {/* ── States */}
       {loading && <div className="state-msg">Loading reports…</div>}
@@ -272,102 +416,121 @@ export default function Dashboard() {
               <table className="report-table">
                 <thead>
                   <tr>
+                    {activeTab !== 'closed' && (
+                      <th style={{ width: 36 }}>
+                        <input type="checkbox"
+                          checked={selected.size === filtered.length && filtered.length > 0}
+                          onChange={toggleSelectAll} />
+                      </th>
+                    )}
                     <th>#</th>
                     <th>Pax ID Date</th>
                     <th>Prev Flight</th>
                     <th>Destination</th>
                     <th>Nationality</th>
                     <th>Pax Type</th>
-                    <th>Pax Count</th>
+                    <th>Pax</th>
+                    <th>Days</th>
                     {activeTab !== 'under_process' && <th>New Flight</th>}
                     {activeTab !== 'under_process' && <th>New Flight Date</th>}
-                    {activeTab !== 'under_process' && <th>Days</th>}
-                    <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(r => (
-                    <tr key={r.id}>
-                      <td className="col-id">#{r.id}</td>
-                      <td>{fmt(r.pax_id_datetime)}</td>
-                      <td className="col-flight">
-                        <span className="flight-badge">{r.prev_flight || '—'}</span>
-                      </td>
-                      <td>{r.prev_destination || '—'}</td>
-                      <td>{r.nationality || '—'}</td>
-                      <td>
-                        <span className="pax-type-badge">{r.pax_type || '—'}</span>
-                      </td>
-                      <td className="col-center">{r.pax_count ?? '—'}</td>
-                      {activeTab !== 'under_process' && (
-                        <td className="col-flight">
-                          <span className="flight-badge">{r.new_flight || '—'}</span>
+                  {filtered.map(r => {
+                    const days = liveDays(r.prev_datetime);
+                    const urgent = days !== null && days >= 1;
+                    return (
+                      <tr key={r.id} className={urgent && activeTab === 'under_process' ? 'row-urgent' : ''}>
+                        {activeTab !== 'closed' && (
+                          <td>
+                            <input type="checkbox" checked={selected.has(r.id)}
+                              onChange={() => toggleSelect(r.id)} />
+                          </td>
+                        )}
+                        <td className="col-id">
+                          #{r.id}
+                          {r.comment && <span className="comment-indicator" title={r.comment}>💬</span>}
                         </td>
-                      )}
-                      {activeTab !== 'under_process' && <td>{fmt(r.new_datetime)}</td>}
-                      {activeTab !== 'under_process' && <td className="col-center">{r.days_at_airport != null ? r.days_at_airport : '—'}</td>}
-                      <td>
-                        <span className="status-badge" style={{ backgroundColor: STATUS_COLORS[r.status || 'under_process'] }}>
-                          {STATUS_LABELS[r.status || 'under_process']}
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        {/* Status action buttons */}
-                        {(r.status || 'under_process') === 'under_process' && (
-                          <button
-                            className="btn btn-xs btn-confirm"
-                            onClick={() => openConfirmModal(r)}
-                            title="Mark as flight confirmed"
-                          >
-                            ✈ Confirm Flight
-                          </button>
+                        <td>{fmt(r.pax_id_datetime)}</td>
+                        <td className="col-flight">
+                          <span className="flight-badge">{r.prev_flight || '—'}</span>
+                        </td>
+                        <td>{r.prev_destination || '—'}</td>
+                        <td>{r.nationality || '—'}</td>
+                        <td>
+                          <span className="pax-type-badge">{r.pax_type || '—'}</span>
+                        </td>
+                        <td className="col-center">{r.pax_count ?? '—'}</td>
+                        <td className="col-center">
+                          {days !== null ? (
+                            <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>
+                              {days}d
+                            </span>
+                          ) : '—'}
+                        </td>
+                        {activeTab !== 'under_process' && (
+                          <td className="col-flight">
+                            <span className="flight-badge">{r.new_flight || '—'}</span>
+                          </td>
                         )}
-                        {r.status === 'flight_confirmed' && (
-                          <button
-                            className="btn btn-xs btn-close-report"
-                            onClick={() => markClosed(r)}
-                            title="Mark as closed"
-                          >
-                            ✓ Close
-                          </button>
-                        )}
-                        {r.status === 'closed' && (
+                        {activeTab !== 'under_process' && <td>{fmt(r.new_datetime)}</td>}
+                        <td className="col-actions">
+                          {(r.status || 'under_process') === 'under_process' && (
+                            <button
+                              className="btn btn-xs btn-confirm"
+                              onClick={() => openConfirmModal(r)}
+                              title="Mark as flight confirmed"
+                            >
+                              ✈ Confirm
+                            </button>
+                          )}
+                          {r.status === 'flight_confirmed' && (
+                            <button
+                              className="btn btn-xs btn-close-report"
+                              onClick={() => markClosed(r)}
+                              title="Mark as closed"
+                            >
+                              ✓ Close
+                            </button>
+                          )}
+                          {r.status === 'closed' && (
+                            <button
+                              className="btn btn-xs btn-secondary"
+                              onClick={() => reopenReport(r)}
+                              title="Reopen report"
+                            >
+                              ↩ Reopen
+                            </button>
+                          )}
                           <button
                             className="btn btn-xs btn-secondary"
-                            onClick={() => reopenReport(r)}
-                            title="Reopen report"
+                            onClick={() => duplicate(r)}
+                            title="Duplicate"
                           >
-                            ↩ Reopen
+                            Dup
                           </button>
-                        )}
-                        <button
-                          className="btn btn-xs btn-secondary"
-                          onClick={() => duplicate(r)}
-                          title="Duplicate this report"
-                        >
-                          Duplicate
-                        </button>
-                        <button
-                          className={`btn btn-xs ${copied === r.id ? 'btn-success' : 'btn-whatsapp'}`}
-                          onClick={() => copyWhatsApp(r)}
-                          title="Copy WhatsApp message"
-                        >
-                          {copied === r.id ? '✓ Copied' : 'WA'}
-                        </button>
-                        {isSupervisor() && (
                           <button
-                            className="btn btn-xs btn-danger"
-                            onClick={() => handleDelete(r.id)}
-                            disabled={deleting === r.id}
-                            title="Delete report"
+                            className={`btn btn-xs ${copied === r.id ? 'btn-success' : 'btn-whatsapp'}`}
+                            onClick={() => copyWhatsApp(r)}
+                            title="Copy WhatsApp message"
                           >
-                            {deleting === r.id ? '…' : 'Delete'}
+                            {copied === r.id ? '✓' : 'WA'}
                           </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                          {isSupervisor() && (
+                            <button
+                              className="btn btn-xs btn-danger"
+                              onClick={() => handleDelete(r.id)}
+                              disabled={deleting === r.id}
+                              title="Delete report"
+                            >
+                              {deleting === r.id ? '…' : 'Del'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -431,6 +594,51 @@ export default function Dashboard() {
               <button className="btn btn-primary" onClick={saveFlightConfirmed} disabled={saving}>
                 {saving ? 'Saving…' : 'Confirm Flight'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Shift Summary Modal */}
+      {shiftModal && (
+        <div className="modal-overlay" onClick={() => setShiftModal(false)}>
+          <div className="modal-content shift-modal" onClick={e => e.stopPropagation()}>
+            <h2 className="modal-title">Shift Summary</h2>
+            <div className="field" style={{ marginBottom: 16 }}>
+              <label className="field-label">Date</label>
+              <input type="date" className="field-input" value={shiftDate}
+                onChange={e => loadShiftForDate(e.target.value)} />
+            </div>
+
+            {shiftLoading && <p className="state-msg">Loading…</p>}
+
+            {!shiftLoading && shiftData && (
+              <div className="shift-cards">
+                {['A', 'B', 'C'].map(s => {
+                  const shift = shiftData.shifts[s];
+                  const hours = s === 'A' ? '06:00–14:00' : s === 'B' ? '14:00–22:00' : '22:00–06:00';
+                  return (
+                    <div key={s} className="shift-card">
+                      <div className="shift-card-header">
+                        <strong>Shift {s}</strong>
+                        <span className="shift-hours">{hours}</span>
+                        <span className="shift-total">{shift.totalPax} PAX</span>
+                      </div>
+                      <pre className="shift-text">{shift.text}</pre>
+                      <button
+                        className={`btn btn-sm ${shiftCopied === s ? 'btn-success' : 'btn-whatsapp'}`}
+                        onClick={() => copyShiftText(s, shift.text)}
+                      >
+                        {shiftCopied === s ? '✓ Copied' : 'Copy for WhatsApp'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setShiftModal(false)}>Close</button>
             </div>
           </div>
         </div>

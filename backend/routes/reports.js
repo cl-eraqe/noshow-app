@@ -59,6 +59,56 @@ router.get('/analytics/summary', (_req, res) => {
   res.json({ thisWeek: thisWeek.count, thisMonth: thisMonth.count, topDestinations, byNationality, byPaxType });
 });
 
+// ── Shift Summary (must be before /:id)
+// Shifts: A = 06:00-14:00, B = 14:00-22:00, C = 22:00-06:00
+router.get('/shift-summary', (req, res) => {
+  const db = getDb();
+  const { date } = req.query; // YYYY-MM-DD, defaults to today
+  const targetDate = date || new Date().toISOString().slice(0, 10);
+
+  // Build shift time ranges
+  const shifts = {
+    A: { start: `${targetDate}T06:00`, end: `${targetDate}T14:00` },
+    B: { start: `${targetDate}T14:00`, end: `${targetDate}T22:00` },
+    C: { start: `${targetDate}T22:00`, end: `${targetDate}T06:00` },
+  };
+  // Shift C spans midnight: 22:00 today → 06:00 next day
+  const nextDay = new Date(targetDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const nextDayStr = nextDay.toISOString().slice(0, 10);
+  shifts.C.end = `${nextDayStr}T06:00`;
+
+  const result = {};
+
+  for (const [shiftName, range] of Object.entries(shifts)) {
+    const reports = db.prepare(`
+      SELECT pax_count, pax_id_datetime FROM reports
+      WHERE pax_id_datetime >= ? AND pax_id_datetime < ?
+      ORDER BY pax_id_datetime ASC
+    `).all(range.start, range.end);
+
+    const lines = reports.map(r => {
+      const time = r.pax_id_datetime ? r.pax_id_datetime.slice(11, 16) : '??:??';
+      const count = String(r.pax_count || 1).padStart(2, '0');
+      return `${count}PAX Identified at ${time}`;
+    });
+
+    const totalPax = reports.reduce((sum, r) => sum + (r.pax_count || 1), 0);
+    const totalReports = reports.length;
+
+    result[shiftName] = {
+      lines,
+      totalPax,
+      totalReports,
+      text: lines.length > 0
+        ? `No-Show App Summary SHIFT ${shiftName}\n${lines.join('\n')}\n\nTotal pax added during shift ${shiftName} is ${totalPax}PAX in the No-Show App.`
+        : `No-Show App Summary SHIFT ${shiftName}\nNo reports during this shift.`,
+    };
+  }
+
+  res.json({ date: targetDate, shifts: result });
+});
+
 // ── GET all reports (auto-close expired ones first)
 router.get('/', (_req, res) => {
   autoCloseReports();
@@ -82,15 +132,23 @@ router.post('/', upload.array('files', 10), (req, res) => {
     nationality, pax_type,
     new_flight, new_datetime, new_destination, new_airline,
     days_at_airport, pax_count,
-    submitted_by, status,
+    submitted_by, status, comment,
   } = req.body;
 
   const filePaths = req.files
     ? req.files.map(f => `/uploads/${f.filename}`)
     : [];
 
-  // Insert first to get the auto-increment ID
   const reportStatus = status || 'under_process';
+
+  // Calculate days_at_airport from prev_flight datetime to now
+  let computedDays = parseFloat(days_at_airport) || null;
+  if (!computedDays && prev_datetime) {
+    const diff = (Date.now() - new Date(prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    if (!isNaN(diff) && diff >= 0) {
+      computedDays = parseFloat(Math.max(0, diff).toFixed(2));
+    }
+  }
 
   const stmt = db.prepare(`
     INSERT INTO reports
@@ -98,8 +156,8 @@ router.post('/', upload.array('files', 10), (req, res) => {
        prev_flight, prev_datetime, prev_destination, prev_airline,
        nationality, pax_type,
        new_flight, new_datetime, new_destination, new_airline,
-       days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status, comment)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const result = stmt.run(
@@ -107,12 +165,13 @@ router.post('/', upload.array('files', 10), (req, res) => {
     prev_flight, prev_datetime, prev_destination, prev_airline,
     nationality, pax_type,
     new_flight || null, new_datetime || null, new_destination || null, new_airline || null,
-    parseFloat(days_at_airport) || null,
+    computedDays,
     parseInt(pax_count) || 0,
     JSON.stringify(filePaths),
     '', // placeholder
     submitted_by,
     reportStatus,
+    comment || '',
   );
 
   const id = result.lastInsertRowid;
@@ -136,7 +195,7 @@ router.patch('/:id', express.json(), (req, res) => {
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
   if (!report) return res.status(404).json({ error: 'Report not found' });
 
-  const { status, new_flight, new_datetime, new_destination, new_airline } = req.body;
+  const { status, new_flight, new_datetime, new_destination, new_airline, comment } = req.body;
 
   // Validate status
   const validStatuses = ['under_process', 'flight_confirmed', 'closed'];
@@ -168,11 +227,14 @@ router.patch('/:id', express.json(), (req, res) => {
     updates.push('new_airline = ?');
     values.push(new_airline);
   }
+  if (comment !== undefined) {
+    updates.push('comment = ?');
+    values.push(comment);
+  }
 
-  // Recalculate days_at_airport if we have both dates
-  const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
-  if (report.pax_id_datetime && finalNewDatetime) {
-    const diff = (new Date(finalNewDatetime) - new Date(report.pax_id_datetime)) / (1000 * 60 * 60 * 24);
+  // Recalculate days_at_airport from prev_flight to now
+  if (report.prev_datetime) {
+    const diff = (Date.now() - new Date(report.prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
     if (!isNaN(diff)) {
       updates.push('days_at_airport = ?');
       values.push(parseFloat(Math.max(0, diff).toFixed(2)));
@@ -186,6 +248,7 @@ router.patch('/:id', express.json(), (req, res) => {
   const finalPaxType = report.pax_type;
   const finalNationality = report.nationality;
   const finalNewFlight = new_flight !== undefined ? new_flight : report.new_flight;
+  const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
 
   const whatsapp_text =
     `No-Show Report #${report.id}\n` +

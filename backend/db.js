@@ -35,6 +35,7 @@ function initDb() {
       whatsapp_text    TEXT,
       submitted_by     TEXT,
       status           TEXT DEFAULT 'under_process',
+      comment          TEXT DEFAULT '',
       created_at       TEXT DEFAULT (datetime('now'))
     )
   `);
@@ -43,6 +44,10 @@ function initDb() {
   if (!cols.find(c => c.name === 'status')) {
     database.exec("ALTER TABLE reports ADD COLUMN status TEXT DEFAULT 'under_process'");
     console.log('Migrated: added status column');
+  }
+  if (!cols.find(c => c.name === 'comment')) {
+    database.exec("ALTER TABLE reports ADD COLUMN comment TEXT DEFAULT ''");
+    console.log('Migrated: added comment column');
   }
 
   console.log('Database ready:', DB_PATH);

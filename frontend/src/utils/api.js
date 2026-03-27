@@ -63,6 +63,12 @@ export async function getAnalytics() {
   return request('/api/reports/analytics/summary');
 }
 
+// ── Shift Summary
+export async function getShiftSummary(date) {
+  const params = date ? `?date=${date}` : '';
+  return request(`/api/reports/shift-summary${params}`);
+}
+
 // ── Airline code → name mapping (client-side, no API call needed)
 const AIRLINE_CODES = {
   SV: 'Saudia',

@@ -60,6 +60,7 @@ export default function NewReport({ prefill }) {
     new_destination:  seed.new_destination  || '',
     new_airline:      seed.new_airline      || '',
     pax_count:        seed.pax_count        || '',
+    comment:          seed.comment          || '',
   });
 
   const [files, setFiles] = useState([]);
@@ -121,7 +122,7 @@ export default function NewReport({ prefill }) {
     setSubmitError('');
     try {
       const fd = new FormData();
-      const baseFields = ['pax_id_datetime', 'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline', 'nationality', 'pax_type', 'pax_count'];
+      const baseFields = ['pax_id_datetime', 'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline', 'nationality', 'pax_type', 'pax_count', 'comment'];
       baseFields.forEach(k => fd.append(k, form[k] || ''));
       fd.append('status', reportStatus);
       fd.append('submitted_by', getRole());
@@ -167,7 +168,7 @@ export default function NewReport({ prefill }) {
             </button>
             <button
               className="btn btn-secondary"
-              onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'' }); setFiles([]); setPrevStatus('idle'); setNewLookupStatus('idle'); setReportStatus('under_process'); }}
+              onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'',comment:'' }); setFiles([]); setPrevStatus('idle'); setNewLookupStatus('idle'); setReportStatus('under_process'); }}
             >
               New Report
             </button>
@@ -348,6 +349,21 @@ export default function NewReport({ prefill }) {
             </div>
           </div>
         )}
+
+        {/* ── Comment */}
+        <div className="form-section">
+          <h2 className="section-title">Comment</h2>
+          <div className="field">
+            <label className="field-label">Additional Notes</label>
+            <textarea
+              className="field-input"
+              rows="3"
+              placeholder="Any additional notes or comments…"
+              value={form.comment}
+              onChange={e => set('comment', e.target.value)}
+            />
+          </div>
+        </div>
 
         {/* ── Attachments */}
         <div className="form-section">
