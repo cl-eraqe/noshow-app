@@ -81,6 +81,11 @@ export async function getShiftSummary(date) {
   return request(`/api/reports/shift-summary${params}`);
 }
 
+// ── CEO Report
+export async function getCeoReport() {
+  return request('/api/reports/ceo-report');
+}
+
 // ── Airline code → name mapping (client-side, no API call needed)
 const AIRLINE_CODES = {
   SV: 'Saudia',

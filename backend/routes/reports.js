@@ -59,6 +59,158 @@ router.get('/analytics/summary', (_req, res) => {
   res.json({ thisWeek: thisWeek.count, thisMonth: thisMonth.count, topDestinations, byNationality, byPaxType });
 });
 
+// ── CEO Report (must be before /:id)
+router.get('/ceo-report', (_req, res) => {
+  const db = getDb();
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
+  const twelveHoursFromNow = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Helper: format date as "23MAR"
+  function fmtDate(dt) {
+    if (!dt) return '??';
+    const d = new Date(dt);
+    const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return String(d.getDate()).padStart(2, '0') + months[d.getMonth()];
+  }
+
+  // Helper: format time as "0945"
+  function fmtTime(dt) {
+    if (!dt) return '????';
+    const d = new Date(dt);
+    return String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  // Helper: extract IATA code from destination like "Cairo (CAI)" → "CAI"
+  function iataCode(dest) {
+    if (!dest) return '???';
+    const match = dest.match(/\(([A-Z]{3})\)/);
+    return match ? match[1] : dest.slice(0, 3).toUpperCase();
+  }
+
+  // Helper: extract airline code from flight number "SV309" → "SV"
+  function airlineCode(flight) {
+    if (!flight) return '??';
+    return flight.replace(/[0-9]/g, '').trim() || flight.slice(0, 2);
+  }
+
+  // 1. Process completed and departed — closed + new_datetime within last 12 hrs
+  const completedRows = db.prepare(`
+    SELECT * FROM reports
+    WHERE status = 'closed'
+      AND new_datetime IS NOT NULL AND new_datetime != ''
+      AND new_datetime >= ? AND new_datetime <= ?
+  `).all(twelveHoursAgo, nowISO);
+  const completedPax = completedRows.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // 2. Cancelled Stamp — always 0
+  const cancelledPax = 0;
+
+  // 3. Flight confirmed, departs within 12 hrs
+  const departSoonRows = db.prepare(`
+    SELECT * FROM reports
+    WHERE status = 'flight_confirmed'
+      AND new_datetime IS NOT NULL AND new_datetime != ''
+      AND new_datetime > ? AND new_datetime <= ?
+  `).all(nowISO, twelveHoursFromNow);
+  const departSoonPax = departSoonRows.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // 4. Flight confirmed, departs after 12 hrs
+  const departLaterRows = db.prepare(`
+    SELECT * FROM reports
+    WHERE status = 'flight_confirmed'
+      AND new_datetime IS NOT NULL AND new_datetime != ''
+      AND new_datetime > ?
+  `).all(twelveHoursFromNow);
+  const departLaterPax = departLaterRows.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // 5. Under process
+  const underProcessRows = db.prepare(`
+    SELECT * FROM reports WHERE status = 'under_process'
+  `).all();
+  const underProcessPax = underProcessRows.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // 6. Refusal — always 0
+  const refusalPax = 0;
+
+  // 7. Over 24hrs — not closed, prev_datetime > 24hrs ago
+  const over24Rows = db.prepare(`
+    SELECT * FROM reports
+    WHERE status IN ('under_process', 'flight_confirmed')
+      AND prev_datetime IS NOT NULL AND prev_datetime != ''
+      AND prev_datetime < ?
+    ORDER BY prev_datetime ASC
+  `).all(twentyFourHoursAgo);
+  const over24Pax = over24Rows.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // Build detailed lines for over 24hrs
+  const over24Lines = over24Rows.map(r => {
+    const count = String(r.pax_count || 1).padStart(2, '0');
+    const paxType = (r.pax_type || 'Unknown').toUpperCase();
+    const airline = airlineCode(r.prev_flight);
+    const dest = iataCode(r.prev_destination);
+    const prevDate = fmtDate(r.prev_datetime);
+    const prevTime = fmtTime(r.prev_datetime);
+    let line = `${count}PAX ${paxType} ${airline} ${dest} ${prevDate} STD ${prevTime}`;
+
+    if (r.status === 'flight_confirmed' && r.new_flight) {
+      const newDate = fmtDate(r.new_datetime);
+      const newTime = fmtTime(r.new_datetime);
+      line += `\nNEW FLT✅ ${newDate} STD ${newTime}`;
+    }
+    return line;
+  });
+
+  // Build full report text
+  const text = [
+    `*Process completed and departed*`,
+    ``,
+    `${String(completedPax).padStart(2, '0')}PAX`,
+    ``,
+    `*Cancelled Stamp*`,
+    ``,
+    `${String(cancelledPax).padStart(2, '0')}PAX`,
+    ``,
+    `*Currently at airport and being supported with alternative flight and will depart in less than 12 hrs*`,
+    ``,
+    `${String(departSoonPax).padStart(2, '0')}PAX`,
+    ``,
+    `*Currently at airport and being supported with alternative flight and will depart after 12 hrs*`,
+    ``,
+    `${String(departLaterPax).padStart(2, '0')}PAX`,
+    ``,
+    `*Under process to rebook the flight by airlines*`,
+    ``,
+    `${String(underProcessPax).padStart(2, '0')} PAX`,
+    ``,
+    `*Passengers spend 12 hrs or more with refusal to support by airline*`,
+    ``,
+    `${String(refusalPax).padStart(2, '0')}PAX`,
+    ``,
+    `*Passengers at airport over 24hrs*`,
+    ``,
+    `${String(over24Pax).padStart(2, '0')}PAX`,
+    ``,
+    ...over24Lines,
+  ].join('\n');
+
+  res.json({
+    text,
+    sections: {
+      completed: completedPax,
+      cancelled: cancelledPax,
+      departSoon: departSoonPax,
+      departLater: departLaterPax,
+      underProcess: underProcessPax,
+      refusal: refusalPax,
+      over24: over24Pax,
+      over24Details: over24Lines,
+    },
+  });
+});
+
 // ── Shift Summary (must be before /:id)
 // Shifts: A = 06:00-14:00, B = 14:00-22:00, C = 22:00-06:00
 router.get('/shift-summary', (req, res) => {
@@ -110,6 +262,62 @@ router.get('/shift-summary', (req, res) => {
   }
 
   res.json({ date: targetDate, shifts: result });
+});
+
+// ── Seed test data (temporary, for testing)
+router.post('/seed-test-data', (_req, res) => {
+  const db = getDb();
+  const now = new Date();
+  const ha = (h) => new Date(now.getTime() - h*60*60*1000).toISOString().slice(0,16);
+  const hf = (h) => new Date(now.getTime() + h*60*60*1000).toISOString().slice(0,16);
+  const da = (d) => new Date(now.getTime() - d*24*60*60*1000).toISOString().slice(0,16);
+
+  const insert = db.prepare(`INSERT INTO reports (pax_id_datetime,prev_flight,prev_datetime,prev_destination,prev_airline,nationality,pax_type,new_flight,new_datetime,new_destination,new_airline,days_at_airport,pax_count,whatsapp_text,submitted_by,status,comment) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'','staff',?,?)`);
+
+  const data = [
+    // CLOSED departed <12hrs (CEO section 1)
+    [ha(8),'SV305',da(2),'Cairo (CAI)','Saudia','Egyptian','Umrah','SV309',ha(3),'Cairo (CAI)','Saudia',2,4,'closed','Family group'],
+    [ha(10),'TK95',da(1),'Istanbul (IST)','Turkish Airlines','Turkish','Tourist','TK95',ha(2),'Istanbul (IST)','Turkish Airlines',1,2,'closed',''],
+    [ha(6),'MS986',da(1),'Cairo (CAI)','EgyptAir','Egyptian','Umrah','SV305',ha(5),'Cairo (CAI)','Saudia',1,3,'closed',''],
+    [ha(7),'PK751',da(1),'Karachi (KHI)','PIA','Pakistani','Umrah','PK752',ha(4),'Karachi (KHI)','PIA',1,5,'closed','Large group'],
+    // CONFIRMED depart <12hrs (CEO section 3)
+    [ha(18),'SV796',da(2),'Peshawar (PEW)','Saudia','Pakistani','Umrah','SV796',hf(4),'Peshawar (PEW)','Saudia',2,6,'flight_confirmed',''],
+    [ha(12),'EK802',da(1),'Dubai (DXB)','Emirates','Indian','Transit','EK803',hf(6),'Dubai (DXB)','Emirates',1,3,'flight_confirmed','Transit to Mumbai'],
+    [ha(9),'SV305',da(1),'Cairo (CAI)','Saudia','Egyptian','Umrah','SV309',hf(8),'Cairo (CAI)','Saudia',1,8,'flight_confirmed',''],
+    // CONFIRMED depart >12hrs (CEO section 4)
+    [ha(30),'SV305',da(3),'Cairo (CAI)','Saudia','Egyptian','Umrah','SV305',hf(24),'Cairo (CAI)','Saudia',3,11,'flight_confirmed','Waiting for next SV flight'],
+    [ha(48),'F3777',da(2),'Algiers (ALG)','Flyadeal','Algerian','Umrah','F3777',hf(36),'Algiers (ALG)','Flyadeal',2,11,'flight_confirmed','Group from same tour'],
+    [ha(36),'TK95',da(2),'Istanbul (IST)','Turkish Airlines','Turkish','Tourist','TK95',hf(14),'Istanbul (IST)','Turkish Airlines',2,4,'flight_confirmed',''],
+    [ha(40),'PK796',da(2),'Lahore (LHE)','PIA','Pakistani','Umrah','PK797',hf(20),'Lahore (LHE)','PIA',2,15,'flight_confirmed',''],
+    [ha(24),'GF154',da(1),'Bahrain (BAH)','Gulf Air','Bahraini','Family Visit','GF155',hf(18),'Bahrain (BAH)','Gulf Air',1,7,'flight_confirmed',''],
+    [ha(28),'QR1168',da(1),'Doha (DOH)','Qatar Airways','Indian','Transit','QR1169',hf(30),'Doha (DOH)','Qatar Airways',1,9,'flight_confirmed','Transit to Kerala'],
+    [ha(20),'ET416',da(1),'Addis Ababa (ADD)','Ethiopian Airlines','Ethiopian','Resident','ET417',hf(16),'Addis Ababa (ADD)','Ethiopian Airlines',1,6,'flight_confirmed',''],
+    [ha(32),'AI902',da(2),'Mumbai (BOM)','Air India','Indian','Umrah','AI903',hf(22),'Mumbai (BOM)','Air India',2,10,'flight_confirmed',''],
+    // UNDER PROCESS (CEO section 5)
+    [ha(3),'SV309',ha(4),'Cairo (CAI)','Saudia','Egyptian','Umrah',null,null,null,null,null,4,'under_process','Contacted airline'],
+    [ha(2),'TK95',ha(3),'Istanbul (IST)','Turkish Airlines','Turkish','Tourist',null,null,null,null,null,1,'under_process',''],
+    [ha(5),'MS986',ha(6),'Cairo (CAI)','EgyptAir','Egyptian','Umrah',null,null,null,null,null,6,'under_process','EgyptAir counter closed'],
+    [ha(1),'EK802',ha(2),'Dubai (DXB)','Emirates','Indian','Transit',null,null,null,null,null,2,'under_process',''],
+    [ha(4),'BG402',ha(5),'Dhaka (DAC)','Biman Bangladesh','Bangladeshi','Umrah',null,null,null,null,null,3,'under_process',''],
+    [ha(6),'XY205',ha(8),'Cairo (CAI)','flynas','Egyptian','Umrah',null,null,null,null,null,5,'under_process',''],
+    [ha(2),'SV796',ha(3),'Peshawar (PEW)','Saudia','Pakistani','Umrah',null,null,null,null,null,5,'under_process',''],
+    // UNDER PROCESS over 24hrs (CEO section 7 detail)
+    [da(2),'SV305',da(3),'Cairo (CAI)','Saudia','Egyptian','Umrah',null,null,null,null,null,2,'under_process','Airline not responding'],
+    [da(1.5),'PK751',da(2),'Karachi (KHI)','PIA','Pakistani','Umrah',null,null,null,null,null,3,'under_process','No seats on next PIA flights'],
+    // Old closed (should NOT show in CEO section 1)
+    [da(3),'SV309',da(4),'Cairo (CAI)','Saudia','Egyptian','Umrah','SV305',da(2),'Cairo (CAI)','Saudia',2,7,'closed',''],
+    [da(5),'TK95',da(6),'Istanbul (IST)','Turkish Airlines','Turkish','Resident','TK95',da(4),'Istanbul (IST)','Turkish Airlines',2,1,'closed',''],
+  ];
+
+  const tx = db.transaction(() => {
+    for (const r of data) {
+      insert.run(...r);
+    }
+  });
+  tx();
+
+  const count = db.prepare('SELECT COUNT(*) as c FROM reports').get();
+  res.json({ success: true, inserted: data.length, total: count.c });
 });
 
 // ── GET all reports (auto-close expired ones first)

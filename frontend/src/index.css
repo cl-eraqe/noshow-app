@@ -132,6 +132,8 @@ html, body, #root {
 
 .btn-success  { background: var(--success); color: #fff; }
 .btn-whatsapp { background: #25D366; color: #fff; }
+.btn-ceo { background: #8e44ad; color: #fff; }
+.btn-ceo:not(:disabled):hover { background: #732d91; }
 .btn-danger   { background: var(--danger); color: #fff; }
 .btn-danger:not(:disabled):hover { background: #a02c22; }
 
@@ -819,6 +821,41 @@ html, body, #root {
   line-height: 1.6;
   max-height: 200px;
   overflow-y: auto;
+}
+
+/* ════════════════ CEO REPORT MODAL ════════════════ */
+.ceo-modal { max-width: 640px; }
+
+.ceo-report-text {
+  font-family: monospace;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+  color: var(--text);
+  line-height: 1.7;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.ceo-summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ceo-summary-bar span {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 /* ════════════════ STATE MESSAGES ════════════════ */
