@@ -823,6 +823,43 @@ html, body, #root {
   overflow-y: auto;
 }
 
+/* ════════════════ BUS BADGE ════════════════ */
+.bus-badge {
+  display: inline-block;
+  background: #f39c12;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+.row-bus { background: #fef9e7 !important; }
+.row-bus:hover { background: #fdf2d0 !important; }
+
+.btn-handover { background: #2c3e50; color: #fff; }
+.btn-handover:not(:disabled):hover { background: #1a252f; }
+
+/* ════════════════ HANDOVER MODAL ════════════════ */
+.handover-modal { max-width: 640px; }
+.handover-shift { font-weight: 400; color: var(--text-muted); font-size: 0.9rem; margin-left: 8px; }
+
+.handover-text {
+  font-family: monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  color: var(--text);
+  line-height: 1.7;
+  max-height: 400px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 8px;
+}
+
 /* ════════════════ CEO REPORT MODAL ════════════════ */
 .ceo-modal { max-width: 640px; }
 

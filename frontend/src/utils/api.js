@@ -86,6 +86,11 @@ export async function getCeoReport() {
   return request('/api/reports/ceo-report');
 }
 
+// ── Handover Report
+export async function getHandoverReport() {
+  return request('/api/reports/handover');
+}
+
 // ── Airline code → name mapping (client-side, no API call needed)
 const AIRLINE_CODES = {
   SV: 'Saudia',
@@ -123,6 +128,38 @@ const AIRLINE_CODES = {
   SQ: 'Singapore Airlines',
   KQ: 'Kenya Airways',
 };
+
+// ── Terminal mapping (T1 = our terminal, North/Hajj = needs bus 🚌)
+const TERMINAL_MAP = {
+  // Terminal 1 — no bus
+  SV: 'T1', XY: 'T1', F3: 'T1', QR: 'T1', EK: 'T1', KU: 'T1',
+  WY: 'T1', FZ: 'T1', RJ: 'T1', ME: 'T1', AZ: 'T1', TK: 'T1',
+  GF: 'T1', EY: 'T1', '9W': 'T1', TR: 'T1', EW: 'T1', HV: 'T1',
+  BI: 'T1', KC: 'T1', A3: 'T1', MH: 'T1', BA: 'T1', MS: 'T1',
+  // North Terminal — bus needed
+  G9: 'North', NE: 'North', IY: 'North', '6E': 'North', PC: 'North',
+  '3T': 'North', SM: 'North', J4: 'North', AI: 'North', ET: 'North',
+  NP: 'North', HY: 'North', W6: 'North', W4: 'North', OV: 'North',
+  IX: 'North', J2: 'North', SZ: 'North', RB: 'North', UJ: 'North',
+  UL: 'North', D3: 'North', SD: 'North', DV: 'North', J9: 'North',
+  UK: 'North', TU: 'North',
+  // Hajj Terminal — bus needed
+  PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', ER: 'Hajj',
+  AH: 'Hajj', GA: 'Hajj', JT: 'Hajj', ID: 'Hajj', VM: 'Hajj',
+  RQ: 'Hajj', T5: 'Hajj', BS: 'Hajj', '9P': 'Hajj', QP: 'Hajj',
+  HC: 'Hajj', R5: 'Hajj',
+};
+
+export function getTerminal(flightNumber) {
+  if (!flightNumber) return 'T1';
+  const code = flightNumber.toUpperCase().trim().replace(/[0-9]/g, '').trim();
+  return TERMINAL_MAP[code] || 'T1';
+}
+
+export function needsBus(flightNumber) {
+  const terminal = getTerminal(flightNumber);
+  return terminal === 'North' || terminal === 'Hajj';
+}
 
 export function airlineFromFlightNumber(flightNumber) {
   if (!flightNumber) return '';

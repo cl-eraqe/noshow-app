@@ -59,6 +59,214 @@ router.get('/analytics/summary', (_req, res) => {
   res.json({ thisWeek: thisWeek.count, thisMonth: thisMonth.count, topDestinations, byNationality, byPaxType });
 });
 
+// ── Terminal mapping (T1 = ours, North/Hajj = bus needed)
+const TERMINAL_MAP = {
+  SV:'T1',XY:'T1',F3:'T1',QR:'T1',EK:'T1',KU:'T1',WY:'T1',FZ:'T1',
+  RJ:'T1',ME:'T1',AZ:'T1',TK:'T1',GF:'T1',EY:'T1','9W':'T1',TR:'T1',
+  EW:'T1',HV:'T1',BI:'T1',KC:'T1',A3:'T1',MH:'T1',BA:'T1',MS:'T1',
+  G9:'North',NE:'North',IY:'North','6E':'North',PC:'North','3T':'North',
+  SM:'North',J4:'North',AI:'North',ET:'North',NP:'North',HY:'North',
+  W6:'North',W4:'North',OV:'North',IX:'North',J2:'North',SZ:'North',
+  RB:'North',UJ:'North',UL:'North',D3:'North',SD:'North',DV:'North',
+  J9:'North',UK:'North',TU:'North',
+  PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',ER:'Hajj',AH:'Hajj',
+  GA:'Hajj',JT:'Hajj',ID:'Hajj',VM:'Hajj',RQ:'Hajj',T5:'Hajj',
+  BS:'Hajj','9P':'Hajj',QP:'Hajj',HC:'Hajj',R5:'Hajj',
+};
+
+function getAirlineCode(flight) {
+  if (!flight) return '';
+  return flight.replace(/[0-9]/g, '').trim().toUpperCase();
+}
+
+function getTerminal(flight) {
+  return TERMINAL_MAP[getAirlineCode(flight)] || 'T1';
+}
+
+function needsBus(flight) {
+  const t = getTerminal(flight);
+  return t === 'North' || t === 'Hajj';
+}
+
+function iataCode(dest) {
+  if (!dest) return '???';
+  const match = dest.match(/\(([A-Z]{3})\)/);
+  return match ? match[1] : dest.slice(0, 3).toUpperCase();
+}
+
+function fmtDateShort(dt) {
+  if (!dt) return '??';
+  const d = new Date(dt);
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  return String(d.getDate()).padStart(2, '0') + months[d.getMonth()];
+}
+
+function fmtTimeShort(dt) {
+  if (!dt) return '????';
+  const d = new Date(dt);
+  return String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+}
+
+// ── Handover Report (must be before /:id)
+router.get('/handover', (_req, res) => {
+  const db = getDb();
+  autoCloseReports();
+  const now = new Date();
+  const hour = now.getHours();
+
+  // Detect current shift and next shift
+  let currentShift, nextShift, shiftEnd;
+  if (hour >= 6 && hour < 14) {
+    currentShift = 'A'; nextShift = 'B'; shiftEnd = 14;
+  } else if (hour >= 14 && hour < 22) {
+    currentShift = 'B'; nextShift = 'C'; shiftEnd = 22;
+  } else {
+    currentShift = 'C'; nextShift = 'A'; shiftEnd = 6;
+  }
+
+  // All active reports
+  const underProcess = db.prepare("SELECT * FROM reports WHERE status = 'under_process' ORDER BY prev_datetime ASC").all();
+  const flightConfirmed = db.prepare("SELECT * FROM reports WHERE status = 'flight_confirmed' ORDER BY new_datetime ASC").all();
+
+  const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString();
+  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+  // Group under_process by airline (SV first, then others)
+  const upSV = underProcess.filter(r => getAirlineCode(r.prev_flight) === 'SV');
+  const upOther = underProcess.filter(r => getAirlineCode(r.prev_flight) !== 'SV');
+
+  // Group follow-up by airline
+  const fuSV = flightConfirmed.filter(r => getAirlineCode(r.prev_flight) === 'SV');
+  const fuOther = flightConfirmed.filter(r => getAirlineCode(r.prev_flight) !== 'SV');
+
+  // Departing soon (within 3 hours)
+  const departingSoon = flightConfirmed.filter(r =>
+    r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > now.toISOString()
+  );
+
+  // Bus transfers (flight_confirmed with new flight from North/Hajj terminal)
+  const busTransfers = flightConfirmed.filter(r => needsBus(r.new_flight));
+
+  // Over 24hrs (not closed)
+  const over24 = [...underProcess, ...flightConfirmed].filter(r =>
+    r.prev_datetime && r.prev_datetime < twentyFourHoursAgo
+  );
+
+  // Format a single report line
+  function fmtReport(r, showNewFlight = false) {
+    const count = String(r.pax_count || 1).padStart(2, '0');
+    const paxType = (r.pax_type || 'Unknown').toUpperCase();
+    const dest = iataCode(r.prev_destination);
+    const airline = getAirlineCode(r.prev_flight);
+    const prevDate = fmtDateShort(r.prev_datetime);
+    const prevTime = fmtTimeShort(r.prev_datetime);
+    const bus = needsBus(r.new_flight) ? ' 🚌' : '';
+
+    let line = `${count}PAX ${paxType} ${airline} ${dest} ${prevDate} STD ${prevTime}`;
+
+    if (showNewFlight && r.status === 'flight_confirmed' && r.new_flight) {
+      const newDate = fmtDateShort(r.new_datetime);
+      const newTime = fmtTimeShort(r.new_datetime);
+      const terminal = getTerminal(r.new_flight);
+      const terminalNote = terminal !== 'T1' ? ` (${terminal})` : '';
+      line += `\n- ALT FLT ${r.new_flight} STD ${newTime} ${newDate} ✅${terminalNote}${bus}`;
+    }
+
+    if (r.comment) {
+      line += `\n   → ${r.comment}`;
+    }
+
+    return line;
+  }
+
+  // Build sections
+  const lines = [];
+
+  lines.push(`📋 SHIFT HANDOVER ${currentShift} → ${nextShift}`);
+  lines.push(`${fmtDateShort(now.toISOString())} ${fmtTimeShort(now.toISOString())}`);
+  lines.push('');
+
+  // Departing soon
+  if (departingSoon.length > 0) {
+    lines.push('━━ ⏰ DEPARTING SOON (< 3hrs) ━━');
+    lines.push('');
+    departingSoon.forEach(r => {
+      const bus = needsBus(r.new_flight) ? ' 🚌' : '';
+      const terminal = getTerminal(r.new_flight);
+      const termNote = terminal !== 'T1' ? ` (${terminal})` : '';
+      lines.push(`${String(r.pax_count || 1).padStart(2, '0')}PAX ${r.new_flight} ${iataCode(r.new_destination)} → STD ${fmtTimeShort(r.new_datetime)} TODAY${termNote}${bus}`);
+      if (r.comment) lines.push(`   → ${r.comment}`);
+    });
+    lines.push('');
+  }
+
+  // Bus transfers
+  if (busTransfers.length > 0) {
+    lines.push('━━ 🚌 BUS TRANSFER NEEDED ━━');
+    lines.push('');
+    busTransfers.forEach(r => {
+      const terminal = getTerminal(r.new_flight);
+      lines.push(`${String(r.pax_count || 1).padStart(2, '0')}PAX → ${r.new_flight} ${iataCode(r.new_destination)} STD ${fmtTimeShort(r.new_datetime)} ${fmtDateShort(r.new_datetime)} (${terminal})`);
+      if (r.comment) lines.push(`   → ${r.comment}`);
+    });
+    lines.push('');
+  }
+
+  // Under process SV
+  if (upSV.length > 0) {
+    lines.push('━━ UNDER PROCESS SV ━━');
+    lines.push('');
+    upSV.forEach(r => lines.push(fmtReport(r)));
+    lines.push('');
+  }
+
+  // Under process other
+  if (upOther.length > 0) {
+    lines.push('━━ UNDER PROCESS OTHER AIRLINES ━━');
+    lines.push('');
+    upOther.forEach(r => lines.push(fmtReport(r)));
+    lines.push('');
+  }
+
+  // Follow up SV
+  if (fuSV.length > 0) {
+    lines.push('━━ FOLLOW UP SV ━━');
+    lines.push('');
+    fuSV.forEach(r => lines.push(fmtReport(r, true)));
+    lines.push('');
+  }
+
+  // Follow up other
+  if (fuOther.length > 0) {
+    lines.push('━━ FOLLOW UP OTHER AIRLINES ━━');
+    lines.push('');
+    fuOther.forEach(r => lines.push(fmtReport(r, true)));
+    lines.push('');
+  }
+
+  // Over 24hrs
+  if (over24.length > 0) {
+    lines.push('━━ ⚠ OVER 24HRS ━━');
+    lines.push('');
+    over24.forEach(r => {
+      const days = ((Date.now() - new Date(r.prev_datetime).getTime()) / (1000*60*60*24)).toFixed(0);
+      lines.push(fmtReport(r, true) + ` (${days} days)`);
+    });
+    lines.push('');
+  }
+
+  // Summary
+  const totalUp = underProcess.reduce((s, r) => s + (r.pax_count || 0), 0);
+  const totalFu = flightConfirmed.reduce((s, r) => s + (r.pax_count || 0), 0);
+  lines.push('━━ SUMMARY ━━');
+  lines.push(`Under Process: ${underProcess.length} cases (${totalUp} PAX)`);
+  lines.push(`Flight Confirmed: ${flightConfirmed.length} cases (${totalFu} PAX)`);
+  lines.push(`Total Active: ${underProcess.length + flightConfirmed.length} cases (${totalUp + totalFu} PAX)`);
+
+  const text = lines.join('\n');
+  res.json({ text, shift: { current: currentShift, next: nextShift } });
+});
+
 // ── CEO Report (must be before /:id)
 router.get('/ceo-report', (_req, res) => {
   const db = getDb();

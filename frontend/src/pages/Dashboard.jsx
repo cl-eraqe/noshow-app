@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal } from '../utils/api';
 import { getRole, isSupervisor, clearRole } from '../utils/auth';
 
 function fmt(dt) {
@@ -77,6 +77,13 @@ export default function Dashboard() {
   const [ceoData, setCeoData] = useState(null);
   const [ceoLoading, setCeoLoading] = useState(false);
   const [ceoCopied, setCeoCopied] = useState(false);
+
+  // Handover modal
+  const [handoverModal, setHandoverModal] = useState(false);
+  const [handoverData, setHandoverData] = useState(null);
+  const [handoverLoading, setHandoverLoading] = useState(false);
+  const [handoverNotes, setHandoverNotes] = useState('');
+  const [handoverCopied, setHandoverCopied] = useState(false);
 
   const role = getRole();
 
@@ -380,6 +387,34 @@ export default function Dashboard() {
     });
   }
 
+  // ── Handover
+  async function openHandover() {
+    setHandoverModal(true);
+    setHandoverLoading(true);
+    setHandoverCopied(false);
+    setHandoverNotes('');
+    try {
+      const data = await getHandoverReport();
+      setHandoverData(data);
+    } catch (err) {
+      alert('Failed to generate handover: ' + err.message);
+    } finally {
+      setHandoverLoading(false);
+    }
+  }
+
+  function copyHandover() {
+    if (!handoverData) return;
+    let text = handoverData.text;
+    if (handoverNotes.trim()) {
+      text += '\n\n━━ NOTES ━━\n' + handoverNotes.trim();
+    }
+    navigator.clipboard.writeText(text).then(() => {
+      setHandoverCopied(true);
+      setTimeout(() => setHandoverCopied(false), 2000);
+    });
+  }
+
   // ── CEO Report
   async function openCeoReport() {
     setCeoModal(true);
@@ -434,6 +469,16 @@ export default function Dashboard() {
 
   useEffect(() => { setSelected(new Set()); }, [activeTab]);
 
+  // Sort flight_confirmed: bus transfers first, then by new_datetime
+  const sorted = [...filtered].sort((a, b) => {
+    if (activeTab === 'flight_confirmed') {
+      const aBus = needsBus(a.new_flight) ? 0 : 1;
+      const bBus = needsBus(b.new_flight) ? 0 : 1;
+      if (aBus !== bBus) return aBus - bBus;
+    }
+    return 0;
+  });
+
   const counts = {
     under_process: reports.filter(r => (r.status || 'under_process') === 'under_process').length,
     flight_confirmed: reports.filter(r => r.status === 'flight_confirmed').length,
@@ -456,6 +501,9 @@ export default function Dashboard() {
           <span className="header-role">{role}</span>
         </div>
         <div className="header-actions">
+          <button className="btn btn-handover btn-sm" onClick={openHandover} title="Shift Handover">
+            Handover
+          </button>
           <button className="btn btn-ceo btn-sm" onClick={openCeoReport} title="CEO Report">
             CEO Report
           </button>
@@ -499,7 +547,7 @@ export default function Dashboard() {
           <option value="">All Airlines</option>
           {airlines.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
-        <span className="report-count">{filtered.length} report{filtered.length !== 1 ? 's' : ''}</span>
+        <span className="report-count">{sorted.length} report{sorted.length !== 1 ? 's' : ''}</span>
         <button className="btn btn-ghost btn-sm" onClick={load} title="Refresh">↻ Refresh</button>
       </div>
 
@@ -529,6 +577,7 @@ export default function Dashboard() {
       {!loading && !error && (
         filtered.length === 0
           ? <div className="state-msg">No {STATUS_LABELS[activeTab].toLowerCase()} reports{search ? ' for "' + search + '"' : ''}.</div>
+
           : (
             <div className="table-wrapper">
               <table className="report-table">
@@ -555,12 +604,13 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(r => {
+                  {sorted.map(r => {
                     const days = liveDays(r.prev_datetime);
                     const urgent = days !== null && days >= 1;
+                    const bus = needsBus(r.new_flight);
                     return (
                       <tr key={r.id}
-                        className={`clickable-row ${urgent && activeTab === 'under_process' ? 'row-urgent' : ''}`}
+                        className={`clickable-row ${urgent && activeTab === 'under_process' ? 'row-urgent' : ''} ${bus && activeTab === 'flight_confirmed' ? 'row-bus' : ''}`}
                         onClick={e => handleRowClick(r, e)}
                       >
                         {activeTab !== 'closed' && (
@@ -593,6 +643,7 @@ export default function Dashboard() {
                         {activeTab !== 'under_process' && (
                           <td className="col-flight">
                             <span className="flight-badge">{r.new_flight || '—'}</span>
+                            {bus && <span className="bus-badge" title={`Bus to ${getTerminal(r.new_flight)} Terminal`}>🚌 {getTerminal(r.new_flight)}</span>}
                           </td>
                         )}
                         {activeTab !== 'under_process' && <td>{fmt(r.new_datetime)}</td>}
@@ -847,6 +898,48 @@ export default function Dashboard() {
 
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setShiftModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Handover Modal */}
+      {handoverModal && (
+        <div className="modal-overlay" onClick={() => setHandoverModal(false)}>
+          <div className="modal-content handover-modal" onClick={e => e.stopPropagation()}>
+            <h2 className="modal-title">
+              Shift Handover
+              {handoverData && <span className="handover-shift"> {handoverData.shift.current} → {handoverData.shift.next}</span>}
+            </h2>
+
+            {handoverLoading && <p className="state-msg">Generating handover…</p>}
+
+            {!handoverLoading && handoverData && (
+              <>
+                <pre className="handover-text">{handoverData.text}</pre>
+
+                <div className="field" style={{ marginTop: 12 }}>
+                  <label className="field-label">Notes (added at the end)</label>
+                  <textarea
+                    className="field-input"
+                    rows="3"
+                    placeholder="e.g. EgyptAir counter closes at 22:00, tell pax to go early…"
+                    value={handoverNotes}
+                    onChange={e => setHandoverNotes(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setHandoverModal(false)}>Close</button>
+              <button
+                className={`btn ${handoverCopied ? 'btn-success' : 'btn-whatsapp'}`}
+                onClick={copyHandover}
+                disabled={!handoverData}
+              >
+                {handoverCopied ? '✓ Copied!' : 'Copy for WhatsApp'}
+              </button>
             </div>
           </div>
         </div>
