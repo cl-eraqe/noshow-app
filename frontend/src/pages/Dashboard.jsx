@@ -50,11 +50,20 @@ export default function Dashboard() {
   const [selected, setSelected] = useState(new Set());
   const [bulkUpdating, setBulkUpdating] = useState(false);
 
-  // Flight confirmed modal state
+  // Single confirm modal (for single report from ✈ Confirm button)
   const [confirmModal, setConfirmModal] = useState(null);
   const [newFlightForm, setNewFlightForm] = useState({ new_flight: '', new_datetime: '', new_destination: '', new_airline: '' });
   const [lookupStatus, setLookupStatus] = useState('idle');
   const [saving, setSaving] = useState(false);
+
+  // Bulk confirm modal
+  const [bulkConfirmModal, setBulkConfirmModal] = useState(false);
+  const [bulkSameFlight, setBulkSameFlight] = useState(true);
+  const [bulkSharedFlight, setBulkSharedFlight] = useState({ new_flight: '', new_datetime: '', new_destination: '', new_airline: '' });
+  const [bulkSharedLookup, setBulkSharedLookup] = useState('idle');
+  const [bulkPerReport, setBulkPerReport] = useState({}); // { [id]: { new_flight, new_datetime, new_destination, new_airline } }
+  const [bulkPerLookup, setBulkPerLookup] = useState({}); // { [id]: 'idle'|'loading'|'found'|'notfound' }
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   // Shift summary modal
   const [shiftModal, setShiftModal] = useState(false);
@@ -80,7 +89,6 @@ export default function Dashboard() {
     }
   }
 
-  // ── Get unique airlines from reports for filter dropdown
   const airlines = [...new Set(reports.map(r => r.prev_airline).filter(Boolean))].sort();
 
   function copyWhatsApp(report) {
@@ -116,7 +124,8 @@ export default function Dashboard() {
     });
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id, e) {
+    e.stopPropagation();
     if (!confirm(`Delete report #${id}? This cannot be undone.`)) return;
     setDeleting(id);
     try {
@@ -129,7 +138,7 @@ export default function Dashboard() {
     }
   }
 
-  // ── Status change handlers
+  // ── Single confirm modal
   function openConfirmModal(report) {
     setConfirmModal(report);
     setNewFlightForm({
@@ -180,7 +189,8 @@ export default function Dashboard() {
     }
   }
 
-  async function markClosed(report) {
+  async function markClosed(report, e) {
+    e.stopPropagation();
     try {
       const updated = await updateReport(report.id, { status: 'closed' });
       setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
@@ -189,7 +199,8 @@ export default function Dashboard() {
     }
   }
 
-  async function reopenReport(report) {
+  async function reopenReport(report, e) {
+    e.stopPropagation();
     try {
       const newStatus = report.new_flight ? 'flight_confirmed' : 'under_process';
       const updated = await updateReport(report.id, { status: newStatus });
@@ -199,8 +210,9 @@ export default function Dashboard() {
     }
   }
 
-  // ── Bulk status update
-  function toggleSelect(id) {
+  // ── Bulk select
+  function toggleSelect(id, e) {
+    e.stopPropagation();
     setSelected(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -216,22 +228,97 @@ export default function Dashboard() {
     }
   }
 
-  async function bulkConfirmFlight() {
-    // For bulk, we just move to flight_confirmed without new flight details (can add later per report)
-    if (!confirm(`Move ${selected.size} report(s) to Flight Confirmed? You can add flight details individually later.`)) return;
-    setBulkUpdating(true);
+  // ── Bulk confirm modal
+  function openBulkConfirmModal() {
+    const selectedReports = reports.filter(r => selected.has(r.id));
+    setBulkConfirmModal(true);
+    setBulkSameFlight(true);
+    setBulkSharedFlight({ new_flight: '', new_datetime: '', new_destination: '', new_airline: '' });
+    setBulkSharedLookup('idle');
+    const perReport = {};
+    const perLookup = {};
+    selectedReports.forEach(r => {
+      perReport[r.id] = { new_flight: '', new_datetime: '', new_destination: '', new_airline: '' };
+      perLookup[r.id] = 'idle';
+    });
+    setBulkPerReport(perReport);
+    setBulkPerLookup(perLookup);
+  }
+
+  async function bulkSharedLookupFn() {
+    const fn = bulkSharedFlight.new_flight.trim();
+    if (!fn) return;
+    setBulkSharedLookup('loading');
     try {
-      const updates = [...selected].map(id => updateReport(id, { status: 'flight_confirmed' }));
+      const data = await lookupFlight(fn);
+      setBulkSharedFlight(prev => ({
+        ...prev,
+        new_datetime: stdToDatetime(data.std),
+        new_destination: `${data.city} (${data.destination})`,
+        new_airline: airlineFromFlightNumber(fn),
+      }));
+      setBulkSharedLookup('found');
+    } catch {
+      setBulkSharedLookup('notfound');
+    }
+  }
+
+  async function bulkPerReportLookup(id) {
+    const fn = (bulkPerReport[id]?.new_flight || '').trim();
+    if (!fn) return;
+    setBulkPerLookup(prev => ({ ...prev, [id]: 'loading' }));
+    try {
+      const data = await lookupFlight(fn);
+      setBulkPerReport(prev => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          new_datetime: stdToDatetime(data.std),
+          new_destination: `${data.city} (${data.destination})`,
+          new_airline: airlineFromFlightNumber(fn),
+        }
+      }));
+      setBulkPerLookup(prev => ({ ...prev, [id]: 'found' }));
+    } catch {
+      setBulkPerLookup(prev => ({ ...prev, [id]: 'notfound' }));
+    }
+  }
+
+  function setBulkPerField(id, field, value) {
+    setBulkPerReport(prev => ({
+      ...prev,
+      [id]: { ...prev[id], [field]: value }
+    }));
+    if (field === 'new_flight') {
+      setBulkPerLookup(prev => ({ ...prev, [id]: 'idle' }));
+    }
+  }
+
+  async function saveBulkConfirm() {
+    setBulkSaving(true);
+    try {
+      const ids = [...selected];
+      const updates = ids.map(id => {
+        const flightData = bulkSameFlight ? bulkSharedFlight : (bulkPerReport[id] || {});
+        if (!flightData.new_flight?.trim()) {
+          throw new Error(`Please enter flight number for all reports`);
+        }
+        return updateReport(id, {
+          status: 'flight_confirmed',
+          ...flightData,
+        });
+      });
       const results = await Promise.all(updates);
       setReports(prev => {
         const map = new Map(results.map(r => [r.id, r]));
         return prev.map(r => map.get(r.id) || r);
       });
       setSelected(new Set());
+      setBulkConfirmModal(false);
     } catch (err) {
-      alert('Bulk update failed: ' + err.message);
+      alert(err.message);
     } finally {
-      setBulkUpdating(false);
+      setBulkSaving(false);
     }
   }
 
@@ -292,7 +379,14 @@ export default function Dashboard() {
     navigate('/login');
   }
 
-  // ── Filter by search + status tab + airline
+  // ── Row click → edit (but not on action buttons/checkboxes)
+  function handleRowClick(r, e) {
+    // Don't navigate if clicking on buttons, inputs, or action cells
+    if (e.target.closest('.col-actions') || e.target.closest('input[type="checkbox"]') || e.target.tagName === 'BUTTON') return;
+    navigate(`/edit-report/${r.id}`);
+  }
+
+  // ── Filter
   const filtered = reports.filter(r => {
     const status = r.status || 'under_process';
     if (status !== activeTab) return false;
@@ -309,15 +403,16 @@ export default function Dashboard() {
     );
   });
 
-  // Clear selection when tab changes
   useEffect(() => { setSelected(new Set()); }, [activeTab]);
 
-  // Count per status
   const counts = {
     under_process: reports.filter(r => (r.status || 'under_process') === 'under_process').length,
     flight_confirmed: reports.filter(r => r.status === 'flight_confirmed').length,
     closed: reports.filter(r => r.status === 'closed').length,
   };
+
+  // Selected reports for bulk modal
+  const selectedReports = reports.filter(r => selected.has(r.id));
 
   return (
     <div className="page">
@@ -364,20 +459,11 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── Search + Airline Filter + count */}
+      {/* ── Search + Airline Filter */}
       <div className="dashboard-toolbar">
-        <input
-          type="search"
-          className="search-input"
-          placeholder="Search reports…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <select
-          className="airline-filter"
-          value={airlineFilter}
-          onChange={e => setAirlineFilter(e.target.value)}
-        >
+        <input type="search" className="search-input" placeholder="Search reports…"
+          value={search} onChange={e => setSearch(e.target.value)} />
+        <select className="airline-filter" value={airlineFilter} onChange={e => setAirlineFilter(e.target.value)}>
           <option value="">All Airlines</option>
           {airlines.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
@@ -390,8 +476,8 @@ export default function Dashboard() {
         <div className="bulk-bar">
           <span>{selected.size} selected</span>
           {activeTab === 'under_process' && (
-            <button className="btn btn-xs btn-confirm" onClick={bulkConfirmFlight} disabled={bulkUpdating}>
-              {bulkUpdating ? '…' : '✈ Bulk Confirm Flight'}
+            <button className="btn btn-xs btn-confirm" onClick={openBulkConfirmModal} disabled={bulkUpdating}>
+              ✈ Bulk Confirm Flight
             </button>
           )}
           {activeTab === 'flight_confirmed' && (
@@ -441,11 +527,14 @@ export default function Dashboard() {
                     const days = liveDays(r.prev_datetime);
                     const urgent = days !== null && days >= 1;
                     return (
-                      <tr key={r.id} className={urgent && activeTab === 'under_process' ? 'row-urgent' : ''}>
+                      <tr key={r.id}
+                        className={`clickable-row ${urgent && activeTab === 'under_process' ? 'row-urgent' : ''}`}
+                        onClick={e => handleRowClick(r, e)}
+                      >
                         {activeTab !== 'closed' && (
                           <td>
                             <input type="checkbox" checked={selected.has(r.id)}
-                              onChange={() => toggleSelect(r.id)} />
+                              onChange={e => toggleSelect(r.id, e)} />
                           </td>
                         )}
                         <td className="col-id">
@@ -477,60 +566,38 @@ export default function Dashboard() {
                         {activeTab !== 'under_process' && <td>{fmt(r.new_datetime)}</td>}
                         <td className="col-actions">
                           {(r.status || 'under_process') === 'under_process' && (
-                            <button
-                              className="btn btn-xs btn-confirm"
-                              onClick={() => openConfirmModal(r)}
-                              title="Mark as flight confirmed"
-                            >
+                            <button className="btn btn-xs btn-confirm"
+                              onClick={e => { e.stopPropagation(); openConfirmModal(r); }}
+                              title="Mark as flight confirmed">
                               ✈ Confirm
                             </button>
                           )}
                           {r.status === 'flight_confirmed' && (
-                            <button
-                              className="btn btn-xs btn-close-report"
-                              onClick={() => markClosed(r)}
-                              title="Mark as closed"
-                            >
+                            <button className="btn btn-xs btn-close-report"
+                              onClick={e => markClosed(r, e)} title="Mark as closed">
                               ✓ Close
                             </button>
                           )}
                           {r.status === 'closed' && (
-                            <button
-                              className="btn btn-xs btn-secondary"
-                              onClick={() => reopenReport(r)}
-                              title="Reopen report"
-                            >
+                            <button className="btn btn-xs btn-secondary"
+                              onClick={e => reopenReport(r, e)} title="Reopen report">
                               ↩ Reopen
                             </button>
                           )}
-                          <button
-                            className="btn btn-xs btn-edit"
-                            onClick={() => navigate(`/edit-report/${r.id}`)}
-                            title="Edit report"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn btn-xs btn-secondary"
-                            onClick={() => duplicate(r)}
-                            title="Duplicate"
-                          >
+                          <button className="btn btn-xs btn-secondary"
+                            onClick={e => { e.stopPropagation(); duplicate(r); }} title="Duplicate">
                             Dup
                           </button>
                           <button
                             className={`btn btn-xs ${copied === r.id ? 'btn-success' : 'btn-whatsapp'}`}
-                            onClick={() => copyWhatsApp(r)}
-                            title="Copy WhatsApp message"
-                          >
+                            onClick={e => { e.stopPropagation(); copyWhatsApp(r); }}
+                            title="Copy WhatsApp message">
                             {copied === r.id ? '✓' : 'WA'}
                           </button>
                           {isSupervisor() && (
-                            <button
-                              className="btn btn-xs btn-danger"
-                              onClick={() => handleDelete(r.id)}
-                              disabled={deleting === r.id}
-                              title="Delete report"
-                            >
+                            <button className="btn btn-xs btn-danger"
+                              onClick={e => handleDelete(r.id, e)}
+                              disabled={deleting === r.id} title="Delete report">
                               {deleting === r.id ? '…' : 'Del'}
                             </button>
                           )}
@@ -544,55 +611,45 @@ export default function Dashboard() {
           )
       )}
 
-      {/* ── Flight Confirmed Modal */}
+      {/* ── Single Confirm Modal */}
       {confirmModal && (
         <div className="modal-overlay" onClick={() => setConfirmModal(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 className="modal-title">Confirm New Flight — Report #{confirmModal.id}</h2>
             <p className="modal-subtitle">
-              Passenger: {confirmModal.pax_count}× {confirmModal.pax_type} ({confirmModal.nationality})<br/>
-              Previous Flight: {confirmModal.prev_flight} → {confirmModal.prev_destination}
+              {confirmModal.pax_count}× {confirmModal.pax_type} ({confirmModal.nationality})<br/>
+              Previous: {confirmModal.prev_flight} → {confirmModal.prev_destination}
             </p>
 
             <div className="field">
               <label className="field-label">New Flight Number <span className="req">*</span></label>
               <div className="lookup-row">
-                <input
-                  type="text"
-                  className="field-input"
-                  placeholder="e.g. SV309"
+                <input type="text" className="field-input" placeholder="e.g. SV309"
                   value={newFlightForm.new_flight}
                   onChange={e => { setNewFlightForm(prev => ({ ...prev, new_flight: e.target.value.toUpperCase() })); setLookupStatus('idle'); }}
                   onBlur={lookupNewFlight}
-                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupNewFlight())}
-                />
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupNewFlight())} />
                 <button type="button" className="btn btn-lookup" onClick={lookupNewFlight}
                   disabled={lookupStatus === 'loading'}>
                   {lookupStatus === 'loading' ? '…' : 'Look up'}
                 </button>
-                {lookupStatus === 'found'    && <span className="badge badge-found">Found</span>}
+                {lookupStatus === 'found' && <span className="badge badge-found">Found</span>}
                 {lookupStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
               </div>
             </div>
 
             <div className="field-grid">
               <div className="field">
-                <label className="field-label">New Flight Date & Time</label>
+                <label className="field-label">Date & Time</label>
                 <input type="datetime-local" className="field-input autofilled"
                   value={newFlightForm.new_datetime}
                   onChange={e => setNewFlightForm(prev => ({ ...prev, new_datetime: e.target.value }))} />
               </div>
               <div className="field">
-                <label className="field-label">New Destination</label>
+                <label className="field-label">Destination</label>
                 <input type="text" className="field-input autofilled" placeholder="Auto-filled"
                   value={newFlightForm.new_destination}
                   onChange={e => setNewFlightForm(prev => ({ ...prev, new_destination: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label className="field-label">New Airline</label>
-                <input type="text" className="field-input autofilled" placeholder="Auto-filled"
-                  value={newFlightForm.new_airline}
-                  onChange={e => setNewFlightForm(prev => ({ ...prev, new_airline: e.target.value }))} />
               </div>
             </div>
 
@@ -600,6 +657,118 @@ export default function Dashboard() {
               <button className="btn btn-secondary" onClick={() => setConfirmModal(null)}>Cancel</button>
               <button className="btn btn-primary" onClick={saveFlightConfirmed} disabled={saving}>
                 {saving ? 'Saving…' : 'Confirm Flight'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Confirm Modal */}
+      {bulkConfirmModal && (
+        <div className="modal-overlay" onClick={() => setBulkConfirmModal(false)}>
+          <div className="modal-content bulk-confirm-modal" onClick={e => e.stopPropagation()}>
+            <h2 className="modal-title">Confirm Flights — {selectedReports.length} Reports</h2>
+
+            <label className="same-flight-toggle">
+              <input type="checkbox" checked={bulkSameFlight}
+                onChange={e => setBulkSameFlight(e.target.checked)} />
+              <span>Same flight for all</span>
+            </label>
+
+            {/* ── Same flight mode */}
+            {bulkSameFlight && (
+              <div className="bulk-shared-section">
+                <div className="field">
+                  <label className="field-label">New Flight Number <span className="req">*</span></label>
+                  <div className="lookup-row">
+                    <input type="text" className="field-input" placeholder="e.g. SV309"
+                      value={bulkSharedFlight.new_flight}
+                      onChange={e => { setBulkSharedFlight(prev => ({ ...prev, new_flight: e.target.value.toUpperCase() })); setBulkSharedLookup('idle'); }}
+                      onBlur={bulkSharedLookupFn}
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), bulkSharedLookupFn())} />
+                    <button type="button" className="btn btn-lookup" onClick={bulkSharedLookupFn}
+                      disabled={bulkSharedLookup === 'loading'}>
+                      {bulkSharedLookup === 'loading' ? '…' : 'Look up'}
+                    </button>
+                    {bulkSharedLookup === 'found' && <span className="badge badge-found">Found</span>}
+                    {bulkSharedLookup === 'notfound' && <span className="badge badge-notfound">Not found</span>}
+                  </div>
+                </div>
+                <div className="field-grid">
+                  <div className="field">
+                    <label className="field-label">Date & Time</label>
+                    <input type="datetime-local" className="field-input autofilled"
+                      value={bulkSharedFlight.new_datetime}
+                      onChange={e => setBulkSharedFlight(prev => ({ ...prev, new_datetime: e.target.value }))} />
+                  </div>
+                  <div className="field">
+                    <label className="field-label">Destination</label>
+                    <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+                      value={bulkSharedFlight.new_destination}
+                      onChange={e => setBulkSharedFlight(prev => ({ ...prev, new_destination: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="bulk-applies-to">
+                  <label className="field-label">Applies to:</label>
+                  {selectedReports.map(r => (
+                    <div key={r.id} className="bulk-report-row">
+                      <span className="bulk-report-id">#{r.id}</span>
+                      <span>{r.pax_count}× {r.pax_type}</span>
+                      <span>{r.nationality}</span>
+                      <span className="flight-badge">{r.prev_flight}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Different flights mode */}
+            {!bulkSameFlight && (
+              <div className="bulk-per-section">
+                {selectedReports.map(r => (
+                  <div key={r.id} className="bulk-per-card">
+                    <div className="bulk-per-header">
+                      <span className="bulk-report-id">#{r.id}</span>
+                      <span>{r.pax_count}× {r.pax_type} ({r.nationality})</span>
+                      <span className="flight-badge">{r.prev_flight} → {r.prev_destination}</span>
+                    </div>
+                    <div className="field">
+                      <div className="lookup-row">
+                        <input type="text" className="field-input" placeholder="New flight…"
+                          value={bulkPerReport[r.id]?.new_flight || ''}
+                          onChange={e => setBulkPerField(r.id, 'new_flight', e.target.value.toUpperCase())}
+                          onBlur={() => bulkPerReportLookup(r.id)}
+                          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), bulkPerReportLookup(r.id))} />
+                        <button type="button" className="btn btn-lookup" onClick={() => bulkPerReportLookup(r.id)}
+                          disabled={bulkPerLookup[r.id] === 'loading'}>
+                          {bulkPerLookup[r.id] === 'loading' ? '…' : 'Look up'}
+                        </button>
+                        {bulkPerLookup[r.id] === 'found' && <span className="badge badge-found">Found</span>}
+                        {bulkPerLookup[r.id] === 'notfound' && <span className="badge badge-notfound">Not found</span>}
+                      </div>
+                    </div>
+                    <div className="field-grid">
+                      <div className="field">
+                        <input type="datetime-local" className="field-input autofilled"
+                          value={bulkPerReport[r.id]?.new_datetime || ''}
+                          onChange={e => setBulkPerField(r.id, 'new_datetime', e.target.value)} />
+                      </div>
+                      <div className="field">
+                        <input type="text" className="field-input autofilled" placeholder="Destination"
+                          value={bulkPerReport[r.id]?.new_destination || ''}
+                          onChange={e => setBulkPerField(r.id, 'new_destination', e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn btn-secondary" onClick={() => setBulkConfirmModal(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={saveBulkConfirm} disabled={bulkSaving}>
+                {bulkSaving ? 'Saving…' : `Confirm ${selectedReports.length} Reports`}
               </button>
             </div>
           </div>

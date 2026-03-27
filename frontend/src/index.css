@@ -830,6 +830,70 @@ html, body, #root {
 }
 .state-msg.error { color: var(--danger); }
 
+/* ════════════════ CLICKABLE ROWS ════════════════ */
+.clickable-row { cursor: pointer; }
+.clickable-row:hover { background: var(--bg-alt, #f0f4f8); }
+
+/* ════════════════ BULK CONFIRM MODAL ════════════════ */
+.bulk-confirm-modal { max-width: 680px; }
+
+.same-flight-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.same-flight-toggle input { width: 18px; height: 18px; }
+
+.bulk-shared-section { margin-bottom: 8px; }
+
+.bulk-applies-to {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-alt, #f7f9fb);
+  border-radius: var(--radius);
+}
+
+.bulk-report-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--border);
+}
+.bulk-report-row:last-child { border-bottom: none; }
+
+.bulk-report-id {
+  font-weight: 700;
+  color: var(--navy);
+  min-width: 36px;
+}
+
+.bulk-per-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bulk-per-card {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.bulk-per-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+
 /* ════════════════ RESPONSIVE ════════════════ */
 @media (max-width: 640px) {
   .dashboard-header { padding: 12px 14px; }

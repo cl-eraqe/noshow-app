@@ -111,7 +111,7 @@ export default function NewReport({ editMode }) {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
-  // ── Previous flight auto-fill with departure validation
+  // ── Previous flight auto-fill (no validation here — user may change the date)
   const lookupPrev = useCallback(async () => {
     const fn = form.prev_flight.trim();
     if (!fn) return;
@@ -119,18 +119,9 @@ export default function NewReport({ editMode }) {
     setFlightWarning('');
     try {
       const data = await lookupFlight(fn);
-      const autoDatetime = stdToDatetime(data.std);
-
-      // Validate: flight must have departed (or within 30 min)
-      if (!hasFlightDeparted(autoDatetime)) {
-        setFlightWarning(`This flight (${fn}) is scheduled at ${data.std} today and hasn't departed yet. You can only add flights that have already departed or depart within 30 minutes.`);
-        setPrevStatus('notdeparted');
-        return;
-      }
-
       setForm(prev => ({
         ...prev,
-        prev_datetime:    autoDatetime,
+        prev_datetime:    stdToDatetime(data.std),
         prev_destination: `${data.city} (${data.destination})`,
         prev_airline:     airlineFromFlightNumber(fn),
         nationality:      prev.nationality || data.nationality,
@@ -287,9 +278,8 @@ export default function NewReport({ editMode }) {
                 disabled={prevStatus === 'loading'}>
                 {prevStatus === 'loading' ? '…' : 'Look up'}
               </button>
-              {prevStatus === 'found'       && <span className="badge badge-found">✓ Found</span>}
-              {prevStatus === 'notfound'    && <span className="badge badge-notfound">Not found</span>}
-              {prevStatus === 'notdeparted' && <span className="badge badge-notfound">Not departed</span>}
+              {prevStatus === 'found'    && <span className="badge badge-found">✓ Found</span>}
+              {prevStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
             </div>
             {flightWarning && (
               <p className="field-warning">{flightWarning}</p>
