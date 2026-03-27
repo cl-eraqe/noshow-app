@@ -64,7 +64,10 @@ router.get('/analytics/summary', (_req, res) => {
 router.get('/shift-summary', (req, res) => {
   const db = getDb();
   const { date } = req.query; // YYYY-MM-DD, defaults to today
-  const targetDate = date || new Date().toISOString().slice(0, 10);
+  // Use local date (not UTC) for default
+  const now = new Date();
+  const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const targetDate = date || localToday;
 
   // Build shift time ranges
   const shifts = {
@@ -187,6 +190,73 @@ router.post('/', upload.array('files', 10), (req, res) => {
 
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id);
   res.status(201).json(report);
+});
+
+// ── PUT full update of a report (edit mode)
+router.put('/:id', upload.array('files', 10), (req, res) => {
+  const db = getDb();
+  const existing = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  if (!existing) return res.status(404).json({ error: 'Report not found' });
+
+  const {
+    pax_id_datetime,
+    prev_flight, prev_datetime, prev_destination, prev_airline,
+    nationality, pax_type,
+    new_flight, new_datetime, new_destination, new_airline,
+    days_at_airport, pax_count,
+    status, comment,
+  } = req.body;
+
+  const reportStatus = status || existing.status || 'under_process';
+
+  // If new files uploaded, merge with existing; otherwise keep old
+  let filePaths;
+  if (req.files && req.files.length > 0) {
+    const newPaths = req.files.map(f => `/uploads/${f.filename}`);
+    const oldPaths = JSON.parse(existing.file_paths || '[]');
+    filePaths = [...oldPaths, ...newPaths];
+  } else {
+    filePaths = JSON.parse(existing.file_paths || '[]');
+  }
+
+  // Compute days from prev_flight to now
+  let computedDays = parseFloat(days_at_airport) || null;
+  if (!computedDays && prev_datetime) {
+    const diff = (Date.now() - new Date(prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    if (!isNaN(diff) && diff >= 0) computedDays = parseFloat(Math.max(0, diff).toFixed(2));
+  }
+
+  const whatsapp_text =
+    `No-Show Report #${existing.id}\n` +
+    `Flight: ${prev_flight || '—'} → ${prev_destination || '—'}\n` +
+    `Pax: ${pax_count} × ${pax_type || '—'}\n` +
+    `Nationality: ${nationality || '—'}\n` +
+    `New Flight: ${new_flight || '—'} on ${new_datetime || '—'}`;
+
+  db.prepare(`
+    UPDATE reports SET
+      pax_id_datetime = ?, prev_flight = ?, prev_datetime = ?, prev_destination = ?, prev_airline = ?,
+      nationality = ?, pax_type = ?,
+      new_flight = ?, new_datetime = ?, new_destination = ?, new_airline = ?,
+      days_at_airport = ?, pax_count = ?, file_paths = ?, whatsapp_text = ?,
+      status = ?, comment = ?
+    WHERE id = ?
+  `).run(
+    pax_id_datetime,
+    prev_flight, prev_datetime, prev_destination, prev_airline,
+    nationality, pax_type,
+    new_flight || null, new_datetime || null, new_destination || null, new_airline || null,
+    computedDays,
+    parseInt(pax_count) || 0,
+    JSON.stringify(filePaths),
+    whatsapp_text,
+    reportStatus,
+    comment || '',
+    req.params.id,
+  );
+
+  const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  res.json(updated);
 });
 
 // ── PATCH update report status (and optionally new flight info)

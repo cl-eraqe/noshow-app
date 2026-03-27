@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { lookupFlight, airlineFromFlightNumber, createReport } from '../utils/api';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull } from '../utils/api';
 import { getRole } from '../utils/auth';
 
 const PAX_TYPES = [
@@ -21,11 +21,6 @@ const NATIONALITIES = [
   'Saudi','Singaporean','Sri Lankan','Sudanese','Syrian','Thai','Tunisian','Turkish',
 ];
 
-function useFlightLookup() {
-  const [status, setStatus] = useState('idle'); // idle | loading | found | notfound
-  return { status, setStatus };
-}
-
 function calcDaysAtAirport(paxIdDatetime, newDatetime) {
   if (!paxIdDatetime || !newDatetime) return '';
   const diff = (new Date(newDatetime) - new Date(paxIdDatetime)) / (1000 * 60 * 60 * 24);
@@ -33,19 +28,28 @@ function calcDaysAtAirport(paxIdDatetime, newDatetime) {
   return Math.max(0, parseFloat(diff.toFixed(2)));
 }
 
-// Format STD (HH:MM) + today's date into a datetime-local value
 function stdToDatetime(std) {
   if (!std) return '';
   const today = new Date().toISOString().slice(0, 10);
   return `${today}T${std}`;
 }
 
-export default function NewReport({ prefill }) {
+// Check if a flight datetime has departed (allow 30 min before STD)
+function hasFlightDeparted(flightDatetime) {
+  if (!flightDatetime) return true; // if no datetime, allow it
+  const flightTime = new Date(flightDatetime).getTime();
+  const now = Date.now();
+  const thirtyMinBefore = flightTime - (30 * 60 * 1000);
+  return now >= thirtyMinBefore;
+}
+
+export default function NewReport({ editMode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const params = useParams();
 
-  // Support duplicate prefill passed via router state
-  const seed = prefill || location.state?.prefill || {};
+  const isEdit = editMode && params.id;
+  const seed = location.state?.prefill || {};
 
   const [form, setForm] = useState({
     pax_id_datetime:  seed.pax_id_datetime  || '',
@@ -64,29 +68,69 @@ export default function NewReport({ prefill }) {
   });
 
   const [files, setFiles] = useState([]);
+  const [existingFiles, setExistingFiles] = useState([]);
   const [prevStatus, setPrevStatus]   = useState('idle');
   const [newLookupStatus, setNewLookupStatus] = useState('idle');
   const [reportStatus, setReportStatus] = useState(seed.status || 'under_process');
   const [submitting, setSubmitting]   = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [success, setSuccess]         = useState(null);
+  const [loadingEdit, setLoadingEdit] = useState(false);
+  const [flightWarning, setFlightWarning] = useState('');
 
   const daysAtAirport = calcDaysAtAirport(form.pax_id_datetime, form.new_datetime);
+
+  // Load report data in edit mode
+  useEffect(() => {
+    if (!isEdit) return;
+    setLoadingEdit(true);
+    getReport(params.id).then(r => {
+      setForm({
+        pax_id_datetime:  r.pax_id_datetime  || '',
+        prev_flight:      r.prev_flight      || '',
+        prev_datetime:    r.prev_datetime    || '',
+        prev_destination: r.prev_destination || '',
+        prev_airline:     r.prev_airline     || '',
+        nationality:      r.nationality      || '',
+        pax_type:         r.pax_type         || '',
+        new_flight:       r.new_flight       || '',
+        new_datetime:     r.new_datetime     || '',
+        new_destination:  r.new_destination  || '',
+        new_airline:      r.new_airline      || '',
+        pax_count:        r.pax_count        || '',
+        comment:          r.comment          || '',
+      });
+      setReportStatus(r.status || 'under_process');
+      try { setExistingFiles(JSON.parse(r.file_paths || '[]')); } catch { setExistingFiles([]); }
+    }).catch(err => {
+      setSubmitError('Failed to load report: ' + err.message);
+    }).finally(() => setLoadingEdit(false));
+  }, [isEdit, params.id]);
 
   function set(field, value) {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
-  // ── Previous flight auto-fill
+  // ── Previous flight auto-fill with departure validation
   const lookupPrev = useCallback(async () => {
     const fn = form.prev_flight.trim();
     if (!fn) return;
     setPrevStatus('loading');
+    setFlightWarning('');
     try {
       const data = await lookupFlight(fn);
+      const autoDatetime = stdToDatetime(data.std);
+
+      // Validate: flight must have departed (or within 30 min)
+      if (!hasFlightDeparted(autoDatetime)) {
+        setFlightWarning(`This flight (${fn}) is scheduled at ${data.std} today and hasn't departed yet. You can only add flights that have already departed or depart within 30 minutes.`);
+        setPrevStatus('notdeparted');
+        return;
+      }
+
       setForm(prev => ({
         ...prev,
-        prev_datetime:    stdToDatetime(data.std),
+        prev_datetime:    autoDatetime,
         prev_destination: `${data.city} (${data.destination})`,
         prev_airline:     airlineFromFlightNumber(fn),
         nationality:      prev.nationality || data.nationality,
@@ -97,7 +141,7 @@ export default function NewReport({ prefill }) {
     }
   }, [form.prev_flight]);
 
-  // ── New flight auto-fill (only used when status = flight_confirmed)
+  // ── New flight auto-fill
   const lookupNew = useCallback(async () => {
     const fn = form.new_flight.trim();
     if (!fn) return;
@@ -116,8 +160,18 @@ export default function NewReport({ prefill }) {
     }
   }, [form.new_flight]);
 
+  // ── Validate prev_datetime on submit
+  function validatePrevFlight() {
+    if (form.prev_datetime && !hasFlightDeparted(form.prev_datetime)) {
+      setSubmitError('Previous flight has not departed yet. The flight must have departed (or be within 30 minutes of departure) to create a report.');
+      return false;
+    }
+    return true;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!validatePrevFlight()) return;
     setSubmitting(true);
     setSubmitError('');
     try {
@@ -125,7 +179,11 @@ export default function NewReport({ prefill }) {
       const baseFields = ['pax_id_datetime', 'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline', 'nationality', 'pax_type', 'pax_count', 'comment'];
       baseFields.forEach(k => fd.append(k, form[k] || ''));
       fd.append('status', reportStatus);
-      fd.append('submitted_by', getRole());
+
+      if (!isEdit) {
+        fd.append('submitted_by', getRole());
+      }
+
       // Include new flight fields if status is flight_confirmed
       if (reportStatus === 'flight_confirmed') {
         fd.append('new_flight', form.new_flight || '');
@@ -136,7 +194,12 @@ export default function NewReport({ prefill }) {
       }
       files.forEach(f => fd.append('files', f));
 
-      const report = await createReport(fd);
+      let report;
+      if (isEdit) {
+        report = await updateReportFull(params.id, fd);
+      } else {
+        report = await createReport(fd);
+      }
       setSuccess(report);
     } catch (err) {
       setSubmitError(err.message);
@@ -145,13 +208,17 @@ export default function NewReport({ prefill }) {
     }
   }
 
+  if (loadingEdit) {
+    return <div className="page"><div className="state-msg">Loading report…</div></div>;
+  }
+
   if (success) {
     return (
       <div className="page">
         <div className="success-card">
           <div className="success-icon">✓</div>
-          <h2>Report #{success.id} Submitted</h2>
-          <p>The no-show report has been saved successfully.</p>
+          <h2>Report #{success.id} {isEdit ? 'Updated' : 'Submitted'}</h2>
+          <p>The no-show report has been {isEdit ? 'updated' : 'saved'} successfully.</p>
           <div className="whatsapp-preview">
             <label className="field-label">WhatsApp Text</label>
             <pre className="whatsapp-text">{success.whatsapp_text}</pre>
@@ -166,12 +233,14 @@ export default function NewReport({ prefill }) {
             <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>
               Back to Dashboard
             </button>
-            <button
-              className="btn btn-secondary"
-              onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'',comment:'' }); setFiles([]); setPrevStatus('idle'); setNewLookupStatus('idle'); setReportStatus('under_process'); }}
-            >
-              New Report
-            </button>
+            {!isEdit && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => { setSuccess(null); setForm({ pax_id_datetime:'',prev_flight:'',prev_datetime:'',prev_destination:'',prev_airline:'',nationality:'',pax_type:'',new_flight:'',new_datetime:'',new_destination:'',new_airline:'',pax_count:'',comment:'' }); setFiles([]); setPrevStatus('idle'); setNewLookupStatus('idle'); setReportStatus('under_process'); setFlightWarning(''); }}
+              >
+                New Report
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -182,7 +251,7 @@ export default function NewReport({ prefill }) {
     <div className="page">
       <div className="page-header">
         <button className="btn-back" onClick={() => navigate('/dashboard')}>← Dashboard</button>
-        <h1 className="page-title">New No-Show Report</h1>
+        <h1 className="page-title">{isEdit ? `Edit Report #${params.id}` : 'New No-Show Report'}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="report-form">
@@ -209,7 +278,7 @@ export default function NewReport({ prefill }) {
                 className="field-input"
                 placeholder="e.g. SV305"
                 value={form.prev_flight}
-                onChange={e => { set('prev_flight', e.target.value.toUpperCase()); setPrevStatus('idle'); }}
+                onChange={e => { set('prev_flight', e.target.value.toUpperCase()); setPrevStatus('idle'); setFlightWarning(''); }}
                 onBlur={lookupPrev}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupPrev())}
                 required
@@ -218,9 +287,13 @@ export default function NewReport({ prefill }) {
                 disabled={prevStatus === 'loading'}>
                 {prevStatus === 'loading' ? '…' : 'Look up'}
               </button>
-              {prevStatus === 'found'    && <span className="badge badge-found">✓ Found</span>}
-              {prevStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
+              {prevStatus === 'found'       && <span className="badge badge-found">✓ Found</span>}
+              {prevStatus === 'notfound'    && <span className="badge badge-notfound">Not found</span>}
+              {prevStatus === 'notdeparted' && <span className="badge badge-notfound">Not departed</span>}
             </div>
+            {flightWarning && (
+              <p className="field-warning">{flightWarning}</p>
+            )}
           </div>
 
           <div className="field-grid">
@@ -368,8 +441,16 @@ export default function NewReport({ prefill }) {
         {/* ── Attachments */}
         <div className="form-section">
           <h2 className="section-title">Attachments</h2>
+          {isEdit && existingFiles.length > 0 && (
+            <div className="field">
+              <label className="field-label">Existing Files</label>
+              <ul className="file-list">
+                {existingFiles.map((fp, i) => <li key={i}>{fp.split('/').pop()}</li>)}
+              </ul>
+            </div>
+          )}
           <div className="field">
-            <label className="field-label">14. File Attachments</label>
+            <label className="field-label">{isEdit ? 'Add More Files' : 'File Attachments'}</label>
             <input type="file" className="field-input" multiple
               onChange={e => setFiles(Array.from(e.target.files))} />
             {files.length > 0 && (
@@ -387,7 +468,7 @@ export default function NewReport({ prefill }) {
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Submitting…' : '15. Submit Report'}
+            {submitting ? 'Saving…' : (isEdit ? 'Save Changes' : 'Submit Report')}
           </button>
         </div>
       </form>

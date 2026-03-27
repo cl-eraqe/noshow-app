@@ -504,6 +504,13 @@ export default function Dashboard() {
                             </button>
                           )}
                           <button
+                            className="btn btn-xs btn-edit"
+                            onClick={() => navigate(`/edit-report/${r.id}`)}
+                            title="Edit report"
+                          >
+                            Edit
+                          </button>
+                          <button
                             className="btn btn-xs btn-secondary"
                             onClick={() => duplicate(r)}
                             title="Duplicate"

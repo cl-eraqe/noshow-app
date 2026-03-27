@@ -19,6 +19,10 @@ export default function App() {
           <PrivateRoute><NewReport /></PrivateRoute>
         } />
 
+        <Route path="/edit-report/:id" element={
+          <PrivateRoute><NewReport editMode /></PrivateRoute>
+        } />
+
         <Route path="/analytics" element={
           <PrivateRoute supervisorOnly><Analytics /></PrivateRoute>
         } />

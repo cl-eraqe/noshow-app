@@ -54,6 +54,18 @@ export async function updateReport(id, data) {
   });
 }
 
+export async function updateReportFull(id, formData) {
+  const res = await fetch(`${BASE}/api/reports/${id}`, {
+    method: 'PUT',
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function deleteReport(id) {
   return request(`/api/reports/${id}`, { method: 'DELETE' });
 }
