@@ -14,11 +14,43 @@ const PAX_TYPES = [
 ];
 
 const NATIONALITIES = [
-  'Algerian','American','Bahraini','Bangladeshi','British','Egyptian','Emirati',
-  'Ethiopian','Filipino','French','German','Ghanaian','Indian','Indonesian',
-  'Iranian','Iraqi','Jordanian','Kenyan','Lebanese','Libyan','Malaysian',
-  'Maldivian','Moroccan','Nepali','Nigerian','Omani','Pakistani','Qatari',
-  'Saudi','Singaporean','Sri Lankan','Sudanese','Syrian','Thai','Tunisian','Turkish',
+  'Afghan','Albanian','Algerian','American','Andorran','Angolan','Antiguan',
+  'Argentine','Armenian','Australian','Austrian','Azerbaijani',
+  'Bahamian','Bahraini','Bangladeshi','Barbadian','Belarusian','Belgian',
+  'Belizean','Beninese','Bhutanese','Bolivian','Bosnian','Botswanan',
+  'Brazilian','British','Bruneian','Bulgarian','Burkinabe','Burundian',
+  'Cambodian','Cameroonian','Canadian','Cape Verdean','Central African',
+  'Chadian','Chilean','Chinese','Colombian','Comoran','Congolese',
+  'Costa Rican','Croatian','Cuban','Cypriot','Czech',
+  'Danish','Djiboutian','Dominican',
+  'Dutch','Ecuadorian','Egyptian','Emirati','Equatorial Guinean',
+  'Eritrean','Estonian','Ethiopian',
+  'Fijian','Filipino','Finnish','French',
+  'Gabonese','Gambian','Georgian','German','Ghanaian','Greek',
+  'Grenadian','Guatemalan','Guinean','Guyanese',
+  'Haitian','Honduran','Hungarian',
+  'Icelandic','Indian','Indonesian','Iranian','Iraqi','Irish','Israeli','Italian','Ivorian',
+  'Jamaican','Japanese','Jordanian',
+  'Kazakhstani','Kenyan','Kuwaiti','Kyrgyz',
+  'Laotian','Latvian','Lebanese','Liberian','Libyan','Lithuanian','Luxembourgish',
+  'Malagasy','Malawian','Malaysian','Maldivian','Malian','Maltese',
+  'Marshallese','Mauritanian','Mauritian','Mexican','Moldovan',
+  'Mongolian','Montenegrin','Moroccan','Mozambican',
+  'Namibian','Nepali','New Zealander','Nicaraguan','Nigerian','Nigerien','Norwegian',
+  'Omani',
+  'Pakistani','Palestinian','Panamanian','Papua New Guinean','Paraguayan',
+  'Peruvian','Polish','Portuguese',
+  'Qatari',
+  'Romanian','Russian','Rwandan',
+  'Samoan','Saudi','Senegalese','Serbian','Seychellois','Sierra Leonean',
+  'Singaporean','Slovak','Slovenian','Somali','South African',
+  'South Korean','South Sudanese','Spanish','Sri Lankan','Sudanese',
+  'Surinamese','Swedish','Swiss','Syrian',
+  'Taiwanese','Tajik','Tanzanian','Thai','Togolese','Tunisian','Turkish','Turkmen',
+  'Ugandan','Ukrainian','Uruguayan','Uzbek',
+  'Venezuelan','Vietnamese',
+  'Yemeni',
+  'Zambian','Zimbabwean',
 ];
 
 function calcDaysAtAirport(paxIdDatetime, newDatetime) {
@@ -79,6 +111,11 @@ export default function NewReport({ editMode }) {
   const [flightWarning, setFlightWarning] = useState('');
 
   const daysAtAirport = calcDaysAtAirport(form.pax_id_datetime, form.new_datetime);
+
+  // Show Nusuk badge when pax is Umrah AND new flight departs 24h+ from now
+  const showNusuk = form.pax_type === 'Umrah' &&
+    form.new_datetime &&
+    (new Date(form.new_datetime) - Date.now()) >= 24 * 60 * 60 * 1000;
 
   // Load report data in edit mode
   useEffect(() => {
@@ -410,6 +447,16 @@ export default function NewReport({ editMode }) {
                 value={daysAtAirport !== '' ? `${daysAtAirport} day(s)` : '—'} />
               <p className="field-hint">Calculated from Pax ID date to New Flight date</p>
             </div>
+
+            {showNusuk && (
+              <div className="nusuk-banner">
+                <img src="/nusuk-logo.png" alt="Nusuk" className="nusuk-logo" />
+                <div className="nusuk-text">
+                  <strong>Nusuk Notification Required</strong>
+                  <span>Umrah passenger – new flight departs in 24 h or more. Notify Nusuk.</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
