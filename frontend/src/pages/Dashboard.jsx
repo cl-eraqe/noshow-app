@@ -621,6 +621,8 @@ export default function Dashboard() {
                     const days = liveDays(r.prev_datetime);
                     const urgent = days !== null && days >= 1;
                     const bus = needsBus(r.new_flight);
+                    const showNusuk = r.pax_type === 'Umrah' && r.new_datetime &&
+                      (new Date(r.new_datetime) - Date.now()) >= 24 * 60 * 60 * 1000;
                     return (
                       <tr key={r.id}
                         className={`clickable-row ${urgent && activeTab === 'under_process' ? 'row-urgent' : ''} ${bus && activeTab === 'flight_confirmed' ? 'row-bus' : ''}`}
@@ -644,6 +646,7 @@ export default function Dashboard() {
                         <td>{r.nationality || '—'}</td>
                         <td>
                           <span className="pax-type-badge">{r.pax_type || '—'}</span>
+                          {showNusuk && <img src="/nusuk-logo.svg" alt="Nusuk" className="nusuk-inline" title="Nusuk notification required" />}
                         </td>
                         <td className="col-center">{r.pax_count ?? '—'}</td>
                         <td className="col-center">
