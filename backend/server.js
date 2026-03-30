@@ -36,7 +36,7 @@ app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().to
 
 app.listen(PORT, () => {
   console.log(`JEDCO No-Show API running on port ${PORT}`);
-  // Auto-close flight_confirmed reports whose departure has passed — check every 5 minutes
+  // Auto-close flight_confirmed reports whose departure has passed — check every minute
   autoCloseReports();
-  setInterval(autoCloseReports, 5 * 60 * 1000);
+  setInterval(autoCloseReports, 60 * 1000);
 });

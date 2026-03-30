@@ -56,15 +56,21 @@ function initDb() {
 // Auto-close reports whose new flight departure has passed
 function autoCloseReports() {
   const database = getDb();
-  const now = new Date().toISOString();
-  database.prepare(`
+  // Users enter times in Jeddah local time (UTC+3) without timezone info,
+  // so we must compare against Jeddah time, not UTC.
+  const jeddahNow = new Date(Date.now() + 3 * 60 * 60 * 1000)
+    .toISOString().slice(0, 16); // e.g. "2026-03-30T14:30"
+  const result = database.prepare(`
     UPDATE reports
     SET status = 'closed'
     WHERE status = 'flight_confirmed'
       AND new_datetime IS NOT NULL
       AND new_datetime != ''
       AND new_datetime < ?
-  `).run(now);
+  `).run(jeddahNow);
+  if (result.changes > 0) {
+    console.log(`Auto-closed ${result.changes} report(s) at Jeddah time ${jeddahNow}`);
+  }
 }
 
 module.exports = { getDb, initDb, autoCloseReports };
