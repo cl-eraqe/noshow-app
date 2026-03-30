@@ -205,7 +205,7 @@ const TERMINAL_MAP = {
 
 export function getTerminal(flightNumber) {
   if (!flightNumber) return 'T1';
-  const code = flightNumber.toUpperCase().trim().replace(/[0-9]/g, '').trim();
+  const code = getAirlineCode(flightNumber);
   return TERMINAL_MAP[code] || 'T1';
 }
 
@@ -216,9 +216,8 @@ export function needsBus(flightNumber) {
 
 export function getAirlineCode(flightNumber) {
   if (!flightNumber) return '';
-  const fn = flightNumber.toUpperCase().trim();
-  const twoChar = fn.replace(/[0-9]/g, '').trim();
-  return twoChar || fn.slice(0, 2);
+  // IATA airline codes are always 2 characters (e.g. SV, G9, 6E, 3T)
+  return flightNumber.toUpperCase().trim().slice(0, 2);
 }
 
 export function airlineLogo(flightNumber) {

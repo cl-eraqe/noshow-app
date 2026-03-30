@@ -604,7 +604,6 @@ export default function Dashboard() {
                       </th>
                     )}
                     <th>#</th>
-                    <th>Pax ID Date</th>
                     <th>Prev Flight</th>
                     <th>Destination</th>
                     <th>Nationality</th>
@@ -638,7 +637,6 @@ export default function Dashboard() {
                           #{r.id}
                           {r.comment && <span className="comment-indicator" title={r.comment}>💬</span>}
                         </td>
-                        <td>{fmt(r.pax_id_datetime)}</td>
                         <td className="col-flight">
                           <span className="flight-badge">{r.prev_flight || '—'}</span>
                         </td>
