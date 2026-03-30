@@ -450,7 +450,7 @@ export default function NewReport({ editMode }) {
 
             {showNusuk && (
               <div className="nusuk-banner">
-                <img src="/nusuk-logo.png" alt="Nusuk" className="nusuk-logo" />
+                <img src="/nusuk-logo.svg" alt="Nusuk" className="nusuk-logo" />
                 <div className="nusuk-text">
                   <strong>Nusuk Notification Required</strong>
                   <span>Umrah passenger – new flight departs in 24 h or more. Notify Nusuk.</span>
