@@ -628,26 +628,26 @@ export default function Dashboard() {
                         onClick={e => handleRowClick(r, e)}
                       >
                         {activeTab !== 'closed' && (
-                          <td>
+                          <td data-label="" className="mobile-checkbox">
                             <input type="checkbox" checked={selected.has(r.id)}
                               onChange={e => toggleSelect(r.id, e)} />
                           </td>
                         )}
-                        <td className="col-id">
+                        <td data-label="#" className="col-id">
                           #{r.id}
                           {r.comment && <span className="comment-indicator" title={r.comment}>💬</span>}
                         </td>
-                        <td className="col-flight">
+                        <td data-label="Prev Flight" className="col-flight">
                           <span className="flight-badge">{r.prev_flight || '—'}</span>
                         </td>
-                        <td>{r.prev_destination || '—'}</td>
-                        <td>{r.nationality || '—'}</td>
-                        <td>
+                        <td data-label="Destination">{r.prev_destination || '—'}</td>
+                        <td data-label="Nationality">{r.nationality || '—'}</td>
+                        <td data-label="Pax Type">
                           <span className="pax-type-badge">{r.pax_type || '—'}</span>
                           {showNusuk && <img src="/nusuk-logo.svg" alt="Nusuk" className="nusuk-inline" title="Nusuk notification required" />}
                         </td>
-                        <td className="col-center">{r.pax_count ?? '—'}</td>
-                        <td className="col-center">
+                        <td data-label="Pax" className="col-center">{r.pax_count ?? '—'}</td>
+                        <td data-label="Days" className="col-center">
                           {days !== null ? (
                             <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>
                               {days}d
@@ -655,13 +655,13 @@ export default function Dashboard() {
                           ) : '—'}
                         </td>
                         {activeTab !== 'under_process' && (
-                          <td className="col-flight">
+                          <td data-label="New Flight" className="col-flight">
                             <span className="flight-badge">{r.new_flight || '—'}</span>
                             {bus && <span className="bus-badge" title={`Bus to ${getTerminal(r.new_flight)} Terminal`}>🚌 {getTerminal(r.new_flight)}</span>}
                           </td>
                         )}
-                        {activeTab !== 'under_process' && <td>{fmt(r.new_datetime)}</td>}
-                        <td className="col-actions">
+                        {activeTab !== 'under_process' && <td data-label="New Flight Date">{fmt(r.new_datetime)}</td>}
+                        <td data-label="" className="col-actions">
                           {(r.status || 'under_process') === 'under_process' && (
                             <button className="btn btn-xs btn-confirm"
                               onClick={e => { e.stopPropagation(); openConfirmModal(r); }}

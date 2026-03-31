@@ -1056,10 +1056,66 @@ html, body, #root {
   .dashboard-header { padding: 12px 14px; }
   .page { padding: 12px 10px 30px; }
   .form-section { padding: 14px; }
-  .report-table th, .report-table td { padding: 8px 8px; }
   .stat-value { font-size: 1.7rem; }
   .success-card { padding: 24px 16px; }
   .field-grid { grid-template-columns: 1fr; }
+
+  /* ── Card layout for table on mobile ── */
+  .table-wrapper { overflow-x: visible; }
+
+  .report-table thead { display: none; }
+
+  .report-table,
+  .report-table tbody { display: block; width: 100%; }
+
+  .report-table tr {
+    display: block;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 10px;
+    padding: 12px 14px;
+    border-left: 4px solid var(--navy);
+  }
+  .report-table tr.row-urgent { border-left-color: var(--danger); }
+  .report-table tr.row-bus { border-left-color: #f39c12; }
+
+  .report-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid #eef2f6;
+    text-align: right;
+  }
+  .report-table td:last-child { border-bottom: none; }
+
+  .report-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-align: left;
+    flex-shrink: 0;
+    margin-right: 12px;
+  }
+
+  /* Hide label for checkbox & actions rows */
+  .mobile-checkbox { justify-content: flex-start; }
+  .mobile-checkbox::before { display: none; }
+  td.col-actions::before { display: none; }
+  td.col-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px;
+    padding-top: 8px;
+  }
+
+  /* Reset text alignment overrides */
+  .report-table td.col-center { text-align: right; }
+  .col-flight { white-space: normal; }
+  .col-actions { white-space: normal; }
 }
 
 /* ════════════════ NUSUK BANNER ════════════════ */
