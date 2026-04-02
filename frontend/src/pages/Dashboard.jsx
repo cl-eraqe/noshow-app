@@ -78,6 +78,10 @@ export default function Dashboard() {
   const [ceoLoading, setCeoLoading] = useState(false);
   const [ceoCopied, setCeoCopied] = useState(false);
 
+  // Inline pax edit
+  const [editingPax, setEditingPax] = useState(null); // report id
+  const [editPaxValue, setEditPaxValue] = useState('');
+
   // Handover modal
   const [handoverModal, setHandoverModal] = useState(false);
   const [handoverData, setHandoverData] = useState(null);
@@ -228,6 +232,25 @@ export default function Dashboard() {
     } catch (err) {
       alert('Failed to update: ' + err.message);
     }
+  }
+
+  // ── Inline pax edit
+  function startEditPax(r, e) {
+    e.stopPropagation();
+    setEditingPax(r.id);
+    setEditPaxValue(String(r.pax_count ?? 0));
+  }
+
+  async function savePax(id) {
+    const val = parseInt(editPaxValue);
+    if (isNaN(val) || val < 0) { setEditingPax(null); return; }
+    try {
+      const updated = await updateReport(id, { pax_count: val });
+      setReports(prev => prev.map(r => r.id === updated.id ? updated : r));
+    } catch (err) {
+      alert('Failed to update pax count: ' + err.message);
+    }
+    setEditingPax(null);
   }
 
   // ── Bulk select
@@ -459,6 +482,35 @@ export default function Dashboard() {
     navigate('/login');
   }
 
+  // ── Swipe handling for mobile
+  const touchRef = { startX: 0, startY: 0, id: null };
+
+  function handleTouchStart(r, e) {
+    const touch = e.touches[0];
+    touchRef.startX = touch.clientX;
+    touchRef.startY = touch.clientY;
+    touchRef.id = r.id;
+  }
+
+  function handleTouchEnd(r, e) {
+    if (touchRef.id !== r.id) return;
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchRef.startX;
+    const dy = touch.clientY - touchRef.startY;
+    // Only register horizontal swipes (dx > 60px, and more horizontal than vertical)
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+
+    if (dx < 0) {
+      // Swipe left → confirm flight (only if under_process)
+      if ((r.status || 'under_process') === 'under_process') {
+        openConfirmModal(r);
+      }
+    } else {
+      // Swipe right → duplicate
+      duplicate(r);
+    }
+  }
+
   // ── Row click → edit (but not on action buttons/checkboxes)
   function handleRowClick(r, e) {
     // Don't navigate if clicking on buttons, inputs, or action cells
@@ -499,6 +551,12 @@ export default function Dashboard() {
     under_process: reports.filter(r => (r.status || 'under_process') === 'under_process').length,
     flight_confirmed: reports.filter(r => r.status === 'flight_confirmed').length,
     closed: reports.filter(r => r.status === 'closed').length,
+  };
+
+  const paxCounts = {
+    under_process: reports.filter(r => (r.status || 'under_process') === 'under_process').reduce((s, r) => s + (r.pax_count || 0), 0),
+    flight_confirmed: reports.filter(r => r.status === 'flight_confirmed').reduce((s, r) => s + (r.pax_count || 0), 0),
+    closed: reports.filter(r => r.status === 'closed').reduce((s, r) => s + (r.pax_count || 0), 0),
   };
 
   // Selected reports for bulk modal
@@ -548,6 +606,7 @@ export default function Dashboard() {
           >
             <span className="tab-label">{STATUS_LABELS[status]}</span>
             <span className="tab-count" style={{ backgroundColor: STATUS_COLORS[status] }}>{counts[status]}</span>
+            <span className="tab-pax">{paxCounts[status]} pax</span>
           </button>
         ))}
       </div>
@@ -593,6 +652,10 @@ export default function Dashboard() {
 
           : (
             <div className="table-wrapper">
+              <div className="swipe-hint">
+                <span>← Swipe left: Confirm</span>
+                <span>Swipe right: Duplicate →</span>
+              </div>
               <table className="report-table">
                 <thead>
                   <tr>
@@ -626,6 +689,8 @@ export default function Dashboard() {
                       <tr key={r.id}
                         className={`clickable-row ${urgent && activeTab === 'under_process' ? 'row-urgent' : ''} ${bus && activeTab === 'flight_confirmed' ? 'row-bus' : ''}`}
                         onClick={e => handleRowClick(r, e)}
+                        onTouchStart={e => handleTouchStart(r, e)}
+                        onTouchEnd={e => handleTouchEnd(r, e)}
                       >
                         {activeTab !== 'closed' && (
                           <td data-label="" className="mobile-checkbox">
@@ -646,7 +711,25 @@ export default function Dashboard() {
                           <span className="pax-type-badge">{r.pax_type || '—'}</span>
                           {showNusuk && <img src="/nusuk-logo.svg" alt="Nusuk" className="nusuk-inline" title="Nusuk notification required" />}
                         </td>
-                        <td data-label="Pax" className="col-center">{r.pax_count ?? '—'}</td>
+                        <td data-label="Pax" className="col-center">
+                          {editingPax === r.id ? (
+                            <input
+                              type="number"
+                              min="0"
+                              className="pax-inline-edit"
+                              value={editPaxValue}
+                              onChange={e => setEditPaxValue(e.target.value)}
+                              onBlur={() => savePax(r.id)}
+                              onKeyDown={e => { if (e.key === 'Enter') savePax(r.id); if (e.key === 'Escape') setEditingPax(null); }}
+                              autoFocus
+                              onClick={e => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="pax-editable" onClick={e => startEditPax(r, e)} title="Click to edit">
+                              {r.pax_count ?? '—'}
+                            </span>
+                          )}
+                        </td>
                         <td data-label="Days" className="col-center">
                           {days !== null ? (
                             <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>

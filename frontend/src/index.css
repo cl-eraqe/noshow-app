@@ -617,6 +617,17 @@ html, body, #root {
   text-align: center;
 }
 
+.tab-pax {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.status-tab.active .tab-pax {
+  color: inherit;
+}
+
 .status-badge {
   display: inline-block;
   padding: 3px 10px;
@@ -1116,6 +1127,43 @@ html, body, #root {
   .report-table td.col-center { text-align: right; }
   .col-flight { white-space: normal; }
   .col-actions { white-space: normal; }
+
+  /* Swipe hint — visible only on mobile (inside @media block) */
+  .swipe-hint {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .swipe-hint span { opacity: 0.7; }
+}
+
+/* ════════════════ SWIPE HINT (hidden on desktop) ════════════════ */
+.swipe-hint { display: none; }
+
+/* ════════════════ INLINE PAX EDIT ════════════════ */
+.pax-editable {
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.pax-editable:hover {
+  background: var(--autofill);
+  outline: 1.5px dashed var(--navy-mid);
+}
+
+.pax-inline-edit {
+  width: 52px;
+  padding: 3px 6px;
+  font-size: 0.85rem;
+  text-align: center;
+  border: 2px solid var(--navy);
+  border-radius: 4px;
+  outline: none;
+  background: var(--autofill);
 }
 
 /* ════════════════ NUSUK BANNER ════════════════ */

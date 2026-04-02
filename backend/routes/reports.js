@@ -182,6 +182,8 @@ router.get('/handover', (req, res) => {
       line += `\n   → ${r.comment}`;
     }
 
+    line += ` #${r.id}`;
+
     return line;
   }
 
@@ -200,7 +202,7 @@ router.get('/handover', (req, res) => {
       const bus = needsBus(r.new_flight) ? ' 🚌' : '';
       const terminal = getTerminal(r.new_flight);
       const termNote = terminal !== 'T1' ? ` (${terminal})` : '';
-      lines.push(`${String(r.pax_count || 1).padStart(2, '0')}PAX ${r.new_flight} ${iataCode(r.new_destination)} → STD ${fmtTimeShort(r.new_datetime)} TODAY${termNote}${bus}`);
+      lines.push(`${String(r.pax_count || 1).padStart(2, '0')}PAX ${r.new_flight} ${iataCode(r.new_destination)} → STD ${fmtTimeShort(r.new_datetime)} TODAY${termNote}${bus} #${r.id}`);
       if (r.comment) lines.push(`   → ${r.comment}`);
     });
     lines.push('');
@@ -212,7 +214,7 @@ router.get('/handover', (req, res) => {
     lines.push('');
     busTransfers.forEach(r => {
       const terminal = getTerminal(r.new_flight);
-      lines.push(`${String(r.pax_count || 1).padStart(2, '0')}PAX → ${r.new_flight} ${iataCode(r.new_destination)} STD ${fmtTimeShort(r.new_datetime)} ${fmtDateShort(r.new_datetime)} (${terminal})`);
+      lines.push(`${String(r.pax_count || 1).padStart(2, '0')}PAX → ${r.new_flight} ${iataCode(r.new_destination)} STD ${fmtTimeShort(r.new_datetime)} ${fmtDateShort(r.new_datetime)} (${terminal}) #${r.id}`);
       if (r.comment) lines.push(`   → ${r.comment}`);
     });
     lines.push('');
@@ -687,7 +689,7 @@ router.patch('/:id', express.json(), (req, res) => {
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
   if (!report) return res.status(404).json({ error: 'Report not found' });
 
-  const { status, new_flight, new_datetime, new_destination, new_airline, comment } = req.body;
+  const { status, new_flight, new_datetime, new_destination, new_airline, comment, pax_count } = req.body;
 
   // Validate status
   const validStatuses = ['under_process', 'flight_confirmed', 'closed'];
@@ -723,6 +725,10 @@ router.patch('/:id', express.json(), (req, res) => {
     updates.push('comment = ?');
     values.push(comment);
   }
+  if (pax_count !== undefined) {
+    updates.push('pax_count = ?');
+    values.push(parseInt(pax_count) || 0);
+  }
 
   // Recalculate days_at_airport from prev_flight to now
   if (report.prev_datetime) {
@@ -736,7 +742,7 @@ router.patch('/:id', express.json(), (req, res) => {
   // Regenerate whatsapp text
   const finalPrevFlight = report.prev_flight;
   const finalPrevDest = report.prev_destination;
-  const finalPaxCount = report.pax_count;
+  const finalPaxCount = pax_count !== undefined ? (parseInt(pax_count) || 0) : report.pax_count;
   const finalPaxType = report.pax_type;
   const finalNationality = report.nationality;
   const finalNewFlight = new_flight !== undefined ? new_flight : report.new_flight;
