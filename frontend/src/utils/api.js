@@ -93,8 +93,9 @@ export async function getHandoverReport(shift) {
 }
 
 // ── Airline code → name mapping (client-side, no API call needed)
+// Updated from POWERAPP.xlsx — 2026-04-09
 const AIRLINE_CODES = {
-  // Terminal 1
+  // Terminal 1 (20 airlines)
   SV: 'Saudia',
   XY: 'flynas',
   F3: 'Flyadeal',
@@ -105,10 +106,6 @@ const AIRLINE_CODES = {
   FZ: 'flydubai',
   AT: 'Royal Air Maroc',
   ME: 'Middle East Airlines',
-  AZ: 'ITA Airways',
-  TK: 'Turkish Airlines',
-  BI: 'Royal Brunei',
-  KC: 'Air Astana',
   A3: 'Aegean',
   MH: 'Malaysia Airlines',
   BA: 'British Airways',
@@ -117,10 +114,9 @@ const AIRLINE_CODES = {
   GF: 'Gulf Air',
   RJ: 'Royal Jordanian',
   VF: 'AJet',
-  TR: 'Scoot',
   EW: 'Eurowings',
-  HV: 'Transavia',
-  // North Terminal
+  HU: 'Hainan Airlines',
+  // North Terminal (22 airlines)
   G9: 'Air Arabia',
   NE: 'Nesma Airlines',
   IY: 'Yemenia',
@@ -131,11 +127,8 @@ const AIRLINE_CODES = {
   ET: 'Ethiopian Airlines',
   NP: 'Nile Air',
   HY: 'Uzbekistan Airways',
-  W6: 'Wizz Air',
-  J2: 'Azerbaijan Airlines',
   SZ: 'Somon Air',
   RB: 'SyrianAir',
-  UJ: 'AlMasria Universal',
   D3: 'Daallo Airlines',
   SD: 'Sudan Airways',
   DV: 'SCAT Airlines',
@@ -143,33 +136,32 @@ const AIRLINE_CODES = {
   AI: 'Air India',
   OV: 'SalamAir',
   IX: 'Air India Express',
-  UL: 'SriLankan Airlines',
-  J9: 'Jazeera Airways',
-  UK: 'Vistara',
   TU: 'Tunisair',
-  // Hajj Terminal
+  W9: 'Wizz Air Abu Dhabi',
+  E5: 'Air Arabia Egypt',
+  // Hajj Terminal (22 airlines)
   PA: 'airblue',
   PF: 'Air Sial',
   BG: 'Biman Bangladesh Airlines',
   AH: 'Air Algérie',
   GA: 'Garuda Indonesia',
   FG: 'Ariana Afghan Airlines',
-  '9S': 'Air Samarkand',
-  HH: 'Qanot Sharq',
-  VM: 'Max Air',
-  T5: 'Turkmenistan Airlines',
-  QB: 'Queen Bilqis Airways',
   BS: 'US-Bangla Airlines',
   '9P': 'Fly Jinnah',
   QP: 'Akasa Air',
-  HC: 'Air Senegal',
   PK: 'Pakistan International Airlines',
-  ER: 'SereneAir',
   JT: 'Lion Air',
-  ID: 'Batik Air',
   RQ: 'Kam Air',
   C6: 'Centrum Air',
-  R5: 'Jordan Aviation',
+  TK: 'Turkish Airlines',
+  D7: 'AirAsia X',
+  '2S': 'Star Peru',
+  '7Q': 'Elite Airways',
+  BJ: 'Nouvelair',
+  BM: 'BMI Regional',
+  FH: 'Freebird Airlines',
+  UZ: 'Buraq Air',
+  XC: 'Corendon Airlines',
   // Other (kept for reference)
   LH: 'Lufthansa',
   AF: 'Air France',
@@ -183,24 +175,25 @@ const AIRLINE_CODES = {
 };
 
 // ── Terminal mapping (T1 = our terminal, North/Hajj = needs bus 🚌)
+// Updated from POWERAPP.xlsx — 2026-04-09
 const TERMINAL_MAP = {
-  // Terminal 1 — no bus (our terminal)
+  // Terminal 1 — no bus (20 airlines)
   SV: 'T1', XY: 'T1', F3: 'T1', QR: 'T1', EK: 'T1', KU: 'T1',
-  WY: 'T1', FZ: 'T1', RJ: 'T1', ME: 'T1', AZ: 'T1', TK: 'T1',
-  GF: 'T1', EY: 'T1', AT: 'T1', VF: 'T1', TR: 'T1', EW: 'T1',
-  HV: 'T1', BI: 'T1', KC: 'T1', A3: 'T1', MH: 'T1', BA: 'T1', MS: 'T1',
-  // North Terminal — bus needed 🚌
+  WY: 'T1', FZ: 'T1', RJ: 'T1', ME: 'T1', GF: 'T1', EY: 'T1',
+  AT: 'T1', VF: 'T1', EW: 'T1', A3: 'T1', MH: 'T1', BA: 'T1',
+  MS: 'T1', HU: 'T1',
+  // North Terminal — bus needed 🚌 (22 airlines)
   G9: 'North', NE: 'North', IY: 'North', '6E': 'North', PC: 'North',
   '3T': 'North', SM: 'North', J4: 'North', AI: 'North', ET: 'North',
-  NP: 'North', HY: 'North', W6: 'North', J2: 'North', SZ: 'North',
-  RB: 'North', UJ: 'North', D3: 'North', SD: 'North', DV: 'North',
-  OV: 'North', IX: 'North', UL: 'North', J9: 'North', UK: 'North', TU: 'North',
-  // Hajj Terminal — bus needed 🚌
-  PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', ER: 'Hajj',
-  AH: 'Hajj', GA: 'Hajj', FG: 'Hajj', '9S': 'Hajj', HH: 'Hajj',
-  VM: 'Hajj', T5: 'Hajj', QB: 'Hajj', BS: 'Hajj', '9P': 'Hajj',
-  QP: 'Hajj', HC: 'Hajj', JT: 'Hajj', ID: 'Hajj', RQ: 'Hajj',
-  C6: 'Hajj', R5: 'Hajj',
+  NP: 'North', HY: 'North', SZ: 'North', RB: 'North', D3: 'North',
+  SD: 'North', DV: 'North', OV: 'North', IX: 'North', TU: 'North',
+  W9: 'North', E5: 'North',
+  // Hajj Terminal — bus needed 🚌 (22 airlines)
+  PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
+  GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '9P': 'Hajj', QP: 'Hajj',
+  JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', TK: 'Hajj', D7: 'Hajj',
+  '2S': 'Hajj', '7Q': 'Hajj', BJ: 'Hajj', BM: 'Hajj', FH: 'Hajj',
+  UZ: 'Hajj', XC: 'Hajj',
 };
 
 export function getTerminal(flightNumber) {
