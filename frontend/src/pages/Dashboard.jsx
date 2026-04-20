@@ -582,9 +582,14 @@ export default function Dashboard() {
             Shift Summary
           </button>
           {isSupervisor() && (
-            <button className="btn btn-secondary btn-sm" onClick={() => navigate('/analytics')}>
-              Analytics
-            </button>
+            <>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/analytics')}>
+                Analytics
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/access-management')} title="Manage Excel export access">
+                Access
+              </button>
+            </>
           )}
           <button className="btn btn-primary btn-sm" onClick={() => navigate('/new-report')}>
             + New Report

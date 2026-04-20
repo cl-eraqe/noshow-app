@@ -75,6 +75,46 @@ export async function getAnalytics() {
   return request('/api/reports/analytics/summary');
 }
 
+export async function getDashboardData(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
+  return request(`/api/analytics/dashboard?${params.toString()}`);
+}
+
+export async function getFilterOptions() {
+  return request('/api/analytics/filter-options');
+}
+
+export async function getAuditLog(reportId) {
+  const q = reportId ? `?report_id=${reportId}` : '';
+  return request(`/api/analytics/audit-log${q}`);
+}
+
+// ── Export tokens (supervisor management)
+export async function getExportTokens() {
+  return request('/api/export/tokens');
+}
+export async function createExportToken(email, role = 'view') {
+  return request('/api/export/tokens', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, role }),
+  });
+}
+export async function revokeExportToken(id, revoked) {
+  return request(`/api/export/tokens/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ revoked }),
+  });
+}
+export async function rotateExportToken(id) {
+  return request(`/api/export/tokens/${id}/rotate`, { method: 'POST' });
+}
+export async function deleteExportToken(id) {
+  return request(`/api/export/tokens/${id}`, { method: 'DELETE' });
+}
+
 // ── Shift Summary
 export async function getShiftSummary(date) {
   const params = date ? `?date=${date}` : '';

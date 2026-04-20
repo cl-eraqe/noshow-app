@@ -3,7 +3,20 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { getDb, autoCloseReports } = require('../db');
+const { getDb, autoCloseReports, logAudit, diffFields } = require('../db');
+
+// Jeddah-time timestamp: "YYYY-MM-DD HH:mm:ss"
+function jeddahNowStr() {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+// Fields to track in audit
+const AUDIT_FIELDS = [
+  'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline',
+  'nationality', 'pax_type', 'pax_count',
+  'new_flight', 'new_datetime', 'new_destination', 'new_airline',
+  'status', 'comment',
+];
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 
@@ -618,7 +631,20 @@ router.post('/', upload.array('files', 10), (req, res) => {
 
   db.prepare('UPDATE reports SET whatsapp_text = ? WHERE id = ?').run(whatsapp_text, id);
 
+  // If created already as flight_confirmed, stamp confirmed_at
+  if (reportStatus === 'flight_confirmed') {
+    db.prepare('UPDATE reports SET confirmed_at = ? WHERE id = ?').run(jeddahNowStr(), id);
+  }
+
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id);
+
+  logAudit({
+    user: submitted_by || 'staff',
+    action: 'create',
+    reportId: id,
+    snapshot: report,
+  });
+
   res.status(201).json(report);
 });
 
@@ -685,7 +711,26 @@ router.put('/:id', upload.array('files', 10), (req, res) => {
     req.params.id,
   );
 
+  // Stamp transition timestamps
+  if (existing.status !== 'flight_confirmed' && reportStatus === 'flight_confirmed' && !existing.confirmed_at) {
+    db.prepare('UPDATE reports SET confirmed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+  if (existing.status !== 'closed' && reportStatus === 'closed' && !existing.closed_at) {
+    db.prepare('UPDATE reports SET closed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+
   const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+
+  const changes = diffFields(existing, updated, AUDIT_FIELDS);
+  if (changes) {
+    logAudit({
+      user: req.body.submitted_by || 'staff',
+      action: 'edit',
+      reportId: updated.id,
+      changes,
+    });
+  }
+
   res.json(updated);
 });
 
@@ -770,7 +815,31 @@ router.patch('/:id', express.json(), (req, res) => {
   values.push(req.params.id);
   db.prepare(`UPDATE reports SET ${updates.join(', ')} WHERE id = ?`).run(...values);
 
+  // Stamp transition timestamps
+  if (status && report.status !== 'flight_confirmed' && status === 'flight_confirmed' && !report.confirmed_at) {
+    db.prepare('UPDATE reports SET confirmed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+  if (status && report.status !== 'closed' && status === 'closed' && !report.closed_at) {
+    db.prepare('UPDATE reports SET closed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+
   const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+
+  const changes = diffFields(report, updated, AUDIT_FIELDS);
+  if (changes) {
+    const action =
+      changes.status?.to === 'flight_confirmed' ? 'confirm_flight' :
+      changes.status?.to === 'closed' ? 'close' :
+      changes.status?.to === 'under_process' ? 'reopen' :
+      'edit';
+    logAudit({
+      user: req.body.submitted_by || 'staff',
+      action,
+      reportId: updated.id,
+      changes,
+    });
+  }
+
   res.json(updated);
 });
 
@@ -790,6 +859,14 @@ router.delete('/:id', (req, res) => {
   } catch (_) { /* ignore parse errors */ }
 
   db.prepare('DELETE FROM reports WHERE id = ?').run(req.params.id);
+
+  logAudit({
+    user: req.query.user || 'supervisor',
+    action: 'delete',
+    reportId: report.id,
+    snapshot: report,
+  });
+
   res.json({ success: true });
 });
 

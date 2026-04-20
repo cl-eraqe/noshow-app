@@ -3,6 +3,7 @@ import LoginPage   from './pages/LoginPage';
 import Dashboard   from './pages/Dashboard';
 import NewReport   from './pages/NewReport';
 import Analytics   from './pages/Analytics';
+import AccessManagement from './pages/AccessManagement';
 import PrivateRoute from './components/PrivateRoute';
 
 export default function App() {
@@ -25,6 +26,10 @@ export default function App() {
 
         <Route path="/analytics" element={
           <PrivateRoute supervisorOnly><Analytics /></PrivateRoute>
+        } />
+
+        <Route path="/access-management" element={
+          <PrivateRoute supervisorOnly><AccessManagement /></PrivateRoute>
         } />
 
         {/* Default redirect */}
