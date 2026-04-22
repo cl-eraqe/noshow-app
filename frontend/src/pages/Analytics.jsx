@@ -6,10 +6,28 @@ import {
 } from 'recharts';
 import { getDashboardData, getFilterOptions } from '../utils/api';
 
-const COLORS = [
-  '#1a3a5c', '#2a5298', '#3a7bd5', '#5a9fd4', '#7ab8e0',
-  '#9ad0ec', '#b4ddf5', '#ce8a35', '#e6a93a', '#f5c842',
-];
+// ── Nationality → ISO country code for flagcdn.com
+const NATIONALITY_FLAGS = {
+  Egyptian: 'eg', Egypt: 'eg',
+  Pakistani: 'pk', Pakistan: 'pk',
+  Indian: 'in', India: 'in',
+  Bangladeshi: 'bd', Bangladesh: 'bd',
+  Turkish: 'tr', Turkey: 'tr',
+  Ethiopian: 'et', Ethiopia: 'et',
+  Ugandan: 'ug', Uganda: 'ug',
+  Moroccan: 'ma', Morocco: 'ma',
+};
+const flagUrl = (nat) => {
+  const code = NATIONALITY_FLAGS[nat];
+  return code ? `https://flagcdn.com/w640/${code}.png` : null;
+};
+
+// ── Airline brand colors + logos (place logos at /public/airlines/{IATA}.png)
+const AIRLINE_BRAND = {
+  Saudia:   { color: '#00623B', accent: '#b99657', logo: '/airlines/SV.png' },
+  flynas:   { color: '#00B2A9', accent: '#004F4B', logo: '/airlines/XY.png' },
+  Flyadeal: { color: '#5B2A86', accent: '#C4D600', logo: '/airlines/F3.png' },
+};
 
 const RANGE_LABELS = {
   today: 'Today',
@@ -21,82 +39,146 @@ const RANGE_LABELS = {
   custom: 'Custom',
 };
 
+// ── Widget list (used by the toggle drawer) ──
+const WIDGETS = [
+  { id: 'kpi_underProcess',  label: 'KPI · Under Process',      defaultOn: true },
+  { id: 'kpi_nusuk',         label: 'KPI · Nusuk Intervention', defaultOn: true },
+  { id: 'kpi_confirmed',     label: 'KPI · Flight Confirmed',   defaultOn: true },
+  { id: 'kpi_closed',        label: 'KPI · Closed',             defaultOn: true },
+  { id: 'kpi_total',         label: 'KPI · Total Cases',        defaultOn: true },
+  { id: 'kpi_rebook',        label: 'KPI · Avg Rebook Time',    defaultOn: true },
+  { id: 'kpi_close',         label: 'KPI · Avg Close Time',     defaultOn: true },
+  { id: 'kpi_days',          label: 'KPI · Avg Days at Airport',defaultOn: true },
+  { id: 'chart_nationality', label: 'Chart · By Nationality',   defaultOn: true },
+  { id: 'chart_airline',     label: 'Chart · By Airline',       defaultOn: true },
+  { id: 'chart_destination', label: 'Chart · By Destination',   defaultOn: true },
+  { id: 'chart_shift',       label: 'Chart · By Shift',         defaultOn: true },
+  { id: 'chart_paxtype',     label: 'Chart · Passenger Type',   defaultOn: true },
+  { id: 'chart_days',        label: 'Chart · Days at Airport',  defaultOn: true },
+  { id: 'chart_resolution',  label: 'Chart · Resolution Time',  defaultOn: true },
+  { id: 'chart_heatmap',     label: 'Chart · Peak Hours',       defaultOn: true },
+  { id: 'chart_trend',       label: 'Chart · Volume Trend',     defaultOn: true },
+  { id: 'table_drill',       label: 'Table · Recent Cases',     defaultOn: true },
+];
+
+const PIE_COLORS = ['#39d0d8','#f5c842','#ff6b9d','#b794f4','#4ade80','#fb923c','#60a5fa'];
+
 function fmtHrs(hrs) {
   if (hrs == null || isNaN(hrs)) return '—';
-  if (hrs < 1) return `${Math.round(hrs * 60)}m`;
+  if (hrs < 1)  return `${Math.round(hrs * 60)}m`;
   if (hrs < 24) return `${hrs.toFixed(1)}h`;
   return `${(hrs / 24).toFixed(1)}d`;
 }
 
-// Sparkline: mini line chart for a KPI card
-function Sparkline({ data, color = '#1a3a5c' }) {
+// ── Sparkline (mini area under KPI)
+function Sparkline({ data, color = '#39d0d8' }) {
   if (!data || data.length === 0) return null;
   return (
-    <ResponsiveContainer width="100%" height={40}>
+    <ResponsiveContainer width="100%" height={32}>
       <AreaChart data={data} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
         <defs>
-          <linearGradient id={`g-${color}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity={0.4}/>
+          <linearGradient id={`sg-${color}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"  stopColor={color} stopOpacity={0.6}/>
             <stop offset="100%" stopColor={color} stopOpacity={0}/>
           </linearGradient>
         </defs>
         <Area type="monotone" dataKey="value" stroke={color} strokeWidth={1.5}
-          fill={`url(#g-${color})`} />
+              fill={`url(#sg-${color})`} />
       </AreaChart>
     </ResponsiveContainer>
   );
 }
 
-// KPI Card with sparkline + trend vs previous value
-function KpiCard({ label, value, spark, color, subtitle }) {
+// ── KPI Card ──
+function KpiCard({ label, value, sub, cases, pax, color, accent, spark, status, onClick, flash }) {
   return (
-    <div className="kpi-card" style={{ borderTopColor: color || '#1a3a5c' }}>
-      <div className="kpi-label">{label}</div>
-      <div className="kpi-value">{value}</div>
-      {subtitle && <div className="kpi-sub">{subtitle}</div>}
-      {spark && <Sparkline data={spark} color={color || '#1a3a5c'} />}
+    <div className={`xkpi ${flash ? 'xkpi-flash' : ''}`}
+         style={{ '--kpi-color': color, '--kpi-accent': accent || color }}
+         onClick={onClick}>
+      <div className="xkpi-top">
+        <span className="xkpi-label">{label}</span>
+        {status && <span className="xkpi-status">{status}</span>}
+      </div>
+      <div className="xkpi-value">{value}</div>
+      {(cases != null || pax != null) ? (
+        <div className="xkpi-meta">
+          {cases != null && <span><b>{cases}</b> cases</span>}
+          {pax != null && <span><b>{pax}</b> pax</span>}
+        </div>
+      ) : sub ? <div className="xkpi-sub">{sub}</div> : null}
+      {spark && <div className="xkpi-spark"><Sparkline data={spark} color={color} /></div>}
     </div>
   );
 }
 
-// Highlight badge (🔥 most / ❄ least)
-function Highlight({ type, item }) {
-  if (!item) return null;
-  const emoji = type === 'most' ? '🔥' : '❄';
-  const label = type === 'most' ? 'Most' : 'Least';
+// ── Custom horizontal bar list (for Nationality with flags & Airline with logos)
+function BrandedBarList({ data, mode, onClick }) {
+  if (!data || data.length === 0) {
+    return <div className="xchart-empty">No data</div>;
+  }
+  const max = Math.max(...data.map(d => d.value), 1);
   return (
-    <div className={`highlight highlight-${type}`}>
-      {emoji} {label}: <strong>{item.name}</strong> ({item.value})
+    <div className="xbarlist">
+      {data.map((d, i) => {
+        const pct = Math.max(4, (d.value / max) * 100);
+        const brand = mode === 'airline' ? AIRLINE_BRAND[d.name] : null;
+        const flag = mode === 'nationality' ? flagUrl(d.name) : null;
+        const bg =
+          flag ? `linear-gradient(90deg, rgba(12,22,40,0.10), rgba(12,22,40,0.25)), url(${flag}) center/cover no-repeat` :
+          brand ? brand.color :
+          'linear-gradient(90deg, #2563eb, #38bdf8)';
+        return (
+          <div key={i} className="xbarlist-row" onClick={() => onClick && onClick(d.name)}>
+            <div className="xbarlist-name">
+              {brand && <img src={brand.logo} alt="" className="xbarlist-logo"
+                             onError={e => { e.target.style.display='none'; }} />}
+              <span>{d.name}</span>
+            </div>
+            <div className="xbarlist-track">
+              <div className="xbarlist-fill"
+                   style={{
+                     width: `${pct}%`,
+                     background: bg,
+                     borderColor: brand ? brand.accent : 'transparent',
+                   }}>
+                <span className="xbarlist-val">
+                  <b>{d.value}</b>{d.pax != null && <span className="pax"> · {d.pax} pax</span>}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-// Heatmap — 7 days × 24 hours
+// ── Peak Hours Heatmap (dark) ──
 function Heatmap({ data }) {
   const max = Math.max(1, ...data.map(d => d.value));
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   return (
-    <div className="heatmap-wrap">
-      <div className="heatmap-hours">
-        <div className="heatmap-day-label"></div>
+    <div className="xheatmap">
+      <div className="xheatmap-row xheatmap-head">
+        <div className="xheatmap-dlab"></div>
         {Array.from({length:24}).map((_, h) => (
-          <div key={h} className="heatmap-hour-label">{h}</div>
+          <div key={h} className="xheatmap-hlab">{h}</div>
         ))}
       </div>
       {dayNames.map((d, di) => (
-        <div key={d} className="heatmap-row">
-          <div className="heatmap-day-label">{d}</div>
+        <div key={d} className="xheatmap-row">
+          <div className="xheatmap-dlab">{d}</div>
           {Array.from({length:24}).map((_, h) => {
             const cell = data.find(x => x.dayIdx === di && x.hour === h);
             const v = cell ? cell.value : 0;
             const intensity = v / max;
             const bg = intensity === 0
-              ? '#f0f4f8'
-              : `rgba(26, 58, 92, ${0.15 + intensity * 0.85})`;
+              ? 'rgba(255,255,255,0.04)'
+              : `rgba(57, 208, 216, ${0.12 + intensity * 0.78})`;
             return (
-              <div key={h} className="heatmap-cell"
-                style={{ background: bg, color: intensity > 0.55 ? '#fff' : '#333' }}
-                title={`${d} ${h}:00 → ${v} cases`}>
+              <div key={h} className="xheatmap-cell"
+                   style={{ background: bg, color: intensity > 0.55 ? '#0b1220' : '#a9bfd1' }}
+                   title={`${d} ${h}:00 → ${v} cases`}>
                 {v > 0 ? v : ''}
               </div>
             );
@@ -107,28 +189,50 @@ function Heatmap({ data }) {
   );
 }
 
+// ── LocalStorage helper
+const loadWidgets = () => {
+  try {
+    const s = JSON.parse(localStorage.getItem('exec_widgets') || 'null');
+    if (s && typeof s === 'object') return s;
+  } catch (_) {}
+  const init = {};
+  WIDGETS.forEach(w => { init[w.id] = w.defaultOn; });
+  return init;
+};
+
 export default function Analytics() {
   const navigate = useNavigate();
+  const [data, setData]     = useState(null);
   const [loading, setLoading] = useState(true);
-  const [data, setData]       = useState(null);
-  const [error, setError]     = useState('');
+  const [error, setError]   = useState('');
 
   // Filters
-  const [range, setRange]       = useState('today');
-  const [from, setFrom]         = useState('');
-  const [to, setTo]             = useState('');
-  const [shift, setShift]       = useState('');
-  const [status, setStatus]     = useState('');
-  const [airline, setAirline]   = useState('');
-  const [nationality, setNat]   = useState('');
+  const [range, setRange]   = useState('today');
+  const [from, setFrom]     = useState('');
+  const [to, setTo]         = useState('');
+  const [shift, setShift]   = useState('');
+  const [status, setStatus] = useState('');
+  const [airline, setAirline] = useState('');
+  const [nationality, setNat] = useState('');
   const [destination, setDest] = useState('');
-  const [terminal, setTerminal] = useState('');
-  const [paxType, setPaxType]   = useState('');
-
-  // Drill-through chip (from clicking a chart)
-  const [drill, setDrill] = useState(null); // { field, value, label }
+  const [paxType, setPaxType] = useState('');
+  const [drill, setDrill] = useState(null);
 
   const [filterOpts, setFilterOpts] = useState({ airlines: [], nationalities: [], destinations: [], paxTypes: [] });
+  const [widgets, setWidgets] = useState(loadWidgets);
+  const [widgetDrawer, setWidgetDrawer] = useState(false);
+  const [clock, setClock] = useState(new Date());
+
+  // persist widget toggles
+  useEffect(() => {
+    localStorage.setItem('exec_widgets', JSON.stringify(widgets));
+  }, [widgets]);
+
+  // live clock
+  useEffect(() => {
+    const t = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => {
     getFilterOptions().then(setFilterOpts).catch(() => {});
@@ -141,439 +245,449 @@ export default function Analytics() {
       const payload = {
         range: range === 'custom' ? '' : range,
         from: range === 'custom' ? from : '',
-        to: range === 'custom' ? to : '',
-        shift, status, airline, nationality, destination, terminal, pax_type: paxType,
+        to:   range === 'custom' ? to : '',
+        shift, status, airline, nationality, destination, pax_type: paxType,
       };
-      // Apply drill-through
-      if (drill) {
-        payload[drill.field] = drill.value;
-      }
+      if (drill) payload[drill.field] = drill.value;
       const d = await getDashboardData(payload);
       setData(d);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { setError(e.message); }
+    finally    { setLoading(false); }
   }
 
-  useEffect(() => {
-    reload();
+  useEffect(() => { reload(); }, [range, from, to, shift, status, airline, nationality, destination, paxType, drill]);
 
-  }, [range, from, to, shift, status, airline, nationality, destination, terminal, paxType, drill]);
+  // auto-refresh every 30s for TV mode
+  useEffect(() => {
+    const t = setInterval(reload, 30000);
+    return () => clearInterval(t);
+  });
 
   const kpi = data?.kpi;
 
-  // Drill-through handlers
-  function onDrill(field, name) {
-    setDrill({ field, value: name, label: name });
-  }
-  function clearDrill() { setDrill(null); }
+  const activeFilterCount = [shift, status, airline, nationality, destination, paxType].filter(Boolean).length + (drill ? 1 : 0);
 
+  function onDrill(field, name) { setDrill({ field, value: name, label: name }); }
+  function clearDrill() { setDrill(null); }
   function clearAllFilters() {
     setShift(''); setStatus(''); setAirline(''); setNat('');
-    setDest(''); setTerminal(''); setPaxType(''); setDrill(null);
+    setDest(''); setPaxType(''); setDrill(null);
+  }
+  function toggleWidget(id) {
+    setWidgets(prev => ({ ...prev, [id]: !prev[id] }));
   }
 
-  const activeFilterCount = [shift, status, airline, nationality, destination, terminal, paxType].filter(Boolean).length + (drill ? 1 : 0);
+  const jeddahTime = clock.toLocaleString('en-GB', {
+    timeZone: 'Asia/Riyadh',
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+
+  const on = (id) => widgets[id];
 
   return (
-    <div className="page analytics-page">
-      {/* ── Header */}
-      <div className="page-header">
-        <button className="btn-back" onClick={() => navigate('/dashboard')}>← Dashboard</button>
-        <h1 className="page-title">Executive Analytics</h1>
-        <span className="supervisor-badge">Supervisor</span>
-      </div>
-
-      {/* ── Filter Bar */}
-      <div className="filter-bar">
-        <div className="filter-group">
-          <label className="filter-label">Period</label>
-          <div className="range-chips">
+    <div className="exec-dashboard">
+      {/* ── Header Bar ── */}
+      <header className="xheader">
+        <div className="xheader-left">
+          <div className="xlive-dot"/>
+          <div>
+            <div className="xtitle">NO-SHOW PASSENGER INTELLIGENCE</div>
+            <div className="xsubtitle">Operations Control Center · Terminal 1</div>
+          </div>
+        </div>
+        <div className="xheader-center">
+          <div className="xchips">
             {['today','yesterday','week','month','year','all','custom'].map(r => (
               <button key={r}
-                className={`range-chip ${range === r ? 'active' : ''}`}
-                onClick={() => setRange(r)}>
+                      className={`xchip ${range === r ? 'active' : ''}`}
+                      onClick={() => setRange(r)}>
                 {RANGE_LABELS[r]}
               </button>
             ))}
           </div>
-        </div>
-
-        {range === 'custom' && (
-          <div className="filter-group">
-            <label className="filter-label">Range</label>
-            <div className="custom-range">
-              <input type="date" className="filter-input" value={from} onChange={e => setFrom(e.target.value)} />
+          {range === 'custom' && (
+            <div className="xcustomrange">
+              <input type="date" className="xinput" value={from} onChange={e => setFrom(e.target.value)} />
               <span>→</span>
-              <input type="date" className="filter-input" value={to} onChange={e => setTo(e.target.value)} />
+              <input type="date" className="xinput" value={to} onChange={e => setTo(e.target.value)} />
             </div>
-          </div>
-        )}
-
-        <div className="filter-group">
-          <label className="filter-label">Filters</label>
-          <div className="filter-row">
-            <select className="filter-input" value={shift} onChange={e => setShift(e.target.value)}>
-              <option value="">All Shifts</option>
-              <option value="A">Shift A (06–14)</option>
-              <option value="B">Shift B (14–22)</option>
-              <option value="C">Shift C (22–06)</option>
-            </select>
-
-            <select className="filter-input" value={status} onChange={e => setStatus(e.target.value)}>
-              <option value="">All Status</option>
-              <option value="under_process">Under Process</option>
-              <option value="flight_confirmed">Flight Confirmed</option>
-              <option value="closed">Closed</option>
-            </select>
-
-            <select className="filter-input" value={terminal} onChange={e => setTerminal(e.target.value)}>
-              <option value="">All Terminals</option>
-              <option value="T1">Terminal 1</option>
-              <option value="North">North Terminal</option>
-              <option value="Hajj">Hajj Terminal</option>
-            </select>
-
-            <select className="filter-input" value={paxType} onChange={e => setPaxType(e.target.value)}>
-              <option value="">All Pax Types</option>
-              {filterOpts.paxTypes.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-
-            <select className="filter-input" value={airline} onChange={e => setAirline(e.target.value)}>
-              <option value="">All Airlines</option>
-              {filterOpts.airlines.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-
-            <select className="filter-input" value={nationality} onChange={e => setNat(e.target.value)}>
-              <option value="">All Nationalities</option>
-              {filterOpts.nationalities.map(n => <option key={n} value={n}>{n}</option>)}
-            </select>
-
-            <select className="filter-input" value={destination} onChange={e => setDest(e.target.value)}>
-              <option value="">All Destinations</option>
-              {filterOpts.destinations.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-
-            {activeFilterCount > 0 && (
-              <button className="btn btn-xs btn-secondary" onClick={clearAllFilters}>
-                Clear ({activeFilterCount})
-              </button>
-            )}
-          </div>
+          )}
         </div>
+        <div className="xheader-right">
+          <div className="xclock">
+            <div className="xclock-time">{jeddahTime}</div>
+            <div className="xclock-label">Jeddah Local</div>
+          </div>
+          <button className="xiconbtn" onClick={() => setWidgetDrawer(!widgetDrawer)}
+                  title="Configure visible widgets">⚙</button>
+          <button className="xiconbtn" onClick={() => navigate('/dashboard')}
+                  title="Back to Dashboard">←</button>
+        </div>
+      </header>
 
+      {/* ── Secondary filter row ── */}
+      <div className="xfilterbar">
+        <select className="xinput" value={shift} onChange={e => setShift(e.target.value)}>
+          <option value="">All Shifts</option>
+          <option value="A">Shift A (06-14)</option>
+          <option value="B">Shift B (14-22)</option>
+          <option value="C">Shift C (22-06)</option>
+        </select>
+        <select className="xinput" value={status} onChange={e => setStatus(e.target.value)}>
+          <option value="">All Status</option>
+          <option value="under_process">Under Process</option>
+          <option value="flight_confirmed">Flight Confirmed</option>
+          <option value="closed">Closed</option>
+        </select>
+        <select className="xinput" value={paxType} onChange={e => setPaxType(e.target.value)}>
+          <option value="">All Pax Types</option>
+          {filterOpts.paxTypes.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select className="xinput" value={airline} onChange={e => setAirline(e.target.value)}>
+          <option value="">All Airlines</option>
+          {filterOpts.airlines.map(a => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select className="xinput" value={nationality} onChange={e => setNat(e.target.value)}>
+          <option value="">All Nationalities</option>
+          {filterOpts.nationalities.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select className="xinput" value={destination} onChange={e => setDest(e.target.value)}>
+          <option value="">All Destinations</option>
+          {filterOpts.destinations.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        {activeFilterCount > 0 && (
+          <button className="xclearbtn" onClick={clearAllFilters}>Clear ({activeFilterCount}) ✕</button>
+        )}
         {drill && (
-          <div className="drill-chip">
-            <span>Filtered by <strong>{drill.label}</strong></span>
+          <div className="xdrill">
+            Drill: <strong>{drill.label}</strong>
             <button onClick={clearDrill}>×</button>
           </div>
         )}
       </div>
 
-      {loading && <div className="state-msg">Loading dashboard…</div>}
-      {error   && <div className="state-msg error">{error}</div>}
+      {/* ── Widget drawer ── */}
+      {widgetDrawer && (
+        <div className="xdrawer-overlay" onClick={() => setWidgetDrawer(false)}>
+          <div className="xdrawer" onClick={e => e.stopPropagation()}>
+            <div className="xdrawer-head">
+              <h3>Customize Dashboard</h3>
+              <button className="xiconbtn" onClick={() => setWidgetDrawer(false)}>×</button>
+            </div>
+            <p className="xdrawer-hint">Uncheck widgets to hide them — the remaining ones will expand to fill the screen.</p>
+            <div className="xdrawer-list">
+              {WIDGETS.map(w => (
+                <label key={w.id} className="xdrawer-item">
+                  <input type="checkbox" checked={!!widgets[w.id]} onChange={() => toggleWidget(w.id)} />
+                  <span>{w.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="xdrawer-foot">
+              <button className="xchip" onClick={() => {
+                const all = {}; WIDGETS.forEach(w => { all[w.id] = true; }); setWidgets(all);
+              }}>Show all</button>
+              <button className="xchip" onClick={() => {
+                const none = {}; WIDGETS.forEach(w => { none[w.id] = false; }); setWidgets(none);
+              }}>Hide all</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && !data && <div className="xstate">Loading intelligence…</div>}
+      {error && <div className="xstate xerror">{error}</div>}
 
       {data && kpi && (
         <>
-          {/* ── KPI Cards Row */}
-          <div className="kpi-grid">
-            <KpiCard
-              label="Total Cases"
-              value={kpi.totalCases}
-              subtitle={`${kpi.totalPax} pax`}
-              color="#1a3a5c"
-              spark={kpi.sparkCases}
-            />
-            <KpiCard
-              label="Avg Time to Rebook"
-              value={fmtHrs(kpi.avgRebookHrs)}
-              subtitle="created → flight confirmed"
-              color="#27ae60"
-            />
-            <KpiCard
-              label="Avg Time to Close"
-              value={fmtHrs(kpi.avgCloseHrs)}
-              subtitle="created → closed"
-              color="#2a5298"
-            />
-            <KpiCard
-              label="Active Cases"
-              value={kpi.active}
-              subtitle="not yet closed"
-              color="#e67e22"
-            />
-            <KpiCard
-              label="Avg Days at Airport"
-              value={kpi.avgDaysAtAirport != null ? kpi.avgDaysAtAirport.toFixed(1) : '—'}
-              subtitle="days per case"
-              color="#8e44ad"
-              spark={kpi.sparkDays}
-            />
-            <KpiCard
-              label="Bus Transfers"
-              value={kpi.busPct.toFixed(1) + '%'}
-              subtitle="new flight at N/H terminal"
-              color="#f39c12"
-            />
-          </div>
+          {/* ── KPI strip ── */}
+          <section className="xkpi-strip">
+            {on('kpi_underProcess') && (
+              <KpiCard label="UNDER PROCESS"
+                       value={kpi.underProcessCases}
+                       cases={kpi.underProcessCases}
+                       pax={kpi.underProcessPax}
+                       status={kpi.underProcessCases > 0 ? 'Needs action' : 'All clear'}
+                       color="#ff8c42" accent="#ffb366" />
+            )}
+            {on('kpi_nusuk') && (
+              <KpiCard label="NUSUK INTERVENTION"
+                       value={kpi.needsNusukCases}
+                       cases={kpi.needsNusukCases}
+                       pax={kpi.needsNusukPax}
+                       status={kpi.needsNusukCases > 0 ? '⚠ Notify Ministry' : '✓ Up to date'}
+                       color="#1abc9c" accent="#26d7b3"
+                       flash={kpi.needsNusukCases > 0} />
+            )}
+            {on('kpi_confirmed') && (
+              <KpiCard label="FLIGHT CONFIRMED"
+                       value={kpi.confirmedCases}
+                       cases={kpi.confirmedCases}
+                       pax={kpi.confirmedPax}
+                       status="Awaiting departure"
+                       color="#22c55e" />
+            )}
+            {on('kpi_closed') && (
+              <KpiCard label="CLOSED"
+                       value={kpi.closedCases}
+                       cases={kpi.closedCases}
+                       pax={kpi.closedPax}
+                       status="Departed" color="#64748b" />
+            )}
+            {on('kpi_total') && (
+              <KpiCard label="TOTAL CASES"
+                       value={kpi.totalCases}
+                       cases={kpi.totalCases}
+                       pax={kpi.totalPax}
+                       status={RANGE_LABELS[range] || 'Range'}
+                       spark={kpi.sparkCases}
+                       color="#39d0d8" />
+            )}
+            {on('kpi_rebook') && (
+              <KpiCard label="AVG REBOOK TIME"
+                       value={fmtHrs(kpi.avgRebookHrs)}
+                       sub="created → confirmed"
+                       status={kpi.avgRebookHrs == null ? '—' :
+                              (kpi.avgRebookHrs < 12 ? '▼ Within SLA' : '▲ Above SLA')}
+                       color="#f5c842" />
+            )}
+            {on('kpi_close') && (
+              <KpiCard label="AVG CLOSE TIME"
+                       value={fmtHrs(kpi.avgCloseHrs)}
+                       sub="created → closed"
+                       status="— Stable"
+                       color="#38bdf8" />
+            )}
+            {on('kpi_days') && (
+              <KpiCard label="AVG DAYS AT AIRPORT"
+                       value={kpi.avgDaysAtAirport != null ? kpi.avgDaysAtAirport.toFixed(1) : '—'}
+                       sub="days per case"
+                       status={kpi.avgDaysAtAirport != null && kpi.avgDaysAtAirport > 3
+                                 ? '▲ Review extended stays' : '— Normal'}
+                       spark={kpi.sparkDays}
+                       color="#b794f4" />
+            )}
+          </section>
 
-          {/* ── Row 1: Nationality + Airline */}
-          <div className="charts-row">
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">By Nationality</h2>
-              <Highlight type="most" item={data.byNationality.most} />
-              <Highlight type="least" item={data.byNationality.least} />
-              {data.byNationality.data.length === 0
-                ? <p className="no-data">No data for current filters.</p>
-                : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart layout="vertical" data={data.byNationality.data} margin={{ left: 20, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#1a3a5c" radius={[0, 4, 4, 0]}
-                        onClick={(d) => onDrill('nationality', d.name)}
-                        style={{ cursor: 'pointer' }} />
+          {/* ── Nusuk intervention list (only when there are cases needing it) ── */}
+          {on('kpi_nusuk') && kpi.needsNusukCases > 0 && (
+            <section className="xpanel xpanel-alert">
+              <div className="xpanel-head">
+                <img src="/nusuk-logo.svg" alt="Nusuk" className="xnusuk-icon"/>
+                <h3>Ministry of Hajj & Umrah — Pax Awaiting Nusuk Confirmation</h3>
+                <span className="xpanel-count">{kpi.needsNusukCases} cases · {kpi.needsNusukPax} pax</span>
+              </div>
+              <div className="xnusuk-grid">
+                {kpi.needsNusukList.map(r => (
+                  <div key={r.id} className="xnusuk-card" onClick={() => navigate(`/edit-report/${r.id}`)}>
+                    <div className="xnusuk-id">#{r.id}</div>
+                    <div className="xnusuk-main">
+                      <div className="xnusuk-line"><b>{r.pax_count} pax</b> · {r.nationality}</div>
+                      <div className="xnusuk-line small">{r.new_flight} → {r.new_destination}</div>
+                      <div className="xnusuk-line small">Departs: {(r.new_datetime || '').replace('T',' ').slice(0,16)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Charts Grid ── */}
+          <section className="xgrid">
+            {on('chart_nationality') && (
+              <div className="xpanel xspan-6">
+                <div className="xpanel-head">
+                  <h3>BY NATIONALITY</h3>
+                  {data.byNationality.most &&
+                    <span className="xtag xtag-hot">🔥 {data.byNationality.most.name} ({data.byNationality.most.value})</span>}
+                </div>
+                <BrandedBarList data={data.byNationality.data} mode="nationality"
+                                onClick={name => onDrill('nationality', name)} />
+              </div>
+            )}
+
+            {on('chart_airline') && (
+              <div className="xpanel xspan-6">
+                <div className="xpanel-head">
+                  <h3>BY AIRLINE</h3>
+                  {data.byAirline.most &&
+                    <span className="xtag xtag-hot">🔥 {data.byAirline.most.name} ({data.byAirline.most.value})</span>}
+                </div>
+                <BrandedBarList data={data.byAirline.data} mode="airline"
+                                onClick={name => onDrill('airline', name)} />
+              </div>
+            )}
+
+            {on('chart_trend') && (
+              <div className="xpanel xspan-8">
+                <div className="xpanel-head"><h3>VOLUME TREND</h3></div>
+                {data.trend.length === 0 ? <div className="xchart-empty">No data for selected period</div> : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={data.trend}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2b45"/>
+                      <XAxis dataKey="date" tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                      <YAxis allowDecimals={false} tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                      <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
+                      <Legend wrapperStyle={{ color:'#a9bfd1' }}/>
+                      <Line type="monotone" dataKey="value" stroke="#39d0d8" strokeWidth={2} name="Cases" dot={false}/>
+                      <Line type="monotone" dataKey="pax" stroke="#f5c842" strokeWidth={2} strokeDasharray="4 3" name="Pax" dot={false}/>
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            )}
+
+            {on('chart_destination') && (
+              <div className="xpanel xspan-4">
+                <div className="xpanel-head">
+                  <h3>BY DESTINATION</h3>
+                  {data.byDestination.most &&
+                    <span className="xtag">{data.byDestination.data.slice(0,3).map(d => d.name).join(' · ')}</span>}
+                </div>
+                {data.byDestination.data.length === 0 ? <div className="xchart-empty">No data</div> : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={data.byDestination.data}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2b45"/>
+                      <XAxis dataKey="name" tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                      <YAxis allowDecimals={false} tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                      <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
+                      <Bar dataKey="value" fill="#38bdf8" radius={[4,4,0,0]}
+                           onClick={d => onDrill('destination', d.name)}
+                           style={{ cursor:'pointer' }}/>
                     </BarChart>
                   </ResponsiveContainer>
-                )
-              }
-            </div>
+                )}
+              </div>
+            )}
 
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">By Airline</h2>
-              <Highlight type="most" item={data.byAirline.most} />
-              <Highlight type="least" item={data.byAirline.least} />
-              {data.byAirline.data.length === 0
-                ? <p className="no-data">No data for current filters.</p>
-                : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart layout="vertical" data={data.byAirline.data} margin={{ left: 20, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#ce8a35" radius={[0, 4, 4, 0]}
-                        onClick={(d) => onDrill('airline', d.name)}
-                        style={{ cursor: 'pointer' }} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )
-              }
-            </div>
-          </div>
+            {on('chart_days') && (
+              <div className="xpanel xspan-4">
+                <div className="xpanel-head"><h3>DAYS AT AIRPORT</h3></div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={data.daysHistogram}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2b45"/>
+                    <XAxis dataKey="name" tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                    <YAxis allowDecimals={false} tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                    <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
+                    <Bar dataKey="value" fill="#b794f4" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
-          {/* ── Row 2: Destination + Shift */}
-          <div className="charts-row">
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">By Destination</h2>
-              <Highlight type="most" item={data.byDestination.most} />
-              <Highlight type="least" item={data.byDestination.least} />
-              {data.byDestination.data.length === 0
-                ? <p className="no-data">No data for current filters.</p>
-                : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={data.byDestination.data} margin={{ top: 10, bottom: 30 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#2a5298" radius={[4, 4, 0, 0]}
-                        onClick={(d) => onDrill('destination', d.name)}
-                        style={{ cursor: 'pointer' }} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )
-              }
-            </div>
+            {on('chart_resolution') && (
+              <div className="xpanel xspan-4">
+                <div className="xpanel-head"><h3>RESOLUTION TIME</h3><span className="xtag">created → confirmed</span></div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={data.resolutionHistogram}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2b45"/>
+                    <XAxis dataKey="name" tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                    <YAxis allowDecimals={false} tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                    <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
+                    <Bar dataKey="value" fill="#22c55e" radius={[4,4,0,0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">By Shift</h2>
-              <Highlight type="most" item={data.byShift.most} />
-              {data.byShift.data.every(d => d.value === 0)
-                ? <p className="no-data">No data for current filters.</p>
-                : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={data.byShift.data}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="value" fill="#1a3a5c" radius={[4, 4, 0, 0]}
-                        onClick={(d) => onDrill('shift', d.name)}
-                        style={{ cursor: 'pointer' }}>
-                        {data.byShift.data.map((_, i) => (
-                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                )
-              }
-            </div>
-          </div>
+            {on('chart_shift') && (
+              <div className="xpanel xspan-4">
+                <div className="xpanel-head">
+                  <h3>BY SHIFT</h3>
+                  {data.byShift.most && <span className="xtag xtag-hot">🔥 {data.byShift.most.name}</span>}
+                </div>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart data={data.byShift.data}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1f2b45"/>
+                    <XAxis dataKey="name" tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                    <YAxis allowDecimals={false} tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
+                    <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
+                    <Bar dataKey="value" radius={[4,4,0,0]}
+                         onClick={d => onDrill('shift', d.name)} style={{ cursor:'pointer' }}>
+                      {data.byShift.data.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
 
-          {/* ── Row 3: Pax Type pie + Terminal pie */}
-          <div className="charts-row">
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">By Passenger Type</h2>
-              {data.byPaxType.data.length === 0
-                ? <p className="no-data">No data.</p>
-                : (
-                  <ResponsiveContainer width="100%" height={260}>
+            {on('chart_paxtype') && (
+              <div className="xpanel xspan-4">
+                <div className="xpanel-head"><h3>PASSENGER TYPE</h3></div>
+                {data.byPaxType.data.length === 0 ? <div className="xchart-empty">No data</div> : (
+                  <ResponsiveContainer width="100%" height={200}>
                     <PieChart>
                       <Pie data={data.byPaxType.data} dataKey="value" nameKey="name"
-                        cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2}
-                        onClick={(d) => onDrill('pax_type', d.name)}
-                        style={{ cursor: 'pointer' }}>
+                           cx="50%" cy="50%" innerRadius={40} outerRadius={78} paddingAngle={3}
+                           onClick={d => onDrill('pax_type', d.name)} style={{ cursor:'pointer' }}>
                         {data.byPaxType.data.map((_, i) => (
-                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                          <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="#0b1220" />
                         ))}
                       </Pie>
-                      <Tooltip />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
+                      <Legend wrapperStyle={{ color:'#a9bfd1', fontSize:11 }}/>
                     </PieChart>
                   </ResponsiveContainer>
-                )
-              }
-            </div>
+                )}
+              </div>
+            )}
 
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">By Terminal</h2>
-              {data.byTerminal.data.length === 0
-                ? <p className="no-data">No data.</p>
-                : (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <PieChart>
-                      <Pie data={data.byTerminal.data} dataKey="value" nameKey="name"
-                        cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={2}
-                        onClick={(d) => onDrill('terminal', d.name)}
-                        style={{ cursor: 'pointer' }}>
-                        {data.byTerminal.data.map((_, i) => (
-                          <Cell key={i} fill={['#1a3a5c','#ce8a35','#2a5298'][i % 3]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend wrapperStyle={{ fontSize: 12 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )
-              }
-            </div>
-          </div>
-
-          {/* ── Row 4: Days-at-airport + Resolution-time histograms */}
-          <div className="charts-row">
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">Days at Airport Distribution</h2>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={data.daysHistogram}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#8e44ad" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="chart-card chart-half">
-              <h2 className="chart-title">Resolution Time Distribution</h2>
-              <p className="chart-sub">created → flight confirmed</p>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={data.resolutionHistogram}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#27ae60" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* ── Peak Hours Heatmap */}
-          <div className="chart-card">
-            <h2 className="chart-title">🕐 Peak Hours Heatmap</h2>
-            <p className="chart-sub">Day of week × hour of day · darker = more cases</p>
-            <Heatmap data={data.heatmapData} />
-          </div>
-
-          {/* ── Volume Trend */}
-          <div className="chart-card">
-            <h2 className="chart-title">Volume Trend</h2>
-            {data.trend.length === 0
-              ? <p className="no-data">No data for selected period.</p>
-              : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart data={data.trend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
-                    <YAxis allowDecimals={false} />
-                    <Tooltip />
-                    <Legend />
-                    <Line type="monotone" dataKey="value" stroke="#1a3a5c" strokeWidth={2} name="Cases" />
-                    <Line type="monotone" dataKey="pax" stroke="#ce8a35" strokeWidth={2} name="Pax" />
-                  </LineChart>
-                </ResponsiveContainer>
-              )
-            }
-          </div>
-
-          {/* ── Drill-through table */}
-          <div className="chart-card">
-            <h2 className="chart-title">Reports ({data.reports.length})</h2>
-            <p className="chart-sub">Matching current filters · click a chart to drill down</p>
-            {data.reports.length === 0
-              ? <p className="no-data">No reports match.</p>
-              : (
-                <div className="drill-table-wrap">
-                  <table className="analytics-table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Created</th>
-                        <th>Shift</th>
-                        <th>Status</th>
-                        <th>Prev Flight</th>
-                        <th>Dest</th>
-                        <th>Nationality</th>
-                        <th>Pax Type</th>
-                        <th>Pax</th>
-                        <th>New Flight</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data.reports.slice(0, 100).map(r => {
-                        const hr = parseInt((r.created_at || '').slice(11, 13));
-                        const sh = isNaN(hr) ? '?' : (hr >= 6 && hr < 14 ? 'A' : hr >= 14 && hr < 22 ? 'B' : 'C');
-                        return (
-                          <tr key={r.id} className="clickable-row" onClick={() => navigate(`/edit-report/${r.id}`)}>
-                            <td><strong>#{r.id}</strong></td>
-                            <td>{(r.created_at || '').slice(0, 16)}</td>
-                            <td className="col-center">{sh}</td>
-                            <td>{r.status}</td>
-                            <td>{r.prev_flight || '—'}</td>
-                            <td>{r.prev_destination || '—'}</td>
-                            <td>{r.nationality || '—'}</td>
-                            <td>{r.pax_type || '—'}</td>
-                            <td className="col-center">{r.pax_count ?? '—'}</td>
-                            <td>{r.new_flight || '—'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {data.reports.length > 100 && (
-                    <p className="no-data" style={{ padding: 10 }}>Showing first 100 of {data.reports.length}.</p>
-                  )}
+            {on('chart_heatmap') && (
+              <div className="xpanel xspan-8">
+                <div className="xpanel-head">
+                  <h3>PEAK HOURS HEATMAP</h3>
+                  <span className="xtag">Day of week × Hour · darker = more cases</span>
                 </div>
-              )
-            }
-          </div>
+                <Heatmap data={data.heatmapData}/>
+              </div>
+            )}
+
+            {on('table_drill') && (
+              <div className="xpanel xspan-12">
+                <div className="xpanel-head">
+                  <h3>RECENT CASES</h3>
+                  <span className="xtag">{data.reports.length} reports · click row to open</span>
+                </div>
+                {data.reports.length === 0 ? <div className="xchart-empty">No reports match current filters</div> : (
+                  <div className="xtable-wrap">
+                    <table className="xtable">
+                      <thead>
+                        <tr>
+                          <th>#</th><th>Created</th><th>Shift</th><th>Status</th>
+                          <th>Prev Flight</th><th>Dest</th><th>Nationality</th>
+                          <th>Pax Type</th><th>Pax</th><th>New Flight</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.reports.slice(0, 30).map(r => {
+                          const hr = parseInt((r.created_at || '').slice(11, 13));
+                          const sh = isNaN(hr) ? '?' :
+                                    hr >= 6 && hr < 14 ? 'A' : hr >= 14 && hr < 22 ? 'B' : 'C';
+                          return (
+                            <tr key={r.id} onClick={() => navigate(`/edit-report/${r.id}`)}>
+                              <td><b>#{r.id}</b></td>
+                              <td>{(r.created_at || '').slice(0, 16)}</td>
+                              <td>{sh}</td>
+                              <td><span className={`xstatus xstatus-${r.status}`}>{r.status.replace('_',' ')}</span></td>
+                              <td><span className="xflight">{r.prev_flight || '—'}</span></td>
+                              <td>{r.prev_destination || '—'}</td>
+                              <td>{r.nationality || '—'}</td>
+                              <td>{r.pax_type || '—'}</td>
+                              <td>{r.pax_count ?? '—'}</td>
+                              <td>{r.new_flight ? <span className="xflight">{r.new_flight}</span> : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
         </>
       )}
     </div>

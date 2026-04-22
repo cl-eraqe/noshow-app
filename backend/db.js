@@ -59,6 +59,14 @@ function initDb() {
     database.exec("ALTER TABLE reports ADD COLUMN confirmed_at TEXT");
     console.log('Migrated: added confirmed_at column');
   }
+  if (!cols.find(c => c.name === 'nusuk_received')) {
+    database.exec("ALTER TABLE reports ADD COLUMN nusuk_received TEXT");
+    console.log('Migrated: added nusuk_received column');
+  }
+  if (!cols.find(c => c.name === 'nusuk_by')) {
+    database.exec("ALTER TABLE reports ADD COLUMN nusuk_by TEXT");
+    console.log('Migrated: added nusuk_by column');
+  }
 
   // ── Audit log (every create/edit/status change/delete is recorded)
   database.exec(`

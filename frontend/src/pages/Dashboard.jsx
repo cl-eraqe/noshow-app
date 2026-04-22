@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal, getAirlineCode } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal, getAirlineCode, confirmNusuk } from '../utils/api';
 import { getRole, isSupervisor, clearRole } from '../utils/auth';
 
 function fmt(dt) {
@@ -750,6 +750,22 @@ export default function Dashboard() {
                         )}
                         {activeTab !== 'under_process' && <td data-label="New Flight Date">{fmt(r.new_datetime)}</td>}
                         <td data-label="" className="col-actions">
+                          {showNusuk && (
+                            <button
+                              className={`btn btn-xs ${r.nusuk_received ? 'btn-success' : 'btn-nusuk'}`}
+                              onClick={async e => {
+                                e.stopPropagation();
+                                try {
+                                  await confirmNusuk(r.id, !r.nusuk_received, role);
+                                  await load();
+                                } catch (err) { alert('Failed: ' + err.message); }
+                              }}
+                              title={r.nusuk_received
+                                ? `Nusuk received pax on ${r.nusuk_received} — click to undo`
+                                : 'Confirm Nusuk received pax'}>
+                              {r.nusuk_received ? '✓ Nusuk' : 'Nusuk?'}
+                            </button>
+                          )}
                           {(r.status || 'under_process') === 'under_process' && (
                             <button className="btn btn-xs btn-confirm"
                               onClick={e => { e.stopPropagation(); openConfirmModal(r); }}

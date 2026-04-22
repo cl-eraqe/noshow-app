@@ -70,6 +70,15 @@ export async function deleteReport(id) {
   return request(`/api/reports/${id}`, { method: 'DELETE' });
 }
 
+// Nusuk confirmation (Ministry of Hajj & Umrah received pax)
+export async function confirmNusuk(id, received, user) {
+  return request(`/api/reports/${id}/nusuk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ received, user }),
+  });
+}
+
 // ── Analytics
 export async function getAnalytics() {
   return request('/api/reports/analytics/summary');

@@ -15,7 +15,7 @@ const AUDIT_FIELDS = [
   'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline',
   'nationality', 'pax_type', 'pax_count',
   'new_flight', 'new_datetime', 'new_destination', 'new_airline',
-  'status', 'comment',
+  'status', 'comment', 'nusuk_received',
 ];
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -868,6 +868,30 @@ router.delete('/:id', (req, res) => {
   });
 
   res.json({ success: true });
+});
+
+// ── Nusuk confirmation toggle (Ministry of Hajj & Umrah received passengers)
+router.post('/:id/nusuk', express.json(), (req, res) => {
+  const db = getDb();
+  const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  if (!report) return res.status(404).json({ error: 'Report not found' });
+
+  const { received, user } = req.body; // received: true | false
+  const ts = received ? jeddahNowStr() : null;
+  const by = received ? (user || 'staff') : null;
+
+  db.prepare('UPDATE reports SET nusuk_received = ?, nusuk_by = ? WHERE id = ?')
+    .run(ts, by, req.params.id);
+
+  logAudit({
+    user: user || 'staff',
+    action: received ? 'nusuk_confirm' : 'nusuk_unconfirm',
+    reportId: report.id,
+    changes: { nusuk_received: { from: report.nusuk_received, to: ts } },
+  });
+
+  const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  res.json(updated);
 });
 
 module.exports = router;

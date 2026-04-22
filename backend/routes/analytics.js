@@ -117,6 +117,37 @@ router.get('/dashboard', (req, res) => {
   const totalCases = filtered.length;
   const totalPax = filtered.reduce((s, r) => s + (r.pax_count || 0), 0);
   const active = filtered.filter(r => r.status !== 'closed').length;
+  const activePax = filtered.filter(r => r.status !== 'closed').reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // Under process only (not confirmed yet, not closed)
+  const underProcessList = filtered.filter(r => r.status === 'under_process');
+  const underProcessCases = underProcessList.length;
+  const underProcessPax = underProcessList.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // Closed
+  const closedList = filtered.filter(r => r.status === 'closed');
+  const closedCases = closedList.length;
+  const closedPax = closedList.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // Flight confirmed
+  const confirmedList = filtered.filter(r => r.status === 'flight_confirmed');
+  const confirmedCases = confirmedList.length;
+  const confirmedPax = confirmedList.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+  // Nusuk intervention needed: Umrah + flight_confirmed + new_datetime >= now+24h + nusuk_received is null
+  const now = Date.now();
+  const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+  const needsNusukList = filtered.filter(r => {
+    if (r.pax_type !== 'Umrah') return false;
+    if (r.status !== 'flight_confirmed') return false;
+    if (!r.new_datetime) return false;
+    if (r.nusuk_received) return false;
+    const newMs = parseJeddahMs(r.new_datetime);
+    if (!newMs) return false;
+    return (newMs - now) >= twentyFourHoursMs;
+  });
+  const needsNusukCases = needsNusukList.length;
+  const needsNusukPax = needsNusukList.reduce((s, r) => s + (r.pax_count || 0), 0);
 
   // Avg time-to-rebook (created_at → confirmed_at)
   let rebookMs = [], closeMs = [];
@@ -258,6 +289,16 @@ router.get('/dashboard', (req, res) => {
       totalCases,
       totalPax,
       active,
+      activePax,
+      underProcessCases,
+      underProcessPax,
+      confirmedCases,
+      confirmedPax,
+      closedCases,
+      closedPax,
+      needsNusukCases,
+      needsNusukPax,
+      needsNusukList,
       avgRebookHrs,
       avgCloseHrs,
       avgDaysAtAirport,
