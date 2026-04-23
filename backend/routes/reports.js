@@ -10,6 +10,19 @@ function jeddahNowStr() {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// Jeddah-local ISO string for datetime comparisons: "YYYY-MM-DDTHH:mm"
+// offsetMs shifts forward (+) or backward (-) from now
+function jeddahISO(offsetMs = 0) {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000 + offsetMs).toISOString().slice(0, 16);
+}
+
+// Convert a stored Jeddah-local datetime string to real UTC ms (for duration math)
+function jeddahDtMs(dtStr) {
+  if (!dtStr) return NaN;
+  const s = String(dtStr).replace(' ', 'T').slice(0, 16);
+  return new Date(s + ':00+03:00').getTime();
+}
+
 // Fields to track in audit
 const AUDIT_FIELDS = [
   'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline',
@@ -153,8 +166,9 @@ router.get('/handover', (req, res) => {
   const underProcess = db.prepare("SELECT * FROM reports WHERE status = 'under_process' ORDER BY prev_datetime ASC").all();
   const flightConfirmed = db.prepare("SELECT * FROM reports WHERE status = 'flight_confirmed' ORDER BY new_datetime ASC").all();
 
-  const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const nowJeddah = jeddahISO();
+  const threeHoursFromNow = jeddahISO(3 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = jeddahISO(-24 * 60 * 60 * 1000);
 
   // Group under_process by airline (SV first, then others)
   const upSV = underProcess.filter(r => getAirlineCode(r.prev_flight) === 'SV');
@@ -166,7 +180,7 @@ router.get('/handover', (req, res) => {
 
   // Departing soon (within 3 hours)
   const departingSoon = flightConfirmed.filter(r =>
-    r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > now.toISOString()
+    r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > nowJeddah
   );
 
   // Bus transfers (flight_confirmed with new flight from North/Hajj terminal)
@@ -210,7 +224,7 @@ router.get('/handover', (req, res) => {
   const lines = [];
 
   lines.push(`📋 SHIFT HANDOVER ${currentShift} → ${nextShift}`);
-  lines.push(`${fmtDateShort(now.toISOString())} ${fmtTimeShort(now.toISOString())}`);
+  lines.push(`${fmtDateShort(nowJeddah)} ${fmtTimeShort(nowJeddah)}`);
   lines.push('');
 
   // Departing soon
@@ -297,11 +311,10 @@ router.get('/handover', (req, res) => {
 // ── CEO Report (must be before /:id)
 router.get('/ceo-report', (_req, res) => {
   const db = getDb();
-  const now = new Date();
-  const nowISO = now.toISOString();
-  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
-  const twelveHoursFromNow = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const nowISO = jeddahISO();
+  const twelveHoursAgo = jeddahISO(-12 * 60 * 60 * 1000);
+  const twelveHoursFromNow = jeddahISO(12 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = jeddahISO(-24 * 60 * 60 * 1000);
 
   // Helper: format date as "23MAR"
   function fmtDate(dt) {
@@ -452,8 +465,7 @@ router.get('/shift-summary', (req, res) => {
   const db = getDb();
   const { date } = req.query; // YYYY-MM-DD, defaults to today
   // Use local date (not UTC) for default
-  const now = new Date();
-  const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const localToday = jeddahISO().slice(0, 10);
   const targetDate = date || localToday;
 
   // Build shift time ranges
@@ -502,10 +514,9 @@ router.get('/shift-summary', (req, res) => {
 // ── Seed test data (temporary, for testing)
 router.post('/seed-test-data', (_req, res) => {
   const db = getDb();
-  const now = new Date();
-  const ha = (h) => new Date(now.getTime() - h*60*60*1000).toISOString().slice(0,16);
-  const hf = (h) => new Date(now.getTime() + h*60*60*1000).toISOString().slice(0,16);
-  const da = (d) => new Date(now.getTime() - d*24*60*60*1000).toISOString().slice(0,16);
+  const ha = (h) => jeddahISO(-h * 60 * 60 * 1000);
+  const hf = (h) => jeddahISO(h * 60 * 60 * 1000);
+  const da = (d) => jeddahISO(-d * 24 * 60 * 60 * 1000);
 
   const insert = db.prepare(`INSERT INTO reports (pax_id_datetime,prev_flight,prev_datetime,prev_destination,prev_airline,nationality,pax_type,new_flight,new_datetime,new_destination,new_airline,days_at_airport,pax_count,whatsapp_text,submitted_by,status,comment) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'','staff',?,?)`);
 
@@ -590,7 +601,7 @@ router.post('/', upload.array('files', 10), (req, res) => {
   // Calculate days_at_airport from prev_flight datetime to now
   let computedDays = parseFloat(days_at_airport) || null;
   if (!computedDays && prev_datetime) {
-    const diff = (Date.now() - new Date(prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    const diff = (Date.now() - jeddahDtMs(prev_datetime)) / (1000 * 60 * 60 * 24);
     if (!isNaN(diff) && diff >= 0) {
       computedDays = parseFloat(Math.max(0, diff).toFixed(2));
     }
@@ -678,7 +689,7 @@ router.put('/:id', upload.array('files', 10), (req, res) => {
   // Compute days from prev_flight to now
   let computedDays = parseFloat(days_at_airport) || null;
   if (!computedDays && prev_datetime) {
-    const diff = (Date.now() - new Date(prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    const diff = (Date.now() - jeddahDtMs(prev_datetime)) / (1000 * 60 * 60 * 24);
     if (!isNaN(diff) && diff >= 0) computedDays = parseFloat(Math.max(0, diff).toFixed(2));
   }
 
@@ -783,7 +794,7 @@ router.patch('/:id', express.json(), (req, res) => {
 
   // Recalculate days_at_airport from prev_flight to now
   if (report.prev_datetime) {
-    const diff = (Date.now() - new Date(report.prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    const diff = (Date.now() - jeddahDtMs(report.prev_datetime)) / (1000 * 60 * 60 * 24);
     if (!isNaN(diff)) {
       updates.push('days_at_airport = ?');
       values.push(parseFloat(Math.max(0, diff).toFixed(2)));

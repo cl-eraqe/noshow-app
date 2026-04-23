@@ -27,7 +27,7 @@ function parseJeddahMs(dtStr) {
   if (!dtStr) return null;
   // Normalize "YYYY-MM-DD HH:mm:ss" or "YYYY-MM-DDTHH:mm"
   const s = String(dtStr).replace(' ', 'T');
-  const ms = Date.parse(s + (s.length === 16 ? ':00' : '') + 'Z'); // treat as UTC for simple diff math (consistent zone)
+  const ms = Date.parse(s + (s.length === 16 ? ':00' : '') + '+03:00');
   return isNaN(ms) ? null : ms;
 }
 
