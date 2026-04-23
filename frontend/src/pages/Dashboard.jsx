@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal, getAirlineCode, confirmNusuk, getFilterOptions, AIRLINE_CODES } from '../utils/api';
+import SearchableSelect from '../components/SearchableSelect';
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 import { getRole, isSupervisor, clearRole } from '../utils/auth';
@@ -595,6 +596,9 @@ export default function Dashboard() {
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/access-management')} title="Manage Excel export access">
                 Access
               </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/flight-manager')} title="Manage flight database">
+                ✈ Flights
+              </button>
             </>
           )}
           <button className="btn btn-primary btn-sm" onClick={() => navigate('/new-report')}>
@@ -854,10 +858,12 @@ export default function Dashboard() {
               </div>
               <div className="field">
                 <label className="field-label">Destination</label>
-                <input type="text" className="field-input autofilled" placeholder="Auto-filled"
-                  list="db-destination-list"
+                <SearchableSelect
+                  placeholder="Auto-filled or search…"
+                  options={knownDestinations}
                   value={newFlightForm.new_destination}
-                  onChange={e => setNewFlightForm(prev => ({ ...prev, new_destination: e.target.value }))} />
+                  onChange={v => setNewFlightForm(prev => ({ ...prev, new_destination: v }))}
+                />
               </div>
             </div>
 
@@ -911,10 +917,12 @@ export default function Dashboard() {
                   </div>
                   <div className="field">
                     <label className="field-label">Destination</label>
-                    <input type="text" className="field-input autofilled" placeholder="Auto-filled"
-                      list="db-destination-list"
+                    <SearchableSelect
+                      placeholder="Auto-filled or search…"
+                      options={knownDestinations}
                       value={bulkSharedFlight.new_destination}
-                      onChange={e => setBulkSharedFlight(prev => ({ ...prev, new_destination: e.target.value }))} />
+                      onChange={v => setBulkSharedFlight(prev => ({ ...prev, new_destination: v }))}
+                    />
                   </div>
                 </div>
 
@@ -964,10 +972,12 @@ export default function Dashboard() {
                           onChange={e => setBulkPerField(r.id, 'new_datetime', e.target.value)} />
                       </div>
                       <div className="field">
-                        <input type="text" className="field-input autofilled" placeholder="Destination"
-                          list="db-destination-list"
+                        <SearchableSelect
+                          placeholder="Destination"
+                          options={knownDestinations}
                           value={bulkPerReport[r.id]?.new_destination || ''}
-                          onChange={e => setBulkPerField(r.id, 'new_destination', e.target.value)} />
+                          onChange={v => setBulkPerField(r.id, 'new_destination', v)}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1122,13 +1132,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Shared datalists for searchable fields */}
-      <datalist id="db-destination-list">
-        {knownDestinations.map(d => <option key={d} value={d} />)}
-      </datalist>
-      <datalist id="db-airline-list">
-        {AIRLINE_NAMES.map(a => <option key={a} value={a} />)}
-      </datalist>
     </div>
   );
 }

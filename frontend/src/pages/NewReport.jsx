@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES } from '../utils/api';
+import SearchableSelect from '../components/SearchableSelect';
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 import { getRole } from '../utils/auth';
@@ -343,15 +344,23 @@ export default function NewReport({ editMode }) {
             </div>
             <div className="field">
               <label className="field-label">4. Previous Destination <span className="req">*</span></label>
-              <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
-                list="nr-destination-list"
-                value={form.prev_destination} onChange={e => set('prev_destination', e.target.value)} />
+              <SearchableSelect
+                required
+                placeholder="Auto-filled or search…"
+                options={knownDestinations}
+                value={form.prev_destination}
+                onChange={v => set('prev_destination', v)}
+              />
             </div>
             <div className="field">
               <label className="field-label">5. Previous Airline <span className="req">*</span></label>
-              <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
-                list="nr-airline-list"
-                value={form.prev_airline} onChange={e => set('prev_airline', e.target.value)} />
+              <SearchableSelect
+                required
+                placeholder="Auto-filled or search…"
+                options={AIRLINE_NAMES}
+                value={form.prev_airline}
+                onChange={v => set('prev_airline', v)}
+              />
             </div>
           </div>
         </div>
@@ -363,12 +372,13 @@ export default function NewReport({ editMode }) {
           <div className="field-grid">
             <div className="field">
               <label className="field-label">6. Nationality <span className="req">*</span></label>
-              <input type="text" className="field-input" placeholder="Type to search…" required
-                list="nr-nationality-list"
-                value={form.nationality} onChange={e => set('nationality', e.target.value)} />
-              <datalist id="nr-nationality-list">
-                {NATIONALITIES.map(n => <option key={n} value={n} />)}
-              </datalist>
+              <SearchableSelect
+                required
+                placeholder="Select nationality…"
+                options={NATIONALITIES}
+                value={form.nationality}
+                onChange={v => set('nationality', v)}
+              />
             </div>
             <div className="field">
               <label className="field-label">7. Passenger Type <span className="req">*</span></label>
@@ -446,15 +456,23 @@ export default function NewReport({ editMode }) {
               </div>
               <div className="field">
                 <label className="field-label">New Destination <span className="req">*</span></label>
-                <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
-                  list="nr-destination-list"
-                  value={form.new_destination} onChange={e => set('new_destination', e.target.value)} />
+                <SearchableSelect
+                  required
+                  placeholder="Auto-filled or search…"
+                  options={knownDestinations}
+                  value={form.new_destination}
+                  onChange={v => set('new_destination', v)}
+                />
               </div>
               <div className="field">
                 <label className="field-label">New Airline <span className="req">*</span></label>
-                <input type="text" className="field-input autofilled" placeholder="Auto-filled" required
-                  list="nr-airline-list"
-                  value={form.new_airline} onChange={e => set('new_airline', e.target.value)} />
+                <SearchableSelect
+                  required
+                  placeholder="Auto-filled or search…"
+                  options={AIRLINE_NAMES}
+                  value={form.new_airline}
+                  onChange={v => set('new_airline', v)}
+                />
               </div>
             </div>
 
@@ -527,13 +545,6 @@ export default function NewReport({ editMode }) {
         </div>
       </form>
 
-      {/* Shared datalists for searchable fields */}
-      <datalist id="nr-destination-list">
-        {knownDestinations.map(d => <option key={d} value={d} />)}
-      </datalist>
-      <datalist id="nr-airline-list">
-        {AIRLINE_NAMES.map(a => <option key={a} value={a} />)}
-      </datalist>
     </div>
   );
 }

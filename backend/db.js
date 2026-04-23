@@ -68,6 +68,20 @@ function initDb() {
     console.log('Migrated: added nusuk_by column');
   }
 
+  // ── Custom / overridden flights (managed via Flight Manager UI)
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS flights_custom (
+      flight_number TEXT PRIMARY KEY,
+      destination   TEXT,
+      std           TEXT,
+      city          TEXT,
+      country       TEXT,
+      nationality   TEXT,
+      deleted       INTEGER DEFAULT 0,
+      updated_at    TEXT
+    )
+  `);
+
   // ── Audit log (every create/edit/status change/delete is recorded)
   database.exec(`
     CREATE TABLE IF NOT EXISTS audit_log (
