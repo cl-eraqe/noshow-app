@@ -382,7 +382,94 @@ router.post('/', upload.array('files', 10), async (req, res) => {
   }
 });
 
+// ── PUT full update ────────────────────────────────────────────────────
+
+router.put('/:id', upload.array('files', 10), async (req, res) => {
+  try {
+    const pool = getDb();
+    const { rows: existingRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    if (!existingRows[0]) return res.status(404).json({ error: 'Report not found' });
+    const existing = existingRows[0];
+
+    const {
+      pax_id_datetime,
+      prev_flight, prev_datetime, prev_destination, prev_airline,
+      nationality, pax_type,
+      new_flight, new_datetime, new_destination, new_airline,
+      days_at_airport, pax_count,
+      status, comment,
+    } = req.body;
+
+    const reportStatus = status || existing.status || 'under_process';
+
+    let filePaths;
+    if (req.files && req.files.length > 0) {
+      const newPaths = req.files.map(f => `/uploads/${f.filename}`);
+      const oldPaths = JSON.parse(existing.file_paths || '[]');
+      filePaths = [...oldPaths, ...newPaths];
+    } else {
+      filePaths = JSON.parse(existing.file_paths || '[]');
+    }
+
+    let computedDays = parseFloat(days_at_airport) || null;
+    if (!computedDays && prev_datetime) {
+      const diff = (Date.now() - jeddahDtMs(prev_datetime)) / (1000 * 60 * 60 * 24);
+      if (!isNaN(diff) && diff >= 0) computedDays = parseFloat(Math.max(0, diff).toFixed(2));
+    }
+
+    const whatsapp_text =
+      `No-Show Report #${existing.id}\n` +
+      `Flight: ${prev_flight || '—'} → ${prev_destination || '—'}\n` +
+      `Pax: ${pax_count} × ${pax_type || '—'}\n` +
+      `Nationality: ${nationality || '—'}\n` +
+      `New Flight: ${new_flight || '—'} on ${new_datetime || '—'}`;
+
+    await pool.query(
+      `UPDATE reports SET
+        pax_id_datetime=$1, prev_flight=$2, prev_datetime=$3, prev_destination=$4, prev_airline=$5,
+        nationality=$6, pax_type=$7,
+        new_flight=$8, new_datetime=$9, new_destination=$10, new_airline=$11,
+        days_at_airport=$12, pax_count=$13, file_paths=$14, whatsapp_text=$15,
+        status=$16, comment=$17
+       WHERE id=$18`,
+      [
+        pax_id_datetime,
+        prev_flight, prev_datetime, prev_destination, prev_airline,
+        nationality, pax_type,
+        new_flight || null, new_datetime || null, new_destination || null, new_airline || null,
+        computedDays,
+        parseInt(pax_count) || 0,
+        JSON.stringify(filePaths),
+        whatsapp_text,
+        reportStatus,
+        comment || '',
+        req.params.id,
+      ]
+    );
+
+    if (existing.status !== 'flight_confirmed' && reportStatus === 'flight_confirmed' && !existing.confirmed_at) {
+      await pool.query('UPDATE reports SET confirmed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+    }
+    if (existing.status !== 'closed' && reportStatus === 'closed' && !existing.closed_at) {
+      await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+    }
+
+    const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    const updated = updatedRows[0];
+
+    const changes = diffFields(existing, updated, AUDIT_FIELDS);
+    if (changes) {
+      await logAudit({ user: req.body.submitted_by || 'staff', action: 'edit', reportId: updated.id, changes });
+    }
+
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+
 
 
 
