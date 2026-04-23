@@ -70,9 +70,58 @@ export async function deleteReport(id) {
   return request(`/api/reports/${id}`, { method: 'DELETE' });
 }
 
+// Nusuk confirmation (Ministry of Hajj & Umrah received pax)
+export async function confirmNusuk(id, received, user) {
+  return request(`/api/reports/${id}/nusuk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ received, user }),
+  });
+}
+
 // ── Analytics
 export async function getAnalytics() {
   return request('/api/reports/analytics/summary');
+}
+
+export async function getDashboardData(filters = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
+  return request(`/api/analytics/dashboard?${params.toString()}`);
+}
+
+export async function getFilterOptions() {
+  return request('/api/analytics/filter-options');
+}
+
+export async function getAuditLog(reportId) {
+  const q = reportId ? `?report_id=${reportId}` : '';
+  return request(`/api/analytics/audit-log${q}`);
+}
+
+// ── Export tokens (supervisor management)
+export async function getExportTokens() {
+  return request('/api/export/tokens');
+}
+export async function createExportToken(email, role = 'view') {
+  return request('/api/export/tokens', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, role }),
+  });
+}
+export async function revokeExportToken(id, revoked) {
+  return request(`/api/export/tokens/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ revoked }),
+  });
+}
+export async function rotateExportToken(id) {
+  return request(`/api/export/tokens/${id}/rotate`, { method: 'POST' });
+}
+export async function deleteExportToken(id) {
+  return request(`/api/export/tokens/${id}`, { method: 'DELETE' });
 }
 
 // ── Shift Summary
@@ -94,7 +143,7 @@ export async function getHandoverReport(shift) {
 
 // ── Airline code → name mapping (client-side, no API call needed)
 // Updated from POWERAPP.xlsx — 2026-04-09
-const AIRLINE_CODES = {
+export const AIRLINE_CODES = {
   // Terminal 1 (20 airlines)
   SV: 'Saudia',
   XY: 'flynas',
@@ -191,7 +240,7 @@ const TERMINAL_MAP = {
   // Hajj Terminal — bus needed 🚌 (22 airlines)
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
   GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '9P': 'Hajj', QP: 'Hajj',
-  JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', TK: 'Hajj', D7: 'Hajj',
+  JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', TK: 'T1', D7: 'Hajj',
   '2S': 'Hajj', '7Q': 'Hajj', BJ: 'Hajj', BM: 'Hajj', FH: 'Hajj',
   UZ: 'Hajj', XC: 'Hajj',
 };

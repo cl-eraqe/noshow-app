@@ -3,7 +3,33 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { getDb, autoCloseReports } = require('../db');
+const { getDb, autoCloseReports, logAudit, diffFields } = require('../db');
+
+// Jeddah-time timestamp: "YYYY-MM-DD HH:mm:ss"
+function jeddahNowStr() {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+// Jeddah-local ISO string for datetime comparisons: "YYYY-MM-DDTHH:mm"
+// offsetMs shifts forward (+) or backward (-) from now
+function jeddahISO(offsetMs = 0) {
+  return new Date(Date.now() + 3 * 60 * 60 * 1000 + offsetMs).toISOString().slice(0, 16);
+}
+
+// Convert a stored Jeddah-local datetime string to real UTC ms (for duration math)
+function jeddahDtMs(dtStr) {
+  if (!dtStr) return NaN;
+  const s = String(dtStr).replace(' ', 'T').slice(0, 16);
+  return new Date(s + ':00+03:00').getTime();
+}
+
+// Fields to track in audit
+const AUDIT_FIELDS = [
+  'prev_flight', 'prev_datetime', 'prev_destination', 'prev_airline',
+  'nationality', 'pax_type', 'pax_count',
+  'new_flight', 'new_datetime', 'new_destination', 'new_airline',
+  'status', 'comment', 'nusuk_received',
+];
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 
@@ -74,7 +100,7 @@ const TERMINAL_MAP = {
   // Hajj (22)
   PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',AH:'Hajj',
   GA:'Hajj',FG:'Hajj',BS:'Hajj','9P':'Hajj',QP:'Hajj',
-  JT:'Hajj',RQ:'Hajj',C6:'Hajj',TK:'Hajj',D7:'Hajj',
+  JT:'Hajj',RQ:'Hajj',C6:'Hajj',TK:'T1',D7:'Hajj',
   '2S':'Hajj','7Q':'Hajj',BJ:'Hajj',BM:'Hajj',FH:'Hajj',
   UZ:'Hajj',XC:'Hajj',
 };
@@ -140,8 +166,9 @@ router.get('/handover', (req, res) => {
   const underProcess = db.prepare("SELECT * FROM reports WHERE status = 'under_process' ORDER BY prev_datetime ASC").all();
   const flightConfirmed = db.prepare("SELECT * FROM reports WHERE status = 'flight_confirmed' ORDER BY new_datetime ASC").all();
 
-  const threeHoursFromNow = new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const nowJeddah = jeddahISO();
+  const threeHoursFromNow = jeddahISO(3 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = jeddahISO(-24 * 60 * 60 * 1000);
 
   // Group under_process by airline (SV first, then others)
   const upSV = underProcess.filter(r => getAirlineCode(r.prev_flight) === 'SV');
@@ -153,7 +180,7 @@ router.get('/handover', (req, res) => {
 
   // Departing soon (within 3 hours)
   const departingSoon = flightConfirmed.filter(r =>
-    r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > now.toISOString()
+    r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > nowJeddah
   );
 
   // Bus transfers (flight_confirmed with new flight from North/Hajj terminal)
@@ -197,7 +224,7 @@ router.get('/handover', (req, res) => {
   const lines = [];
 
   lines.push(`📋 SHIFT HANDOVER ${currentShift} → ${nextShift}`);
-  lines.push(`${fmtDateShort(now.toISOString())} ${fmtTimeShort(now.toISOString())}`);
+  lines.push(`${fmtDateShort(nowJeddah)} ${fmtTimeShort(nowJeddah)}`);
   lines.push('');
 
   // Departing soon
@@ -284,11 +311,10 @@ router.get('/handover', (req, res) => {
 // ── CEO Report (must be before /:id)
 router.get('/ceo-report', (_req, res) => {
   const db = getDb();
-  const now = new Date();
-  const nowISO = now.toISOString();
-  const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
-  const twelveHoursFromNow = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const nowISO = jeddahISO();
+  const twelveHoursAgo = jeddahISO(-12 * 60 * 60 * 1000);
+  const twelveHoursFromNow = jeddahISO(12 * 60 * 60 * 1000);
+  const twentyFourHoursAgo = jeddahISO(-24 * 60 * 60 * 1000);
 
   // Helper: format date as "23MAR"
   function fmtDate(dt) {
@@ -439,8 +465,7 @@ router.get('/shift-summary', (req, res) => {
   const db = getDb();
   const { date } = req.query; // YYYY-MM-DD, defaults to today
   // Use local date (not UTC) for default
-  const now = new Date();
-  const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const localToday = jeddahISO().slice(0, 10);
   const targetDate = date || localToday;
 
   // Build shift time ranges
@@ -489,10 +514,9 @@ router.get('/shift-summary', (req, res) => {
 // ── Seed test data (temporary, for testing)
 router.post('/seed-test-data', (_req, res) => {
   const db = getDb();
-  const now = new Date();
-  const ha = (h) => new Date(now.getTime() - h*60*60*1000).toISOString().slice(0,16);
-  const hf = (h) => new Date(now.getTime() + h*60*60*1000).toISOString().slice(0,16);
-  const da = (d) => new Date(now.getTime() - d*24*60*60*1000).toISOString().slice(0,16);
+  const ha = (h) => jeddahISO(-h * 60 * 60 * 1000);
+  const hf = (h) => jeddahISO(h * 60 * 60 * 1000);
+  const da = (d) => jeddahISO(-d * 24 * 60 * 60 * 1000);
 
   const insert = db.prepare(`INSERT INTO reports (pax_id_datetime,prev_flight,prev_datetime,prev_destination,prev_airline,nationality,pax_type,new_flight,new_datetime,new_destination,new_airline,days_at_airport,pax_count,whatsapp_text,submitted_by,status,comment) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'','staff',?,?)`);
 
@@ -577,7 +601,7 @@ router.post('/', upload.array('files', 10), (req, res) => {
   // Calculate days_at_airport from prev_flight datetime to now
   let computedDays = parseFloat(days_at_airport) || null;
   if (!computedDays && prev_datetime) {
-    const diff = (Date.now() - new Date(prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    const diff = (Date.now() - jeddahDtMs(prev_datetime)) / (1000 * 60 * 60 * 24);
     if (!isNaN(diff) && diff >= 0) {
       computedDays = parseFloat(Math.max(0, diff).toFixed(2));
     }
@@ -618,7 +642,20 @@ router.post('/', upload.array('files', 10), (req, res) => {
 
   db.prepare('UPDATE reports SET whatsapp_text = ? WHERE id = ?').run(whatsapp_text, id);
 
+  // If created already as flight_confirmed, stamp confirmed_at
+  if (reportStatus === 'flight_confirmed') {
+    db.prepare('UPDATE reports SET confirmed_at = ? WHERE id = ?').run(jeddahNowStr(), id);
+  }
+
   const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(id);
+
+  logAudit({
+    user: submitted_by || 'staff',
+    action: 'create',
+    reportId: id,
+    snapshot: report,
+  });
+
   res.status(201).json(report);
 });
 
@@ -652,7 +689,7 @@ router.put('/:id', upload.array('files', 10), (req, res) => {
   // Compute days from prev_flight to now
   let computedDays = parseFloat(days_at_airport) || null;
   if (!computedDays && prev_datetime) {
-    const diff = (Date.now() - new Date(prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    const diff = (Date.now() - jeddahDtMs(prev_datetime)) / (1000 * 60 * 60 * 24);
     if (!isNaN(diff) && diff >= 0) computedDays = parseFloat(Math.max(0, diff).toFixed(2));
   }
 
@@ -685,7 +722,26 @@ router.put('/:id', upload.array('files', 10), (req, res) => {
     req.params.id,
   );
 
+  // Stamp transition timestamps
+  if (existing.status !== 'flight_confirmed' && reportStatus === 'flight_confirmed' && !existing.confirmed_at) {
+    db.prepare('UPDATE reports SET confirmed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+  if (existing.status !== 'closed' && reportStatus === 'closed' && !existing.closed_at) {
+    db.prepare('UPDATE reports SET closed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+
   const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+
+  const changes = diffFields(existing, updated, AUDIT_FIELDS);
+  if (changes) {
+    logAudit({
+      user: req.body.submitted_by || 'staff',
+      action: 'edit',
+      reportId: updated.id,
+      changes,
+    });
+  }
+
   res.json(updated);
 });
 
@@ -738,7 +794,7 @@ router.patch('/:id', express.json(), (req, res) => {
 
   // Recalculate days_at_airport from prev_flight to now
   if (report.prev_datetime) {
-    const diff = (Date.now() - new Date(report.prev_datetime).getTime()) / (1000 * 60 * 60 * 24);
+    const diff = (Date.now() - jeddahDtMs(report.prev_datetime)) / (1000 * 60 * 60 * 24);
     if (!isNaN(diff)) {
       updates.push('days_at_airport = ?');
       values.push(parseFloat(Math.max(0, diff).toFixed(2)));
@@ -770,7 +826,31 @@ router.patch('/:id', express.json(), (req, res) => {
   values.push(req.params.id);
   db.prepare(`UPDATE reports SET ${updates.join(', ')} WHERE id = ?`).run(...values);
 
+  // Stamp transition timestamps
+  if (status && report.status !== 'flight_confirmed' && status === 'flight_confirmed' && !report.confirmed_at) {
+    db.prepare('UPDATE reports SET confirmed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+  if (status && report.status !== 'closed' && status === 'closed' && !report.closed_at) {
+    db.prepare('UPDATE reports SET closed_at = ? WHERE id = ?').run(jeddahNowStr(), req.params.id);
+  }
+
   const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+
+  const changes = diffFields(report, updated, AUDIT_FIELDS);
+  if (changes) {
+    const action =
+      changes.status?.to === 'flight_confirmed' ? 'confirm_flight' :
+      changes.status?.to === 'closed' ? 'close' :
+      changes.status?.to === 'under_process' ? 'reopen' :
+      'edit';
+    logAudit({
+      user: req.body.submitted_by || 'staff',
+      action,
+      reportId: updated.id,
+      changes,
+    });
+  }
+
   res.json(updated);
 });
 
@@ -790,7 +870,39 @@ router.delete('/:id', (req, res) => {
   } catch (_) { /* ignore parse errors */ }
 
   db.prepare('DELETE FROM reports WHERE id = ?').run(req.params.id);
+
+  logAudit({
+    user: req.query.user || 'supervisor',
+    action: 'delete',
+    reportId: report.id,
+    snapshot: report,
+  });
+
   res.json({ success: true });
+});
+
+// ── Nusuk confirmation toggle (Ministry of Hajj & Umrah received passengers)
+router.post('/:id/nusuk', express.json(), (req, res) => {
+  const db = getDb();
+  const report = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  if (!report) return res.status(404).json({ error: 'Report not found' });
+
+  const { received, user } = req.body; // received: true | false
+  const ts = received ? jeddahNowStr() : null;
+  const by = received ? (user || 'staff') : null;
+
+  db.prepare('UPDATE reports SET nusuk_received = ?, nusuk_by = ? WHERE id = ?')
+    .run(ts, by, req.params.id);
+
+  logAudit({
+    user: user || 'staff',
+    action: received ? 'nusuk_confirm' : 'nusuk_unconfirm',
+    reportId: report.id,
+    changes: { nusuk_received: { from: report.nusuk_received, to: ts } },
+  });
+
+  const updated = db.prepare('SELECT * FROM reports WHERE id = ?').get(req.params.id);
+  res.json(updated);
 });
 
 module.exports = router;
