@@ -309,7 +309,81 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// ── POST create report ─────────────────────────────────────────────────
+
+router.post('/', upload.array('files', 10), async (req, res) => {
+  try {
+    const pool = getDb();
+    const {
+      pax_id_datetime,
+      prev_flight, prev_datetime, prev_destination, prev_airline,
+      nationality, pax_type,
+      new_flight, new_datetime, new_destination, new_airline,
+      days_at_airport, pax_count,
+      submitted_by, status, comment,
+    } = req.body;
+
+    const filePaths = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
+    const reportStatus = status || 'under_process';
+
+    let computedDays = parseFloat(days_at_airport) || null;
+    if (!computedDays && prev_datetime) {
+      const diff = (Date.now() - jeddahDtMs(prev_datetime)) / (1000 * 60 * 60 * 24);
+      if (!isNaN(diff) && diff >= 0) computedDays = parseFloat(Math.max(0, diff).toFixed(2));
+    }
+
+    const { rows } = await pool.query(
+      `INSERT INTO reports
+        (pax_id_datetime,
+         prev_flight, prev_datetime, prev_destination, prev_airline,
+         nationality, pax_type,
+         new_flight, new_datetime, new_destination, new_airline,
+         days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status, comment)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+       RETURNING id`,
+      [
+        pax_id_datetime,
+        prev_flight, prev_datetime, prev_destination, prev_airline,
+        nationality, pax_type,
+        new_flight || null, new_datetime || null, new_destination || null, new_airline || null,
+        computedDays,
+        parseInt(pax_count) || 0,
+        JSON.stringify(filePaths),
+        '',
+        submitted_by,
+        reportStatus,
+        comment || '',
+      ]
+    );
+
+    const id = rows[0].id;
+
+    const whatsapp_text =
+      `No-Show Report #${id}\n` +
+      `Flight: ${prev_flight || '—'} → ${prev_destination || '—'}\n` +
+      `Pax: ${pax_count} × ${pax_type || '—'}\n` +
+      `Nationality: ${nationality || '—'}\n` +
+      `New Flight: ${new_flight || '—'} on ${new_datetime || '—'}`;
+
+    await pool.query('UPDATE reports SET whatsapp_text = $1 WHERE id = $2', [whatsapp_text, id]);
+
+    if (reportStatus === 'flight_confirmed') {
+      await pool.query('UPDATE reports SET confirmed_at = $1 WHERE id = $2', [jeddahNowStr(), id]);
+    }
+
+    const { rows: reportRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [id]);
+    const report = reportRows[0];
+
+    await logAudit({ user: submitted_by || 'staff', action: 'create', reportId: id, snapshot: report });
+
+    res.status(201).json(report);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+
 
 
 
