@@ -468,7 +468,138 @@ router.put('/:id', upload.array('files', 10), async (req, res) => {
   }
 });
 
+// ── PATCH update status / fields ──────────────────────────────────────
+
+router.patch('/:id', express.json(), async (req, res) => {
+  try {
+    const pool = getDb();
+    const { rows: existing } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    if (!existing[0]) return res.status(404).json({ error: 'Report not found' });
+    const report = existing[0];
+
+    const { status, new_flight, new_datetime, new_destination, new_airline, comment, pax_count } = req.body;
+
+    const validStatuses = ['under_process', 'flight_confirmed', 'closed'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const updates = [];
+    const values = [];
+    let idx = 1;
+
+    if (status !== undefined)          { updates.push(`status = $${idx++}`);          values.push(status); }
+    if (new_flight !== undefined)      { updates.push(`new_flight = $${idx++}`);      values.push(new_flight); }
+    if (new_datetime !== undefined)    { updates.push(`new_datetime = $${idx++}`);    values.push(new_datetime); }
+    if (new_destination !== undefined) { updates.push(`new_destination = $${idx++}`); values.push(new_destination); }
+    if (new_airline !== undefined)     { updates.push(`new_airline = $${idx++}`);     values.push(new_airline); }
+    if (comment !== undefined)         { updates.push(`comment = $${idx++}`);         values.push(comment); }
+    if (pax_count !== undefined)       { updates.push(`pax_count = $${idx++}`);       values.push(parseInt(pax_count) || 0); }
+
+    if (report.prev_datetime) {
+      const diff = (Date.now() - jeddahDtMs(report.prev_datetime)) / (1000 * 60 * 60 * 24);
+      if (!isNaN(diff)) { updates.push(`days_at_airport = $${idx++}`); values.push(parseFloat(Math.max(0, diff).toFixed(2))); }
+    }
+
+    const finalNewFlight   = new_flight   !== undefined ? new_flight   : report.new_flight;
+    const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
+    const finalPaxCount    = pax_count    !== undefined ? (parseInt(pax_count) || 0) : report.pax_count;
+
+    const whatsapp_text =
+      `No-Show Report #${report.id}\n` +
+      `Flight: ${report.prev_flight || '—'} → ${report.prev_destination || '—'}\n` +
+      `Pax: ${finalPaxCount} × ${report.pax_type || '—'}\n` +
+      `Nationality: ${report.nationality || '—'}\n` +
+      `New Flight: ${finalNewFlight || '—'} on ${finalNewDatetime || '—'}`;
+    updates.push(`whatsapp_text = $${idx++}`);
+    values.push(whatsapp_text);
+
+    if (updates.length === 0) return res.json(report);
+
+    values.push(req.params.id);
+    await pool.query(`UPDATE reports SET ${updates.join(', ')} WHERE id = $${idx}`, values);
+
+    if (status && report.status !== 'flight_confirmed' && status === 'flight_confirmed' && !report.confirmed_at) {
+      await pool.query('UPDATE reports SET confirmed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+    }
+    if (status && report.status !== 'closed' && status === 'closed' && !report.closed_at) {
+      await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+    }
+
+    const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    const updated = updatedRows[0];
+
+    const changes = diffFields(report, updated, AUDIT_FIELDS);
+    if (changes) {
+      const action =
+        changes.status?.to === 'flight_confirmed' ? 'confirm_flight' :
+        changes.status?.to === 'closed'           ? 'close'          :
+        changes.status?.to === 'under_process'    ? 'reopen'         : 'edit';
+      await logAudit({ user: req.body.submitted_by || 'staff', action, reportId: updated.id, changes });
+    }
+
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── DELETE report ──────────────────────────────────────────────────────
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    const report = rows[0];
+
+    try {
+      const files = JSON.parse(report.file_paths || '[]');
+      files.forEach(fp => {
+        const full = path.join(__dirname, '..', fp);
+        if (fs.existsSync(full)) fs.unlinkSync(full);
+      });
+    } catch (_) {}
+
+    await pool.query('DELETE FROM reports WHERE id = $1', [req.params.id]);
+    await logAudit({ user: req.query.user || 'supervisor', action: 'delete', reportId: report.id, snapshot: report });
+
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Nusuk confirmation ─────────────────────────────────────────────────
+
+router.post('/:id/nusuk', express.json(), async (req, res) => {
+  try {
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    const report = rows[0];
+
+    const { received, user } = req.body;
+    const ts = received ? jeddahNowStr() : null;
+    const by = received ? (user || 'staff') : null;
+
+    await pool.query('UPDATE reports SET nusuk_received = $1, nusuk_by = $2 WHERE id = $3', [ts, by, req.params.id]);
+    await logAudit({
+      user: user || 'staff',
+      action: received ? 'nusuk_confirm' : 'nusuk_unconfirm',
+      reportId: report.id,
+      changes: { nusuk_received: { from: report.nusuk_received, to: ts } },
+    });
+
+    const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    res.json(updatedRows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+
 
 
 
