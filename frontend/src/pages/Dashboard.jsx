@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal, getAirlineCode, confirmNusuk, getFilterOptions, AIRLINE_CODES } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, getAirlineCode, confirmNusuk, getFilterOptions, AIRLINE_CODES } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
@@ -75,11 +75,6 @@ export default function Dashboard() {
   const [shiftLoading, setShiftLoading] = useState(false);
   const [shiftCopied, setShiftCopied] = useState(null);
 
-  // CEO report modal
-  const [ceoModal, setCeoModal] = useState(false);
-  const [ceoData, setCeoData] = useState(null);
-  const [ceoLoading, setCeoLoading] = useState(false);
-  const [ceoCopied, setCeoCopied] = useState(false);
 
   // Inline pax edit
   const [editingPax, setEditingPax] = useState(null); // report id
@@ -462,28 +457,6 @@ export default function Dashboard() {
   }
 
   // ── CEO Report
-  async function openCeoReport() {
-    setCeoModal(true);
-    setCeoLoading(true);
-    setCeoCopied(false);
-    try {
-      const data = await getCeoReport();
-      setCeoData(data);
-    } catch (err) {
-      alert('Failed to generate CEO report: ' + err.message);
-    } finally {
-      setCeoLoading(false);
-    }
-  }
-
-  function copyCeoReport() {
-    if (!ceoData) return;
-    navigator.clipboard.writeText(ceoData.text).then(() => {
-      setCeoCopied(true);
-      setTimeout(() => setCeoCopied(false), 2000);
-    });
-  }
-
   function logout() {
     clearRole();
     navigate('/login');
@@ -581,9 +554,6 @@ export default function Dashboard() {
         <div className="header-actions">
           <button className="btn btn-handover btn-sm" onClick={openHandover} title="Shift Handover">
             Handover
-          </button>
-          <button className="btn btn-ceo btn-sm" onClick={openCeoReport} title="CEO Report">
-            CEO Report
           </button>
           <button className="btn btn-secondary btn-sm" onClick={openShiftSummary} title="Shift Summary">
             Shift Summary
@@ -1097,40 +1067,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── CEO Report Modal */}
-      {ceoModal && (
-        <div className="modal-overlay" onClick={() => setCeoModal(false)}>
-          <div className="modal-content ceo-modal" onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">CEO Report</h2>
 
-            {ceoLoading && <p className="state-msg">Generating report…</p>}
-
-            {!ceoLoading && ceoData && (
-              <>
-                <pre className="ceo-report-text">{ceoData.text}</pre>
-                <div className="ceo-summary-bar">
-                  <span>Completed: {ceoData.sections.completed}</span>
-                  <span>Depart &lt;12h: {ceoData.sections.departSoon}</span>
-                  <span>Depart &gt;12h: {ceoData.sections.departLater}</span>
-                  <span>Under Process: {ceoData.sections.underProcess}</span>
-                  <span>Over 24hrs: {ceoData.sections.over24}</span>
-                </div>
-              </>
-            )}
-
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setCeoModal(false)}>Close</button>
-              <button
-                className={`btn ${ceoCopied ? 'btn-success' : 'btn-whatsapp'}`}
-                onClick={copyCeoReport}
-                disabled={!ceoData}
-              >
-                {ceoCopied ? '✓ Copied!' : 'Copy for WhatsApp'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

@@ -141,11 +141,6 @@ export async function getShiftSummary(date) {
   return request(`/api/reports/shift-summary${params}`);
 }
 
-// ── CEO Report
-export async function getCeoReport() {
-  return request('/api/reports/ceo-report');
-}
-
 // ── Handover Report
 export async function getHandoverReport(shift) {
   const params = shift ? `?shift=${shift}` : '';
