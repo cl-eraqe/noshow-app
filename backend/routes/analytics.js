@@ -346,7 +346,8 @@ router.get('/filter-options', (_req, res) => {
     })
     .filter((v, i, a) => v && a.indexOf(v) === i).sort();
   const paxTypes = db.prepare("SELECT DISTINCT pax_type AS v FROM reports WHERE pax_type IS NOT NULL AND pax_type != '' ORDER BY pax_type").all().map(r => r.v);
-  res.json({ airlines, nationalities, destinations, paxTypes });
+  const destinationsFull = db.prepare("SELECT DISTINCT prev_destination AS v FROM reports WHERE prev_destination IS NOT NULL AND prev_destination != '' ORDER BY prev_destination").all().map(r => r.v).filter(Boolean);
+  res.json({ airlines, nationalities, destinations, destinationsFull, paxTypes });
 });
 
 // ── Audit log endpoint (supervisor only - protection handled at route level in future) ──

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal, getAirlineCode, confirmNusuk } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getCeoReport, getHandoverReport, needsBus, getTerminal, getAirlineCode, confirmNusuk, getFilterOptions, AIRLINE_CODES } from '../utils/api';
+
+const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 import { getRole, isSupervisor, clearRole } from '../utils/auth';
 
 function fmt(dt) {
@@ -97,8 +99,12 @@ export default function Dashboard() {
   });
 
   const role = getRole();
+  const [knownDestinations, setKnownDestinations] = useState([]);
 
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    getFilterOptions().then(o => setKnownDestinations(o.destinationsFull || [])).catch(() => {});
+  }, []);
 
   async function load() {
     setLoading(true);
@@ -849,6 +855,7 @@ export default function Dashboard() {
               <div className="field">
                 <label className="field-label">Destination</label>
                 <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+                  list="db-destination-list"
                   value={newFlightForm.new_destination}
                   onChange={e => setNewFlightForm(prev => ({ ...prev, new_destination: e.target.value }))} />
               </div>
@@ -905,6 +912,7 @@ export default function Dashboard() {
                   <div className="field">
                     <label className="field-label">Destination</label>
                     <input type="text" className="field-input autofilled" placeholder="Auto-filled"
+                      list="db-destination-list"
                       value={bulkSharedFlight.new_destination}
                       onChange={e => setBulkSharedFlight(prev => ({ ...prev, new_destination: e.target.value }))} />
                   </div>
@@ -957,6 +965,7 @@ export default function Dashboard() {
                       </div>
                       <div className="field">
                         <input type="text" className="field-input autofilled" placeholder="Destination"
+                          list="db-destination-list"
                           value={bulkPerReport[r.id]?.new_destination || ''}
                           onChange={e => setBulkPerField(r.id, 'new_destination', e.target.value)} />
                       </div>
@@ -1112,6 +1121,14 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Shared datalists for searchable fields */}
+      <datalist id="db-destination-list">
+        {knownDestinations.map(d => <option key={d} value={d} />)}
+      </datalist>
+      <datalist id="db-airline-list">
+        {AIRLINE_NAMES.map(a => <option key={a} value={a} />)}
+      </datalist>
     </div>
   );
 }

@@ -12,7 +12,7 @@ const TERMINAL_MAP = {
   // Hajj (22)
   PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',AH:'Hajj',
   GA:'Hajj',FG:'Hajj',BS:'Hajj','9P':'Hajj',QP:'Hajj',
-  JT:'Hajj',RQ:'Hajj',C6:'Hajj',TK:'Hajj',D7:'Hajj',
+  JT:'Hajj',RQ:'Hajj',C6:'Hajj',TK:'T1',D7:'Hajj',
   '2S':'Hajj','7Q':'Hajj',BJ:'Hajj',BM:'Hajj',FH:'Hajj',
   UZ:'Hajj',XC:'Hajj',
 };

@@ -143,7 +143,7 @@ export async function getHandoverReport(shift) {
 
 // ── Airline code → name mapping (client-side, no API call needed)
 // Updated from POWERAPP.xlsx — 2026-04-09
-const AIRLINE_CODES = {
+export const AIRLINE_CODES = {
   // Terminal 1 (20 airlines)
   SV: 'Saudia',
   XY: 'flynas',
@@ -240,7 +240,7 @@ const TERMINAL_MAP = {
   // Hajj Terminal — bus needed 🚌 (22 airlines)
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
   GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '9P': 'Hajj', QP: 'Hajj',
-  JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', TK: 'Hajj', D7: 'Hajj',
+  JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', TK: 'T1', D7: 'Hajj',
   '2S': 'Hajj', '7Q': 'Hajj', BJ: 'Hajj', BM: 'Hajj', FH: 'Hajj',
   UZ: 'Hajj', XC: 'Hajj',
 };
