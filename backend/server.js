@@ -26,9 +26,6 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
 
-// Initialize database
-initDb();
-
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/flights', flightRoutes);
@@ -38,9 +35,16 @@ app.use('/api/export', exportRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
-app.listen(PORT, () => {
-  console.log(`JEDCO No-Show API running on port ${PORT}`);
-  // Auto-close flight_confirmed reports whose departure has passed — check every minute
-  autoCloseReports();
-  setInterval(autoCloseReports, 60 * 1000);
+async function start() {
+  await initDb();
+  app.listen(PORT, () => {
+    console.log(`JEDCO No-Show API running on port ${PORT}`);
+  });
+  autoCloseReports().catch(console.error);
+  setInterval(() => autoCloseReports().catch(console.error), 60 * 1000);
+}
+
+start().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });
