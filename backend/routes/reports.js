@@ -89,4 +89,34 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 15 * 1024 * 1024 } });
 
+// ── Analytics summary (must be before /:id) ───────────────────────────
+
+router.get('/analytics/summary', async (_req, res) => {
+  try {
+    const pool = getDb();
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const startOfMonth = jeddahISO().slice(0, 7) + '-01';
+
+    const [week, month, topDest, byNat, byType] = await Promise.all([
+      pool.query(`SELECT COUNT(*) AS count FROM reports WHERE LEFT(created_at,10) >= $1`, [sevenDaysAgo]),
+      pool.query(`SELECT COUNT(*) AS count FROM reports WHERE LEFT(created_at,10) >= $1`, [startOfMonth]),
+      pool.query(`SELECT prev_destination AS destination, SUM(pax_count) AS total FROM reports GROUP BY prev_destination ORDER BY total DESC LIMIT 10`),
+      pool.query(`SELECT nationality, SUM(pax_count) AS total FROM reports GROUP BY nationality ORDER BY total DESC`),
+      pool.query(`SELECT pax_type, COUNT(*) AS report_count, SUM(pax_count) AS total_pax FROM reports GROUP BY pax_type ORDER BY total_pax DESC`),
+    ]);
+
+    res.json({
+      thisWeek:        parseInt(week.rows[0].count),
+      thisMonth:       parseInt(month.rows[0].count),
+      topDestinations: topDest.rows,
+      byNationality:   byNat.rows,
+      byPaxType:       byType.rows,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+
