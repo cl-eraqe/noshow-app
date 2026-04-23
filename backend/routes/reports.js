@@ -118,5 +118,123 @@ router.get('/analytics/summary', async (_req, res) => {
   }
 });
 
+// ── Handover Report (must be before /:id) ─────────────────────────────
+
+router.get('/handover', async (req, res) => {
+  try {
+    const pool = getDb();
+    await autoCloseReports();
+
+    const jeddahHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })).getHours();
+    const shiftParam = (req.query.shift || '').toUpperCase();
+    let currentShift, nextShift;
+    if (['A','B','C'].includes(shiftParam)) {
+      currentShift = shiftParam;
+      nextShift = shiftParam === 'A' ? 'B' : shiftParam === 'B' ? 'C' : 'A';
+    } else if (jeddahHour >= 6 && jeddahHour < 14) {
+      currentShift = 'A'; nextShift = 'B';
+    } else if (jeddahHour >= 14 && jeddahHour < 22) {
+      currentShift = 'B'; nextShift = 'C';
+    } else {
+      currentShift = 'C'; nextShift = 'A';
+    }
+
+    const [upRes, fuRes] = await Promise.all([
+      pool.query("SELECT * FROM reports WHERE status = 'under_process' ORDER BY prev_datetime ASC"),
+      pool.query("SELECT * FROM reports WHERE status = 'flight_confirmed' ORDER BY new_datetime ASC"),
+    ]);
+    const underProcess = upRes.rows;
+    const flightConfirmed = fuRes.rows;
+
+    const nowJeddah          = jeddahISO();
+    const threeHoursFromNow  = jeddahISO(3 * 60 * 60 * 1000);
+    const twentyFourHoursAgo = jeddahISO(-24 * 60 * 60 * 1000);
+
+    const upSV    = underProcess.filter(r => getAirlineCode(r.prev_flight) === 'SV');
+    const upOther = underProcess.filter(r => getAirlineCode(r.prev_flight) !== 'SV');
+    const fuSV    = flightConfirmed.filter(r => getAirlineCode(r.prev_flight) === 'SV');
+    const fuOther = flightConfirmed.filter(r => getAirlineCode(r.prev_flight) !== 'SV');
+
+    const departingSoon = flightConfirmed.filter(r =>
+      r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > nowJeddah
+    );
+    const busTransfers = flightConfirmed.filter(r => needsBus(r.new_flight));
+    const over24 = [...underProcess, ...flightConfirmed].filter(r =>
+      r.prev_datetime && r.prev_datetime < twentyFourHoursAgo
+    );
+
+    function fmtReport(r, showNewFlight = false) {
+      const count    = String(r.pax_count || 1).padStart(2, '0');
+      const paxType  = (r.pax_type || 'Unknown').toUpperCase();
+      const dest     = iataCode(r.prev_destination);
+      const airline  = getAirlineCode(r.prev_flight);
+      const prevDate = fmtDateShort(r.prev_datetime);
+      const prevTime = fmtTimeShort(r.prev_datetime);
+      const bus      = needsBus(r.new_flight) ? ' 🚌' : '';
+      let line = `${count}PAX ${paxType} ${airline} ${dest} ${prevDate} STD ${prevTime}`;
+      if (showNewFlight && r.status === 'flight_confirmed' && r.new_flight) {
+        const newDate    = fmtDateShort(r.new_datetime);
+        const newTime    = fmtTimeShort(r.new_datetime);
+        const terminal   = getTerminal(r.new_flight);
+        const termNote   = terminal !== 'T1' ? ` (${terminal})` : '';
+        line += `\n- ALT FLT ${r.new_flight} STD ${newTime} ${newDate} ✅${termNote}${bus}`;
+      }
+      if (r.comment) line += `\n   → ${r.comment}`;
+      line += ` #${r.id}`;
+      return line;
+    }
+
+    const lines = [];
+    lines.push(`📋 SHIFT HANDOVER ${currentShift} → ${nextShift}`);
+    lines.push(`${fmtDateShort(nowJeddah)} ${fmtTimeShort(nowJeddah)}`);
+    lines.push('');
+
+    if (departingSoon.length > 0) {
+      lines.push('━━ ⏰ DEPARTING SOON (< 3hrs) ━━'); lines.push('');
+      departingSoon.forEach(r => {
+        const bus      = needsBus(r.new_flight) ? ' 🚌' : '';
+        const terminal = getTerminal(r.new_flight);
+        const termNote = terminal !== 'T1' ? ` (${terminal})` : '';
+        lines.push(`${String(r.pax_count||1).padStart(2,'0')}PAX ${r.new_flight} ${iataCode(r.new_destination)} → STD ${fmtTimeShort(r.new_datetime)} TODAY${termNote}${bus} #${r.id}`);
+        if (r.comment) lines.push(`   → ${r.comment}`);
+      });
+      lines.push('');
+    }
+    if (busTransfers.length > 0) {
+      lines.push('━━ 🚌 BUS TRANSFER NEEDED ━━'); lines.push('');
+      busTransfers.forEach(r => {
+        const terminal = getTerminal(r.new_flight);
+        lines.push(`${String(r.pax_count||1).padStart(2,'0')}PAX → ${r.new_flight} ${iataCode(r.new_destination)} STD ${fmtTimeShort(r.new_datetime)} ${fmtDateShort(r.new_datetime)} (${terminal}) #${r.id}`);
+        if (r.comment) lines.push(`   → ${r.comment}`);
+      });
+      lines.push('');
+    }
+    if (upSV.length > 0)    { lines.push('━━ UNDER PROCESS SV ━━'); lines.push(''); upSV.forEach(r => lines.push(fmtReport(r))); lines.push(''); }
+    if (upOther.length > 0) { lines.push('━━ UNDER PROCESS OTHER AIRLINES ━━'); lines.push(''); upOther.forEach(r => lines.push(fmtReport(r))); lines.push(''); }
+    if (fuSV.length > 0)    { lines.push('━━ FOLLOW UP SV ━━'); lines.push(''); fuSV.forEach(r => lines.push(fmtReport(r, true))); lines.push(''); }
+    if (fuOther.length > 0) { lines.push('━━ FOLLOW UP OTHER AIRLINES ━━'); lines.push(''); fuOther.forEach(r => lines.push(fmtReport(r, true))); lines.push(''); }
+    if (over24.length > 0) {
+      lines.push('━━ ⚠ OVER 24HRS ━━'); lines.push('');
+      over24.forEach(r => {
+        const days = ((Date.now() - new Date(r.prev_datetime).getTime()) / (1000*60*60*24)).toFixed(0);
+        lines.push(fmtReport(r, true) + ` (${days} days)`);
+      });
+      lines.push('');
+    }
+
+    const totalUp = underProcess.reduce((s,r) => s+(r.pax_count||0), 0);
+    const totalFu = flightConfirmed.reduce((s,r) => s+(r.pax_count||0), 0);
+    lines.push('━━ SUMMARY ━━');
+    lines.push(`Under Process: ${underProcess.length} cases (${totalUp} PAX)`);
+    lines.push(`Flight Confirmed: ${flightConfirmed.length} cases (${totalFu} PAX)`);
+    lines.push(`Total Active: ${underProcess.length + flightConfirmed.length} cases (${totalUp + totalFu} PAX)`);
+
+    res.json({ text: lines.join('\n'), shift: { current: currentShift, next: nextShift } });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+
 
