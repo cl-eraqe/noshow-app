@@ -7,81 +7,89 @@ function jeddahNow() {
   return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
 }
 
-// Merge JSON + custom table into one flight record (custom wins / can mark deleted)
-function lookupFlight(key) {
-  const db = getDb();
-  const custom = db.prepare('SELECT * FROM flights_custom WHERE flight_number = ?').get(key);
-  if (custom) {
-    if (custom.deleted) return null;
-    return { destination: custom.destination, std: custom.std, city: custom.city, country: custom.country, nationality: custom.nationality };
+// GET /api/flights/custom/list — must be before /:flightNumber
+router.get('/custom/list', async (_req, res) => {
+  try {
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT * FROM flights_custom ORDER BY flight_number ASC');
+    const enriched = rows.map(r => ({ ...r, isOverride: !!flights[r.flight_number] }));
+    res.json(enriched);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
-  return flights[key] || null;
-}
+});
+
+// GET /api/flights — all known flight numbers
+router.get('/', async (_req, res) => {
+  try {
+    const pool = getDb();
+    const { rows: customs } = await pool.query('SELECT * FROM flights_custom');
+    const customMap = {};
+    customs.forEach(c => { customMap[c.flight_number] = c; });
+    const jsonKeys = Object.keys(flights).filter(k => !customMap[k]?.deleted);
+    const customAdditions = customs.filter(c => !c.deleted && !flights[c.flight_number]).map(c => c.flight_number);
+    res.json([...jsonKeys, ...customAdditions].sort());
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // GET /api/flights/:flightNumber
-router.get('/:flightNumber', (req, res) => {
-  const key = req.params.flightNumber.toUpperCase().trim();
-  const flight = lookupFlight(key);
-  if (!flight) return res.status(404).json({ error: `Flight ${key} not found` });
-  res.json(flight);
+router.get('/:flightNumber', async (req, res) => {
+  try {
+    const key = req.params.flightNumber.toUpperCase().trim();
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT * FROM flights_custom WHERE flight_number = $1', [key]);
+    const custom = rows[0];
+    if (custom) {
+      if (custom.deleted) return res.status(404).json({ error: `Flight ${key} not found` });
+      return res.json({ destination: custom.destination, std: custom.std, city: custom.city, country: custom.country, nationality: custom.nationality });
+    }
+    const base = flights[key];
+    if (!base) return res.status(404).json({ error: `Flight ${key} not found` });
+    res.json(base);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// GET /api/flights — all known flight numbers (JSON base + custom additions, minus deleted)
-router.get('/', (_req, res) => {
-  const db = getDb();
-  const customs = db.prepare('SELECT * FROM flights_custom').all();
-  const customMap = {};
-  customs.forEach(c => { customMap[c.flight_number] = c; });
-
-  const jsonKeys = Object.keys(flights).filter(k => !customMap[k]?.deleted);
-  const customAdditions = customs.filter(c => !c.deleted && !flights[c.flight_number]).map(c => c.flight_number);
-
-  res.json([...jsonKeys, ...customAdditions].sort());
+// POST /api/flights — add or update a flight
+router.post('/', express.json(), async (req, res) => {
+  try {
+    const { flight_number, destination, std, city, country, nationality } = req.body;
+    if (!flight_number) return res.status(400).json({ error: 'flight_number required' });
+    const key = flight_number.toUpperCase().trim();
+    const pool = getDb();
+    await pool.query(
+      `INSERT INTO flights_custom (flight_number, destination, std, city, country, nationality, deleted, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
+       ON CONFLICT (flight_number) DO UPDATE SET
+         destination = EXCLUDED.destination, std = EXCLUDED.std, city = EXCLUDED.city,
+         country = EXCLUDED.country, nationality = EXCLUDED.nationality,
+         deleted = 0, updated_at = EXCLUDED.updated_at`,
+      [key, destination || '', std || '', city || '', country || '', nationality || '', jeddahNow()]
+    );
+    res.json({ success: true, flight_number: key });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// GET /api/flights/custom/list — list all custom entries (for Flight Manager UI)
-router.get('/custom/list', (_req, res) => {
-  const db = getDb();
-  const rows = db.prepare('SELECT * FROM flights_custom ORDER BY flight_number ASC').all();
-  const enriched = rows.map(r => ({
-    ...r,
-    isOverride: !!flights[r.flight_number],
-  }));
-  res.json(enriched);
-});
-
-// POST /api/flights — add or update a flight (supervisor only)
-router.post('/', express.json(), (req, res) => {
-  const { flight_number, destination, std, city, country, nationality } = req.body;
-  if (!flight_number) return res.status(400).json({ error: 'flight_number required' });
-
-  const key = flight_number.toUpperCase().trim();
-  const db = getDb();
-
-  db.prepare(`
-    INSERT INTO flights_custom (flight_number, destination, std, city, country, nationality, deleted, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, 0, ?)
-    ON CONFLICT(flight_number) DO UPDATE SET
-      destination = excluded.destination, std = excluded.std, city = excluded.city,
-      country = excluded.country, nationality = excluded.nationality,
-      deleted = 0, updated_at = excluded.updated_at
-  `).run(key, destination || '', std || '', city || '', country || '', nationality || '', jeddahNow());
-
-  res.json({ success: true, flight_number: key });
-});
-
-// DELETE /api/flights/:flightNumber — soft-delete (marks as deleted in custom table)
-router.delete('/:flightNumber', (req, res) => {
-  const key = req.params.flightNumber.toUpperCase().trim();
-  const db = getDb();
-
-  db.prepare(`
-    INSERT INTO flights_custom (flight_number, deleted, updated_at)
-    VALUES (?, 1, ?)
-    ON CONFLICT(flight_number) DO UPDATE SET deleted = 1, updated_at = excluded.updated_at
-  `).run(key, jeddahNow());
-
-  res.json({ success: true });
+// DELETE /api/flights/:flightNumber — soft-delete
+router.delete('/:flightNumber', async (req, res) => {
+  try {
+    const key = req.params.flightNumber.toUpperCase().trim();
+    const pool = getDb();
+    await pool.query(
+      `INSERT INTO flights_custom (flight_number, deleted, updated_at)
+       VALUES ($1, 1, $2)
+       ON CONFLICT (flight_number) DO UPDATE SET deleted = 1, updated_at = EXCLUDED.updated_at`,
+      [key, jeddahNow()]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;
