@@ -235,6 +235,81 @@ router.get('/handover', async (req, res) => {
   }
 });
 
+// ── Shift Summary (must be before /:id) ───────────────────────────────
+
+router.get('/shift-summary', async (req, res) => {
+  try {
+    const pool = getDb();
+    const { date } = req.query;
+    const localToday = jeddahISO().slice(0, 10);
+    const targetDate = date || localToday;
+
+    const nextDay = new Date(targetDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDayStr = nextDay.toISOString().slice(0, 10);
+
+    const shifts = {
+      A: { start: `${targetDate}T06:00`, end: `${targetDate}T14:00` },
+      B: { start: `${targetDate}T14:00`, end: `${targetDate}T22:00` },
+      C: { start: `${targetDate}T22:00`, end: `${nextDayStr}T06:00` },
+    };
+
+    const result = {};
+    for (const [shiftName, range] of Object.entries(shifts)) {
+      const { rows } = await pool.query(
+        `SELECT pax_count, pax_id_datetime FROM reports
+         WHERE pax_id_datetime >= $1 AND pax_id_datetime < $2
+         ORDER BY pax_id_datetime ASC`,
+        [range.start, range.end]
+      );
+      const lines = rows.map(r => {
+        const time  = r.pax_id_datetime ? r.pax_id_datetime.slice(11, 16) : '??:??';
+        const count = String(r.pax_count || 1).padStart(2, '0');
+        return `${count}PAX Identified at ${time}`;
+      });
+      const totalPax     = rows.reduce((sum, r) => sum + (r.pax_count || 1), 0);
+      const totalReports = rows.length;
+      result[shiftName] = {
+        lines, totalPax, totalReports,
+        text: lines.length > 0
+          ? `No-Show App Summary SHIFT ${shiftName}\n${lines.join('\n')}\n\nTotal pax added during shift ${shiftName} is ${totalPax}PAX in the No-Show App.`
+          : `No-Show App Summary SHIFT ${shiftName}\nNo reports during this shift.`,
+      };
+    }
+
+    res.json({ date: targetDate, shifts: result });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET all reports ────────────────────────────────────────────────────
+
+router.get('/', async (_req, res) => {
+  try {
+    autoCloseReports().catch(console.error);
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET single report ──────────────────────────────────────────────────
+
+router.get('/:id', async (req, res) => {
+  try {
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    res.json(rows[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 module.exports = router;
+
 
 
