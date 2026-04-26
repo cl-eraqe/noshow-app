@@ -236,7 +236,7 @@ export default function FlightManager() {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2 className="modal-title">Delete {confirmDel}?</h2>
             <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>
-              {flights_json_has(confirmDel)
+              {customs.find(r => r.flight_number === confirmDel)?.isOverride
                 ? 'This will hide the flight from lookups. The original entry in the built-in database is not affected.'
                 : 'This will remove the custom flight from the database.'}
             </p>
@@ -250,6 +250,3 @@ export default function FlightManager() {
     </div>
   );
 }
-
-// tiny helper — we don't have the JSON here so just show generic message
-function flights_json_has() { return false; }

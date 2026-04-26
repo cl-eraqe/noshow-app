@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
+import { getRole } from '../utils/auth';
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
-import { getRole } from '../utils/auth';
 
 const PAX_TYPES = [
   'Umrah',
