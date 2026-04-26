@@ -314,8 +314,8 @@ router.post('/', upload.array('files', 10), async (req, res) => {
          prev_flight, prev_datetime, prev_destination, prev_airline,
          nationality, pax_type,
          new_flight, new_datetime, new_destination, new_airline,
-         days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status, comment)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+         days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status, comment, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
        RETURNING id`,
       [
         pax_id_datetime,
@@ -329,6 +329,7 @@ router.post('/', upload.array('files', 10), async (req, res) => {
         submitted_by,
         reportStatus,
         comment || '',
+        jeddahNowStr(),
       ]
     );
 

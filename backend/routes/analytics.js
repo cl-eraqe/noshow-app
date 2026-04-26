@@ -194,10 +194,11 @@ router.get('/dashboard', async (req, res) => {
     const heatmap = Array.from({length: 7}, () => Array(24).fill(0));
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     filtered.forEach(r => {
-      if (!r.created_at) return;
-      const d = new Date(String(r.created_at).replace(' ', 'T') + '+03:00');
-      if (isNaN(d.getTime())) return;
-      heatmap[d.getUTCDay()][d.getUTCHours()] += 1;
+      if (!r.created_at || r.created_at.length < 13) return;
+      const jeddahHour = parseInt(r.created_at.slice(11, 13));
+      const jeddahDay  = new Date(r.created_at.slice(0, 10) + 'T12:00:00Z').getUTCDay();
+      if (isNaN(jeddahHour) || isNaN(jeddahDay)) return;
+      heatmap[jeddahDay][jeddahHour] += 1;
     });
     const heatmapData = [];
     for (let d = 0; d < 7; d++) {

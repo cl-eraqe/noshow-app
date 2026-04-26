@@ -36,7 +36,7 @@ async function initDb() {
       submitted_by     TEXT,
       status           TEXT DEFAULT 'under_process',
       comment          TEXT DEFAULT '',
-      created_at       TEXT DEFAULT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
+      created_at       TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS'),
       closed_at        TEXT,
       confirmed_at     TEXT,
       nusuk_received   TEXT,
@@ -77,12 +77,34 @@ async function initDb() {
       email       TEXT NOT NULL,
       token       TEXT NOT NULL UNIQUE,
       role        TEXT NOT NULL DEFAULT 'view',
-      created_at  TEXT DEFAULT to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
+      created_at  TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS'),
       last_used   TEXT,
       revoked     INTEGER DEFAULT 0
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_export_token ON export_tokens(token)`);
+
+  // Fix column defaults on existing tables (safe, idempotent)
+  await pool.query(`ALTER TABLE reports ALTER COLUMN created_at SET DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')`);
+  await pool.query(`ALTER TABLE export_tokens ALTER COLUMN created_at SET DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')`);
+
+  // One-time migration: convert existing UTC created_at values to Jeddah time (+3h)
+  await pool.query(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT)`);
+  const { rows: migRows } = await pool.query(`SELECT 1 FROM _migrations WHERE name = 'utc_to_jeddah_created_at'`);
+  if (migRows.length === 0) {
+    await pool.query(`
+      UPDATE reports
+      SET created_at = to_char((created_at::timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
+      WHERE created_at IS NOT NULL AND created_at != ''
+    `);
+    await pool.query(`
+      UPDATE export_tokens
+      SET created_at = to_char((created_at::timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
+      WHERE created_at IS NOT NULL AND created_at != ''
+    `);
+    await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('utc_to_jeddah_created_at', $1)`, [jeddahNowStr()]);
+    console.log('Migration applied: created_at converted from UTC to Jeddah time');
+  }
 
   console.log('Database ready (PostgreSQL)');
 }
