@@ -116,6 +116,25 @@ function ExistingFilesList({ files }) {
     } catch { alert('Failed to open file'); }
   }
 
+  async function shareFile(fp) {
+    try {
+      const { url, type } = await getFileObjectUrl(fp);
+      const blob = await (await fetch(url)).blob();
+      const filename = fp.split('/').pop();
+      const file = new File([blob], filename, { type: type || blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+      } else {
+        window.open(url, '_blank');
+        alert('Share not supported on this device — file opened in a new tab instead');
+      }
+    } catch (err) {
+      if (err && err.name !== 'AbortError') alert('Share failed');
+    }
+  }
+
+  const canShare = typeof navigator !== 'undefined' && !!navigator.canShare;
+
   return (
     <ul className="file-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
       {files.map((fp, i) => {
@@ -123,7 +142,7 @@ function ExistingFilesList({ files }) {
         const isImg   = IMG_RE.test(fp);
         const preview = previews[fp];
         return (
-          <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border, #eee)' }}>
+          <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border, #eee)', flexWrap: 'wrap' }}>
             {isImg && preview ? (
               <img src={preview.url} alt={name}
                 style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
@@ -133,8 +152,11 @@ function ExistingFilesList({ files }) {
                 📄
               </span>
             )}
-            <span style={{ flex: 1, wordBreak: 'break-all', fontSize: '0.9rem' }}>{name}</span>
+            <span style={{ flex: 1, minWidth: 120, wordBreak: 'break-all', fontSize: '0.9rem' }}>{name}</span>
             <button type="button" className="btn btn-sm btn-secondary" onClick={() => openInNewTab(fp)}>Open</button>
+            {canShare && (
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => shareFile(fp)} title="Share to WhatsApp, email, etc.">Share</button>
+            )}
             <button type="button" className="btn btn-sm btn-primary" onClick={() => downloadFile(fp).catch(() => alert('Download failed'))}>Download</button>
           </li>
         );
