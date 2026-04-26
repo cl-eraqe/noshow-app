@@ -1,13 +1,48 @@
+import { getToken } from './auth';
+
 // Base URL: empty string uses Vite proxy in dev; set VITE_API_URL for production
 const BASE = import.meta.env.VITE_API_URL || '';
 
+function authHeaders(extra = {}) {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra };
+}
+
 async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, options);
+  const opts = { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } };
+  const res = await fetch(`${BASE}${path}`, opts);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `HTTP ${res.status}`);
   }
   return res.json();
+}
+
+// Download a protected file by fetching with auth header, then triggering a browser download
+export async function downloadFile(filePath) {
+  const filename = filePath.split('/').pop();
+  const res = await fetch(`${BASE}/api/files/${encodeURIComponent(filename)}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Get a temporary object URL for previewing a file inline (images, PDFs)
+export async function getFileObjectUrl(filePath) {
+  const filename = filePath.split('/').pop();
+  const res = await fetch(`${BASE}/api/files/${encodeURIComponent(filename)}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const blob = await res.blob();
+  return { url: URL.createObjectURL(blob), type: blob.type };
 }
 
 // ── Auth
@@ -34,9 +69,9 @@ export async function getReport(id) {
 }
 
 export async function createReport(formData) {
-  // formData is a FormData object (supports file uploads)
   const res = await fetch(`${BASE}/api/reports`, {
     method: 'POST',
+    headers: authHeaders(),
     body: formData, // do NOT set Content-Type; browser sets multipart boundary
   });
   if (!res.ok) {
@@ -57,6 +92,7 @@ export async function updateReport(id, data) {
 export async function updateReportFull(id, formData) {
   const res = await fetch(`${BASE}/api/reports/${id}`, {
     method: 'PUT',
+    headers: authHeaders(),
     body: formData,
   });
   if (!res.ok) {

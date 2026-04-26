@@ -10,6 +10,7 @@ const flightRoutes = require('./routes/flights');
 const reportRoutes = require('./routes/reports');
 const analyticsRoutes = require('./routes/analytics');
 const exportRoutes = require('./routes/export');
+const { requireAuth } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,7 +25,14 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use('/uploads', express.static(uploadsDir));
+
+// Protected file downloads — requires a valid session token
+app.get('/api/files/:filename', requireAuth, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filepath = path.join(uploadsDir, filename);
+  if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
+  res.sendFile(filepath);
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

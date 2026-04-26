@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES } from '../utils/api';
+import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { getRole } from '../utils/auth';
 
@@ -81,6 +81,88 @@ function hasFlightDeparted(flightDatetime) {
   const now = Date.now();
   const thirtyMinBefore = flightTime - (30 * 60 * 1000);
   return now >= thirtyMinBefore;
+}
+
+const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)$/i;
+
+function ExistingFilesList({ files }) {
+  const [previews, setPreviews] = useState({}); // { [filePath]: { url, type } }
+
+  // Auto-load previews for image files
+  useEffect(() => {
+    let cancelled = false;
+    const urls = [];
+    (async () => {
+      for (const fp of files) {
+        if (!IMG_RE.test(fp)) continue;
+        try {
+          const obj = await getFileObjectUrl(fp);
+          if (cancelled) { URL.revokeObjectURL(obj.url); return; }
+          urls.push(obj.url);
+          setPreviews(prev => ({ ...prev, [fp]: obj }));
+        } catch { /* ignore */ }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      urls.forEach(u => URL.revokeObjectURL(u));
+    };
+  }, [files]);
+
+  async function openInNewTab(fp) {
+    try {
+      const { url } = await getFileObjectUrl(fp);
+      window.open(url, '_blank');
+    } catch { alert('Failed to open file'); }
+  }
+
+  async function shareFile(fp) {
+    try {
+      const { url, type } = await getFileObjectUrl(fp);
+      const blob = await (await fetch(url)).blob();
+      const filename = fp.split('/').pop();
+      const file = new File([blob], filename, { type: type || blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+      } else {
+        window.open(url, '_blank');
+        alert('Share not supported on this device — file opened in a new tab instead');
+      }
+    } catch (err) {
+      if (err && err.name !== 'AbortError') alert('Share failed');
+    }
+  }
+
+  const canShare = typeof navigator !== 'undefined' && !!navigator.canShare;
+
+  return (
+    <ul className="file-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+      {files.map((fp, i) => {
+        const name    = fp.split('/').pop();
+        const isImg   = IMG_RE.test(fp);
+        const preview = previews[fp];
+        return (
+          <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border, #eee)', flexWrap: 'wrap' }}>
+            {isImg && preview ? (
+              <img src={preview.url} alt={name}
+                style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
+                onClick={() => window.open(preview.url, '_blank')} />
+            ) : (
+              <span style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-muted, #f3f4f6)', borderRadius: 6, fontSize: 22 }}>
+                📄
+              </span>
+            )}
+            <span style={{ flex: 1, minWidth: 120, wordBreak: 'break-all', fontSize: '0.9rem' }}>{name}</span>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={() => openInNewTab(fp)}>Open</button>
+            {canShare && (
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => shareFile(fp)} title="Share to WhatsApp, email, etc.">Share</button>
+            )}
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => downloadFile(fp).catch(() => alert('Download failed'))}>Download</button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export default function NewReport({ editMode }) {
@@ -516,9 +598,7 @@ export default function NewReport({ editMode }) {
           {isEdit && existingFiles.length > 0 && (
             <div className="field">
               <label className="field-label">Existing Files</label>
-              <ul className="file-list">
-                {existingFiles.map((fp, i) => <li key={i}>{fp.split('/').pop()}</li>)}
-              </ul>
+              <ExistingFilesList files={existingFiles} />
             </div>
           )}
           <div className="field">

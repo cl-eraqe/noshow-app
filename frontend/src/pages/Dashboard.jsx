@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
-import { getRole, isSupervisor, clearRole } from '../utils/auth';
+import { getRole, isSupervisor, logout as authLogout } from '../utils/auth';
 
 function fmt(dt) {
   if (!dt) return '—';
@@ -456,7 +456,7 @@ export default function Dashboard() {
   }
 
   function logout() {
-    clearRole();
+    authLogout();
     navigate('/login');
   }
 
@@ -684,6 +684,9 @@ export default function Dashboard() {
                         <td data-label="#" className="col-id">
                           #{r.id}
                           {r.comment && <span className="comment-indicator" title={r.comment}>💬</span>}
+                          {(() => { try { return JSON.parse(r.file_paths || '[]').length > 0; } catch { return false; } })() && (
+                            <span className="comment-indicator" title="Has attachments">📎</span>
+                          )}
                         </td>
                         <td data-label="Prev Flight" className="col-flight">
                           <span className="flight-badge">{r.prev_flight || '—'}</span>
