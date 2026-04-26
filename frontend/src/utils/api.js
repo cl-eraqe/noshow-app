@@ -19,7 +19,7 @@ async function request(path, options = {}) {
 }
 
 // Download a protected file by fetching with auth header, then triggering a browser download
-export async function downloadFile(filePath) {
+export async function downloadFile(filePath, saveName) {
   const filename = filePath.split('/').pop();
   const res = await fetch(`${BASE}/api/files/${encodeURIComponent(filename)}`, {
     headers: authHeaders(),
@@ -29,7 +29,7 @@ export async function downloadFile(filePath) {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href     = url;
-  a.download = filename;
+  a.download = saveName || filename;
   a.click();
   URL.revokeObjectURL(url);
 }

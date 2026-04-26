@@ -84,11 +84,30 @@ function hasFlightDeparted(flightDatetime) {
 }
 
 const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)$/i;
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
-function ExistingFilesList({ files }) {
-  const [previews, setPreviews] = useState({}); // { [filePath]: { url, type } }
+function friendlyFilename(report, originalPath, index, total) {
+  const ext     = originalPath.includes('.') ? originalPath.split('.').pop().toLowerCase() : '';
+  const pax     = report.pax_count || 1;
+  const paxType = (report.pax_type || 'PAX').trim();
+  const rawDest = report.new_destination || report.prev_destination || '';
+  const dest    = (rawDest.match(/\(([A-Z]{3})\)/)?.[1] || rawDest).toUpperCase().replace(/[^A-Z0-9]/g, '') || '';
+  const flight  = (report.new_flight || report.prev_flight || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const dt      = report.new_datetime || report.prev_datetime || '';
+  let dayMonth  = '';
+  if (dt) {
+    const d = new Date(dt.replace(' ', 'T'));
+    if (!isNaN(d)) dayMonth = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  }
+  const parts  = [`${pax} PAX`, paxType, dest, flight, dayMonth].filter(Boolean);
+  const base   = parts.join(' - ');
+  const suffix = total > 1 ? ` (${index + 1})` : '';
+  return ext ? `${base}${suffix}.${ext}` : `${base}${suffix}`;
+}
 
-  // Auto-load previews for image files
+function ExistingFilesList({ files, report }) {
+  const [previews, setPreviews] = useState({});
+
   useEffect(() => {
     let cancelled = false;
     const urls = [];
@@ -103,30 +122,28 @@ function ExistingFilesList({ files }) {
         } catch { /* ignore */ }
       }
     })();
-    return () => {
-      cancelled = true;
-      urls.forEach(u => URL.revokeObjectURL(u));
-    };
+    return () => { cancelled = true; urls.forEach(u => URL.revokeObjectURL(u)); };
   }, [files]);
 
-  async function openInNewTab(fp) {
-    try {
-      const { url } = await getFileObjectUrl(fp);
-      window.open(url, '_blank');
-    } catch { alert('Failed to open file'); }
+  // Fix for mobile: open window synchronously BEFORE the async fetch,
+  // then navigate it — avoids Safari/Chrome popup blocker on async calls
+  function openInNewTab(fp, preview) {
+    if (preview) { window.open(preview.url, '_blank'); return; }
+    const win = window.open('', '_blank');
+    getFileObjectUrl(fp)
+      .then(({ url }) => { win.location.href = url; })
+      .catch(() => { win.close(); alert('Failed to open file'); });
   }
 
-  async function shareFile(fp) {
+  async function shareFile(fp, saveName) {
     try {
       const { url, type } = await getFileObjectUrl(fp);
       const blob = await (await fetch(url)).blob();
-      const filename = fp.split('/').pop();
-      const file = new File([blob], filename, { type: type || blob.type });
+      const file = new File([blob], saveName, { type: type || blob.type });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: filename });
+        await navigator.share({ files: [file], title: saveName });
       } else {
         window.open(url, '_blank');
-        alert('Share not supported on this device — file opened in a new tab instead');
       }
     } catch (err) {
       if (err && err.name !== 'AbortError') alert('Share failed');
@@ -138,13 +155,13 @@ function ExistingFilesList({ files }) {
   return (
     <ul className="file-list" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
       {files.map((fp, i) => {
-        const name    = fp.split('/').pop();
-        const isImg   = IMG_RE.test(fp);
-        const preview = previews[fp];
+        const saveName = friendlyFilename(report || {}, fp, i, files.length);
+        const isImg    = IMG_RE.test(fp);
+        const preview  = previews[fp];
         return (
           <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border, #eee)', flexWrap: 'wrap' }}>
             {isImg && preview ? (
-              <img src={preview.url} alt={name}
+              <img src={preview.url} alt={saveName}
                 style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, cursor: 'pointer' }}
                 onClick={() => window.open(preview.url, '_blank')} />
             ) : (
@@ -152,12 +169,12 @@ function ExistingFilesList({ files }) {
                 📄
               </span>
             )}
-            <span style={{ flex: 1, minWidth: 120, wordBreak: 'break-all', fontSize: '0.9rem' }}>{name}</span>
-            <button type="button" className="btn btn-sm btn-secondary" onClick={() => openInNewTab(fp)}>Open</button>
+            <span style={{ flex: 1, minWidth: 120, wordBreak: 'break-all', fontSize: '0.9rem' }}>{saveName}</span>
+            <button type="button" className="btn btn-sm btn-secondary" onClick={() => openInNewTab(fp, preview)}>Open</button>
             {canShare && (
-              <button type="button" className="btn btn-sm btn-secondary" onClick={() => shareFile(fp)} title="Share to WhatsApp, email, etc.">Share</button>
+              <button type="button" className="btn btn-sm btn-secondary" onClick={() => shareFile(fp, saveName)}>Share</button>
             )}
-            <button type="button" className="btn btn-sm btn-primary" onClick={() => downloadFile(fp).catch(() => alert('Download failed'))}>Download</button>
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => downloadFile(fp, saveName).catch(() => alert('Download failed'))}>Download</button>
           </li>
         );
       })}
@@ -598,7 +615,7 @@ export default function NewReport({ editMode }) {
           {isEdit && existingFiles.length > 0 && (
             <div className="field">
               <label className="field-label">Existing Files</label>
-              <ExistingFilesList files={existingFiles} />
+              <ExistingFilesList files={existingFiles} report={form} />
             </div>
           )}
           <div className="field">
