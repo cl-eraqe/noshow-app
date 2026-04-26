@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../utils/api';
-import { saveRole } from '../utils/auth';
+import { saveRole, saveToken } from '../utils/auth';
 
 export default function LoginPage() {
   const [pin, setPin] = useState('');
@@ -14,8 +14,9 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { role } = await login(pin);
+      const { role, token } = await login(pin);
       saveRole(role);
+      saveToken(token);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message === 'Invalid PIN' ? 'Incorrect PIN. Please try again.' : err.message);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES } from '../utils/api';
+import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { getRole } from '../utils/auth';
 
@@ -517,7 +517,18 @@ export default function NewReport({ editMode }) {
             <div className="field">
               <label className="field-label">Existing Files</label>
               <ul className="file-list">
-                {existingFiles.map((fp, i) => <li key={i}>{fp.split('/').pop()}</li>)}
+                {existingFiles.map((fp, i) => (
+                  <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ flex: 1, wordBreak: 'break-all' }}>{fp.split('/').pop()}</span>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => downloadFile(fp).catch(() => alert('Download failed'))}
+                    >
+                      Download
+                    </button>
+                  </li>
+                ))}
               </ul>
             </div>
           )}
