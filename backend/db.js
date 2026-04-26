@@ -148,4 +148,4 @@ async function autoCloseReports() {
   }
 }
 
-module.exports = { getDb, initDb, autoCloseReports, logAudit, diffFields };
+module.exports = { getDb, initDb, autoCloseReports, logAudit, diffFields, jeddahNowStr };

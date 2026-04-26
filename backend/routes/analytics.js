@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getDb } = require('../db');
+const { getDb, jeddahNowStr } = require('../db');
 
 function getShift(dtStr) {
   if (!dtStr) return null;
@@ -11,9 +11,6 @@ function getShift(dtStr) {
   return 'C';
 }
 
-function jeddahNowStr() {
-  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-}
 function jeddahNowDateOnly() {
   return jeddahNowStr().slice(0, 10);
 }
@@ -198,7 +195,7 @@ router.get('/dashboard', async (req, res) => {
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     filtered.forEach(r => {
       if (!r.created_at) return;
-      const d = new Date(String(r.created_at).replace(' ', 'T') + 'Z');
+      const d = new Date(String(r.created_at).replace(' ', 'T') + '+03:00');
       if (isNaN(d.getTime())) return;
       heatmap[d.getUTCDay()][d.getUTCHours()] += 1;
     });

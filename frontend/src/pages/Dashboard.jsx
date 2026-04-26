@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, getAirlineCode, confirmNusuk, getFilterOptions, AIRLINE_CODES } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
-const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 import { getRole, isSupervisor, clearRole } from '../utils/auth';
 
 function fmt(dt) {
@@ -456,27 +455,26 @@ export default function Dashboard() {
     });
   }
 
-  // ── CEO Report
   function logout() {
     clearRole();
     navigate('/login');
   }
 
   // ── Swipe handling for mobile
-  const touchRef = { startX: 0, startY: 0, id: null };
+  const touchRef = useRef({ startX: 0, startY: 0, id: null });
 
   function handleTouchStart(r, e) {
     const touch = e.touches[0];
-    touchRef.startX = touch.clientX;
-    touchRef.startY = touch.clientY;
-    touchRef.id = r.id;
+    touchRef.current.startX = touch.clientX;
+    touchRef.current.startY = touch.clientY;
+    touchRef.current.id = r.id;
   }
 
   function handleTouchEnd(r, e) {
-    if (touchRef.id !== r.id) return;
+    if (touchRef.current.id !== r.id) return;
     const touch = e.changedTouches[0];
-    const dx = touch.clientX - touchRef.startX;
-    const dy = touch.clientY - touchRef.startY;
+    const dx = touch.clientX - touchRef.current.startX;
+    const dy = touch.clientY - touchRef.current.startY;
     // Only register horizontal swipes (dx > 60px, and more horizontal than vertical)
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
 

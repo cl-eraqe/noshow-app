@@ -1,11 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const flights = require('../flights.json');
-const { getDb } = require('../db');
-
-function jeddahNow() {
-  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-}
+const { getDb, jeddahNowStr } = require('../db');
 
 // GET /api/flights/custom/list — must be before /:flightNumber
 router.get('/custom/list', async (_req, res) => {
@@ -67,7 +63,7 @@ router.post('/', express.json(), async (req, res) => {
          destination = EXCLUDED.destination, std = EXCLUDED.std, city = EXCLUDED.city,
          country = EXCLUDED.country, nationality = EXCLUDED.nationality,
          deleted = 0, updated_at = EXCLUDED.updated_at`,
-      [key, destination || '', std || '', city || '', country || '', nationality || '', jeddahNow()]
+      [key, destination || '', std || '', city || '', country || '', nationality || '', jeddahNowStr()]
     );
     res.json({ success: true, flight_number: key });
   } catch (e) {
@@ -84,7 +80,7 @@ router.delete('/:flightNumber', async (req, res) => {
       `INSERT INTO flights_custom (flight_number, deleted, updated_at)
        VALUES ($1, 1, $2)
        ON CONFLICT (flight_number) DO UPDATE SET deleted = 1, updated_at = EXCLUDED.updated_at`,
-      [key, jeddahNow()]
+      [key, jeddahNowStr()]
     );
     res.json({ success: true });
   } catch (e) {

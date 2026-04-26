@@ -3,13 +3,10 @@ const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { getDb, autoCloseReports, logAudit, diffFields } = require('../db');
+const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
+const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
 
 // ── Jeddah time helpers ────────────────────────────────────────────────
-
-function jeddahNowStr() {
-  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-}
 
 // Returns "YYYY-MM-DDTHH:mm" in Jeddah local time, shifted by offsetMs
 function jeddahISO(offsetMs = 0) {
@@ -32,27 +29,6 @@ const AUDIT_FIELDS = [
   'status', 'comment', 'nusuk_received',
 ];
 
-// ── Terminal mapping ───────────────────────────────────────────────────
-
-const TERMINAL_MAP = {
-  SV:'T1',XY:'T1',F3:'T1',QR:'T1',EK:'T1',KU:'T1',WY:'T1',FZ:'T1',
-  RJ:'T1',ME:'T1',GF:'T1',EY:'T1',AT:'T1',VF:'T1',EW:'T1',
-  A3:'T1',MH:'T1',BA:'T1',MS:'T1',HU:'T1',
-  G9:'North',NE:'North',IY:'North','6E':'North',PC:'North','3T':'North',
-  SM:'North',J4:'North',AI:'North',ET:'North',NP:'North',HY:'North',
-  SZ:'North',RB:'North',D3:'North',SD:'North',DV:'North',
-  OV:'North',IX:'North',TU:'North',W9:'North',E5:'North',
-  PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',AH:'Hajj',
-  GA:'Hajj',FG:'Hajj',BS:'Hajj','9P':'Hajj',QP:'Hajj',
-  JT:'Hajj',RQ:'Hajj',C6:'Hajj',TK:'T1',D7:'Hajj',
-  '2S':'Hajj','7Q':'Hajj',BJ:'Hajj',BM:'Hajj',FH:'Hajj',
-  UZ:'Hajj',XC:'Hajj',
-};
-
-function getAirlineCode(flight) {
-  if (!flight) return '';
-  return flight.toUpperCase().trim().slice(0, 2);
-}
 function getTerminal(flight) {
   return TERMINAL_MAP[getAirlineCode(flight)] || 'T1';
 }
@@ -501,6 +477,8 @@ router.patch('/:id', express.json(), async (req, res) => {
       if (!isNaN(diff)) { updates.push(`days_at_airport = $${idx++}`); values.push(parseFloat(Math.max(0, diff).toFixed(2))); }
     }
 
+    if (updates.length === 0) return res.json(report);
+
     const finalNewFlight   = new_flight   !== undefined ? new_flight   : report.new_flight;
     const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
     const finalPaxCount    = pax_count    !== undefined ? (parseInt(pax_count) || 0) : report.pax_count;
@@ -513,8 +491,6 @@ router.patch('/:id', express.json(), async (req, res) => {
       `New Flight: ${finalNewFlight || '—'} on ${finalNewDatetime || '—'}`;
     updates.push(`whatsapp_text = $${idx++}`);
     values.push(whatsapp_text);
-
-    if (updates.length === 0) return res.json(report);
 
     values.push(req.params.id);
     await pool.query(`UPDATE reports SET ${updates.join(', ')} WHERE id = $${idx}`, values);
@@ -599,9 +575,5 @@ router.post('/:id/nusuk', express.json(), async (req, res) => {
 });
 
 module.exports = router;
-
-
-
-
 
 

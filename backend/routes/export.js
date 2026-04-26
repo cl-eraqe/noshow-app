@@ -1,11 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
-const { getDb } = require('../db');
-
-function jeddahNowStr() {
-  return new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ');
-}
+const { getDb, jeddahNowStr } = require('../db');
 
 async function requireToken(req, res, next) {
   const token = req.query.token || req.headers['x-export-token'];
