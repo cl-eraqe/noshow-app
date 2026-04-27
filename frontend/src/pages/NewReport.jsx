@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl } from '../utils/api';
+import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { getRole } from '../utils/auth';
 
@@ -221,6 +221,12 @@ export default function NewReport({ editMode }) {
   useEffect(() => {
     getFilterOptions().then(o => setKnownDestinations(o.destinationsFull || [])).catch(() => {});
   }, []);
+
+  // Pick up files passed in via Web Share Target (?shared=1)
+  useEffect(() => {
+    if (!location.search.includes('shared=1')) return;
+    readSharedFiles().then(shared => { if (shared.length) setFiles(prev => [...prev, ...shared]); });
+  }, [location.search]);
 
   const daysAtAirport = calcDaysAtAirport(form.pax_id_datetime, form.new_datetime);
 

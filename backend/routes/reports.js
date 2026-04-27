@@ -523,6 +523,32 @@ router.patch('/:id', express.json(), async (req, res) => {
 
 // ── DELETE report ──────────────────────────────────────────────────────
 
+// ── Attach additional files to an existing report (no other fields changed)
+router.post('/:id/files', upload.array('files', 10), async (req, res) => {
+  try {
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+
+    const oldPaths = JSON.parse(rows[0].file_paths || '[]');
+    const newPaths = req.files.map(f => `/uploads/${f.filename}`);
+    const filePaths = [...oldPaths, ...newPaths];
+
+    await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', [JSON.stringify(filePaths), req.params.id]);
+    await logAudit({
+      user: req.body.user || req.query.user || 'unknown',
+      action: 'attach_files',
+      reportId: rows[0].id,
+      changes: { file_paths: { added: newPaths } },
+    });
+
+    res.json({ success: true, file_paths: filePaths, added: newPaths });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     const pool = getDb();

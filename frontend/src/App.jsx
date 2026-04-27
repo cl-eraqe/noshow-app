@@ -5,6 +5,7 @@ import NewReport   from './pages/NewReport';
 import Analytics   from './pages/Analytics';
 import AccessManagement from './pages/AccessManagement';
 import FlightManager from './pages/FlightManager';
+import SharePicker from './pages/SharePicker';
 import PrivateRoute from './components/PrivateRoute';
 
 export default function App() {
@@ -35,6 +36,10 @@ export default function App() {
 
         <Route path="/flight-manager" element={
           <PrivateRoute supervisorOnly><FlightManager /></PrivateRoute>
+        } />
+
+        <Route path="/share-pick" element={
+          <PrivateRoute><SharePicker /></PrivateRoute>
         } />
 
         {/* Default redirect */}

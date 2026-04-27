@@ -115,6 +115,41 @@ export async function confirmNusuk(id, received, user) {
   });
 }
 
+// Attach files (from Web Share Target or any source) to an existing report
+export async function attachFilesToReport(id, fileList, user) {
+  const fd = new FormData();
+  for (const f of fileList) fd.append('files', f, f.name);
+  if (user) fd.append('user', user);
+  const res = await fetch(`${BASE}/api/reports/${id}/files`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: fd,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Read files that were shared into the app via the Web Share Target API.
+// These live in the service worker's SHARE_CACHE keyed under /__share__/...
+export async function readSharedFiles() {
+  try {
+    const manifestRes = await fetch('/__share__/manifest', { cache: 'no-store' });
+    if (!manifestRes.ok) return [];
+    const manifest = await manifestRes.json();
+    const files = await Promise.all(manifest.map(async ({ url, name, type }) => {
+      const r = await fetch(url, { cache: 'no-store' });
+      const blob = await r.blob();
+      return new File([blob], name, { type: type || blob.type });
+    }));
+    return files;
+  } catch {
+    return [];
+  }
+}
+
 // ── Analytics
 export async function getAnalytics() {
   return request('/api/reports/analytics/summary');
