@@ -210,7 +210,9 @@ export default function NewReport({ editMode }) {
   const [pasteStatus, setPasteStatus] = useState('idle'); // idle | pasting | done | error
   const [existingFiles, setExistingFiles] = useState([]);
   const [prevStatus, setPrevStatus]   = useState('idle');
+  const [prevTerminal, setPrevTerminal] = useState('');
   const [newLookupStatus, setNewLookupStatus] = useState('idle');
+  const [newTerminal, setNewTerminal] = useState('');
   const [reportStatus, setReportStatus] = useState(seed.status || 'under_process');
   const [submitting, setSubmitting]   = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -331,8 +333,10 @@ export default function NewReport({ editMode }) {
         prev_airline:     airlineFromFlightNumber(fn),
         nationality:      prev.nationality || data.nationality,
       }));
+      setPrevTerminal(data.terminal || '');
       setPrevStatus('found');
     } catch {
+      setPrevTerminal('');
       setPrevStatus('notfound');
     }
   }, [form.prev_flight]);
@@ -350,8 +354,10 @@ export default function NewReport({ editMode }) {
         new_destination: `${data.city} (${data.destination})`,
         new_airline:     airlineFromFlightNumber(fn),
       }));
+      setNewTerminal(data.terminal || '');
       setNewLookupStatus('found');
     } catch {
+      setNewTerminal('');
       setNewLookupStatus('notfound');
     }
   }, [form.new_flight]);
@@ -474,7 +480,7 @@ export default function NewReport({ editMode }) {
                 className="field-input"
                 placeholder="e.g. SV305"
                 value={form.prev_flight}
-                onChange={e => { set('prev_flight', e.target.value.toUpperCase()); setPrevStatus('idle'); setFlightWarning(''); }}
+                onChange={e => { set('prev_flight', e.target.value.toUpperCase()); setPrevStatus('idle'); setPrevTerminal(''); setFlightWarning(''); }}
                 onBlur={lookupPrev}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupPrev())}
                 required
@@ -485,6 +491,11 @@ export default function NewReport({ editMode }) {
               </button>
               {prevStatus === 'found'    && <span className="badge badge-found">✓ Found</span>}
               {prevStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
+              {prevTerminal && (
+                <span className={`badge badge-terminal ${prevTerminal !== 'T1' ? 'badge-terminal-bus' : 'badge-terminal-t1'}`}>
+                  {prevTerminal === 'T1' ? 'Terminal 1' : prevTerminal === 'Hajj' ? '🚌 Hajj Terminal' : '🚌 North Terminal'}
+                </span>
+              )}
             </div>
             {flightWarning && (
               <p className="field-warning">{flightWarning}</p>
@@ -589,7 +600,7 @@ export default function NewReport({ editMode }) {
                   className="field-input"
                   placeholder="e.g. SV309"
                   value={form.new_flight}
-                  onChange={e => { set('new_flight', e.target.value.toUpperCase()); setNewLookupStatus('idle'); }}
+                  onChange={e => { set('new_flight', e.target.value.toUpperCase()); setNewLookupStatus('idle'); setNewTerminal(''); }}
                   onBlur={lookupNew}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupNew())}
                   required
@@ -600,6 +611,11 @@ export default function NewReport({ editMode }) {
                 </button>
                 {newLookupStatus === 'found'    && <span className="badge badge-found">Found</span>}
                 {newLookupStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
+                {newTerminal && (
+                  <span className={`badge badge-terminal ${newTerminal !== 'T1' ? 'badge-terminal-bus' : 'badge-terminal-t1'}`}>
+                    {newTerminal === 'T1' ? 'Terminal 1' : newTerminal === 'Hajj' ? '🚌 Hajj Terminal' : '🚌 North Terminal'}
+                  </span>
+                )}
               </div>
             </div>
 

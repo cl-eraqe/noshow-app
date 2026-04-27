@@ -401,6 +401,8 @@ html, body, #root {
 }
 .badge-found    { background: #d4edda; color: #155724; }
 .badge-notfound { background: #f8d7da; color: #721c24; }
+.badge-terminal-t1  { background: #dbeafe; color: #1e40af; }
+.badge-terminal-bus { background: #fef3c7; color: #92400e; font-weight: 700; }
 
 .field-warning {
   color: #e67e22;

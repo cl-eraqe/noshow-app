@@ -1,109 +1,181 @@
-#!/usr/bin/env python3
 """
-Convert flights Excel/CSV to flights.json
+Converts flights.csv to flights.json for the JEDCO no-show app.
+Usage: python csv_to_flights_json.py <input.csv> [output.json]
+Default output: ../flights.json  (overwrites the existing file)
 
-Usage:
-    python3 scripts/csv_to_flights_json.py flights.csv
-    python3 scripts/csv_to_flights_json.py flights.csv --out flights.json
-
-Expects columns (order doesn't matter, headers required):
-    Flight Number, Destination, STD, City, Country, Nationality
-    (Terminal column is ignored)
+Terminal assignment rules:
+  - Taken from the CSV data — each airline maps to a single terminal.
+  - Conflict cases use flight-number patterns derived from the actual data:
+      SV: SV2xxx -> H  (Royal Air Maroc-codeshare North Africa routes), rest -> T1
+      TK: TK5xxx -> H  (regional codeshares operated by other carriers), rest -> T1
+      VF: VF6xxx -> H  (regional Turkish flights), rest -> T1
+      F3: F39xxx -> H  (Batik Air / Citilink Indonesian codeshares), rest -> T1
+      PC: 4-digit numbers -> H, 3-digit numbers -> N  (Pegasus main vs charter)
+      AT: 4-digit numbers -> H, 3-digit numbers -> T1  (Royal Air Maroc regional vs main)
 """
 
 import csv
 import json
+import re
 import sys
-import os
-import argparse
 from pathlib import Path
 
-def normalize_std(raw):
-    """Ensure STD is H:MM or HH:MM format."""
-    raw = str(raw).strip()
-    if not raw:
-        return ""
-    # Handle cases like "3:30", "03:30", "330" etc.
+# Base terminal per IATA prefix (all clean, single-terminal airlines)
+TERMINAL_MAP = {
+    "2S": "Hajj",
+    "3T": "North",
+    "6E": "North",
+    "7Q": "Hajj",
+    "9P": "Hajj",
+    "A3": "T1",
+    "AH": "Hajj",
+    "AI": "North",
+    "BA": "T1",
+    "BG": "Hajj",
+    "BJ": "Hajj",
+    "BM": "Hajj",
+    "BS": "Hajj",
+    "C6": "Hajj",
+    "D3": "North",
+    "D7": "Hajj",
+    "DV": "North",
+    "E5": "North",
+    "EK": "T1",
+    "ET": "North",
+    "EW": "T1",
+    "EY": "T1",
+    "FG": "Hajj",
+    "FH": "Hajj",
+    "FZ": "T1",
+    "G9": "North",
+    "GA": "Hajj",
+    "GF": "T1",
+    "HU": "T1",
+    "HY": "North",
+    "IX": "North",
+    "IY": "North",
+    "J4": "North",
+    "JT": "Hajj",
+    "KU": "T1",
+    "ME": "T1",
+    "MH": "T1",
+    "MS": "T1",
+    "NE": "North",
+    "NP": "North",
+    "OV": "North",
+    "PA": "Hajj",
+    "PF": "Hajj",
+    "PK": "Hajj",
+    "QP": "Hajj",
+    "QR": "T1",
+    "R5": "Hajj",
+    "RB": "North",
+    "RJ": "T1",
+    "RQ": "Hajj",
+    "SD": "North",
+    "SM": "North",
+    "SZ": "North",
+    "TU": "North",
+    "UZ": "Hajj",
+    "W9": "North",
+    "WY": "T1",
+    "XC": "Hajj",
+    "XY": "T1",
+}
+
+
+def iata_prefix(flight_number):
+    m = re.match(r"^([A-Z0-9]{2})", flight_number.upper())
+    return m.group(1) if m else ""
+
+
+def flight_number_digits(flight_number):
+    m = re.search(r"(\d+)", flight_number)
+    return int(m.group(1)) if m else 0
+
+
+def assign_terminal(flight_number):
+    prefix = iata_prefix(flight_number)
+    digits = flight_number_digits(flight_number)
+
+    if prefix == "SV":
+        return "Hajj" if 2000 <= digits <= 2999 else "T1"
+
+    if prefix == "TK":
+        return "Hajj" if 5000 <= digits <= 5999 else "T1"
+
+    if prefix == "VF":
+        return "Hajj" if 6100 <= digits <= 6199 else "T1"
+
+    if prefix == "F3":
+        # F39xxx -> Hajj, others -> T1
+        num_str = re.search(r"\d+", flight_number)
+        return "Hajj" if num_str and num_str.group().startswith("39") else "T1"
+
+    if prefix == "PC":
+        return "Hajj" if digits >= 1000 else "North"
+
+    if prefix == "AT":
+        return "Hajj" if digits >= 1000 else "T1"
+
+    return TERMINAL_MAP.get(prefix, "UNKNOWN")
+
+
+def format_std(raw):
+    """Normalize STD from 'H:MM' or 'HH:MM' to 'HH:MM'."""
+    raw = raw.strip()
     if ":" in raw:
-        parts = raw.split(":")
-        h = int(parts[0])
-        m = int(parts[1])
-    elif len(raw) <= 2:
-        h = int(raw)
-        m = 0
-    elif len(raw) == 3:
-        h = int(raw[0])
-        m = int(raw[1:])
-    elif len(raw) == 4:
-        h = int(raw[:2])
-        m = int(raw[2:])
-    else:
-        return raw  # unknown format, keep as-is
-    return f"{h}:{m:02d}"
+        h, m = raw.split(":", 1)
+        return f"{int(h):02d}:{m.zfill(2)}"
+    return raw
 
-def csv_to_json(csv_path, out_path):
-    flights = {}
-    skipped = []
-
-    with open(csv_path, newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-
-        # Normalize header names (strip spaces, lowercase)
-        raw_headers = reader.fieldnames or []
-        header_map = {h.strip().lower().replace(" ", "_"): h for h in raw_headers}
-
-        required = ["flight_number", "destination", "std", "city", "country", "nationality"]
-        missing = [r for r in required if r not in header_map]
-        if missing:
-            print(f"ERROR: Missing columns: {missing}")
-            print(f"Found columns: {list(header_map.keys())}")
-            sys.exit(1)
-
-        for i, row in enumerate(reader, start=2):
-            def get(key):
-                return row[header_map[key]].strip()
-
-            flight_num = get("flight_number").upper()
-            if not flight_num:
-                skipped.append(f"Row {i}: empty flight number")
-                continue
-
-            flights[flight_num] = {
-                "destination": get("destination").upper(),
-                "std":         normalize_std(get("std")),
-                "city":        get("city"),
-                "country":     get("country"),
-                "nationality": get("nationality"),
-            }
-
-    with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(flights, f, indent=2, ensure_ascii=False)
-
-    print(f"Done: {len(flights)} flights written to {out_path}")
-    if skipped:
-        print(f"Skipped {len(skipped)} rows:")
-        for s in skipped:
-            print(f"  {s}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Convert flights CSV to flights.json")
-    parser.add_argument("csv", help="Path to the CSV file exported from Excel")
-    parser.add_argument("--out", default=None,
-                        help="Output JSON path (default: flights.json next to this script)")
-    args = parser.parse_args()
-
-    csv_path = Path(args.csv).resolve()
-    if not csv_path.exists():
-        print(f"ERROR: File not found: {csv_path}")
+    if len(sys.argv) < 2:
+        print("Usage: python csv_to_flights_json.py <input.csv> [output.json]")
         sys.exit(1)
 
-    if args.out:
-        out_path = Path(args.out).resolve()
-    else:
-        # Default: backend/flights.json (one level up from scripts/)
-        out_path = Path(__file__).parent.parent / "flights.json"
+    input_path = Path(sys.argv[1])
+    output_path = (
+        Path(sys.argv[2]) if len(sys.argv) >= 3
+        else Path(__file__).parent.parent / "flights.json"
+    )
 
-    csv_to_json(csv_path, out_path)
+    flights = {}
+    unknown = []
+
+    with open(input_path, encoding="cp1252") as f:
+        reader = csv.DictReader(f)
+        # Strip whitespace from header names (e.g. 'Country  ')
+        reader.fieldnames = [h.strip() for h in reader.fieldnames]
+        for row in reader:
+            fn = row["Flight Number"].strip()
+            if not fn:
+                continue
+
+            terminal = assign_terminal(fn)
+            if terminal == "UNKNOWN":
+                unknown.append(fn)
+
+            flights[fn] = {
+                "destination": row["Destination"].strip(),
+                "std": format_std(row["STD"]),
+                "city": row["City"].strip(),
+                "country": row["Country"].strip(),
+                "nationality": row["Nationality"].strip(),
+                "terminal": terminal,
+            }
+
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(flights, f, ensure_ascii=False, indent=2)
+
+    print(f"Written {len(flights)} flights -> {output_path}")
+
+    if unknown:
+        print(f"\nWARNING: {len(unknown)} flights with unrecognized airline prefix:")
+        for fn in unknown:
+            print(f"  {fn}")
+
 
 if __name__ == "__main__":
     main()
