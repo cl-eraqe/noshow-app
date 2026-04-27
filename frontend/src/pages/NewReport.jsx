@@ -207,6 +207,7 @@ export default function NewReport({ editMode }) {
   });
 
   const [files, setFiles] = useState([]);
+  const [pasteStatus, setPasteStatus] = useState('idle'); // idle | pasting | done | error
   const [existingFiles, setExistingFiles] = useState([]);
   const [prevStatus, setPrevStatus]   = useState('idle');
   const [newLookupStatus, setNewLookupStatus] = useState('idle');
@@ -227,6 +228,55 @@ export default function NewReport({ editMode }) {
     if (!location.search.includes('shared=1')) return;
     readSharedFiles().then(shared => { if (shared.length) setFiles(prev => [...prev, ...shared]); });
   }, [location.search]);
+
+  // Global paste listener — catches Cmd/Ctrl+V and iOS long-press-paste anywhere on the page
+  useEffect(() => {
+    function onPaste(e) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const pasted = [];
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const f = item.getAsFile();
+          if (f) pasted.push(f);
+        }
+      }
+      if (pasted.length) {
+        e.preventDefault();
+        setFiles(prev => [...prev, ...pasted]);
+        setPasteStatus('done');
+        setTimeout(() => setPasteStatus('idle'), 2000);
+      }
+    }
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, []);
+
+  async function pasteFromClipboard() {
+    setPasteStatus('pasting');
+    try {
+      const items = await navigator.clipboard.read();
+      const pasted = [];
+      for (const item of items) {
+        for (const type of item.types) {
+          if (type.startsWith('image/') || type === 'application/pdf') {
+            const blob = await item.getType(type);
+            const ext  = type === 'application/pdf' ? 'pdf' : type.split('/')[1];
+            pasted.push(new File([blob], `pasted-${Date.now()}.${ext}`, { type }));
+          }
+        }
+      }
+      if (pasted.length) {
+        setFiles(prev => [...prev, ...pasted]);
+        setPasteStatus('done');
+      } else {
+        setPasteStatus('error');
+      }
+    } catch {
+      setPasteStatus('error');
+    }
+    setTimeout(() => setPasteStatus('idle'), 2500);
+  }
 
   const daysAtAirport = calcDaysAtAirport(form.pax_id_datetime, form.new_datetime);
 
@@ -626,11 +676,32 @@ export default function NewReport({ editMode }) {
           )}
           <div className="field">
             <label className="field-label">{isEdit ? 'Add More Files' : 'File Attachments'}</label>
-            <input type="file" className="field-input" multiple
-              onChange={e => setFiles(Array.from(e.target.files))} />
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+              <input type="file" className="field-input" multiple style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
+                onChange={e => setFiles(prev => [...prev, ...Array.from(e.target.files)])} />
+              <button
+                type="button"
+                className={`btn btn-sm ${pasteStatus === 'done' ? 'btn-success' : pasteStatus === 'error' ? 'btn-danger' : 'btn-secondary'}`}
+                onClick={pasteFromClipboard}
+                disabled={pasteStatus === 'pasting'}
+                title="Paste a copied PDF or image from CamScanner"
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                {pasteStatus === 'pasting' ? '…' : pasteStatus === 'done' ? '✓ Pasted' : pasteStatus === 'error' ? 'Nothing to paste' : '📋 Paste'}
+              </button>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 6px' }}>
+              Tip: Copy a scan in CamScanner, then tap Paste here — no need to save the file first.
+            </p>
             {files.length > 0 && (
               <ul className="file-list">
-                {files.map((f, i) => <li key={i}>{f.name} ({(f.size/1024).toFixed(1)} KB)</li>)}
+                {files.map((f, i) => (
+                  <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ flex: 1 }}>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
+                    <button type="button" className="btn btn-xs btn-danger"
+                      onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                  </li>
+                ))}
               </ul>
             )}
           </div>
