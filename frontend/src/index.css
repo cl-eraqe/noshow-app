@@ -242,7 +242,7 @@ html, body, #root {
   padding: 9px 14px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.875rem;
+  font-size: 16px;
   outline: none;
   background: var(--surface);
 }
@@ -367,7 +367,6 @@ html, body, #root {
   font-size: 16px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius);
-  font-size: 0.9rem;
   background: var(--surface);
   color: var(--text);
   outline: none;
@@ -2073,7 +2072,7 @@ html, body, #root {
 .ss-search-icon { width: 16px; height: 16px; color: #aab8c2; flex-shrink: 0; }
 .ss-search-input {
   flex: 1; background: transparent; border: none; outline: none;
-  color: #fff; font-size: 0.95rem; placeholder-color: #aab8c2;
+  color: #fff; font-size: 16px; placeholder-color: #aab8c2;
 }
 .ss-search-input::placeholder { color: #aab8c2; }
 .ss-clear {
