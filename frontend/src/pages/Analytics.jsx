@@ -94,9 +94,9 @@ function Sparkline({ data, color = '#39d0d8' }) {
 }
 
 // ── KPI Card ──
-function KpiCard({ label, value, sub, cases, pax, color, accent, spark, status, onClick, flash }) {
+function KpiCard({ label, value, sub, cases, pax, color, accent, spark, status, onClick, flash, active }) {
   return (
-    <div className={`xkpi ${flash ? 'xkpi-flash' : ''}`}
+    <div className={`xkpi ${flash ? 'xkpi-flash' : ''} ${active ? 'xkpi-active' : ''} ${onClick ? 'xkpi-clickable' : ''}`}
          style={{ '--kpi-color': color, '--kpi-accent': accent || color }}
          onClick={onClick}>
       <div className="xkpi-top">
@@ -226,6 +226,7 @@ export default function Analytics() {
   const [widgets, setWidgets] = useState(loadWidgets);
   const [widgetDrawer, setWidgetDrawer] = useState(false);
   const [clock, setClock] = useState(new Date());
+  const [kpiFilter, setKpiFilter] = useState(null); // { id, label, predicate }
 
   // persist widget toggles
   useEffect(() => {
@@ -280,6 +281,51 @@ export default function Analytics() {
   function toggleWidget(id) {
     setWidgets(prev => ({ ...prev, [id]: !prev[id] }));
   }
+
+  // ── KPI drill-down predicates (client-side filter on data.reports)
+  function parseMs(dt) {
+    if (!dt) return null;
+    const s = String(dt).replace(' ', 'T');
+    const ms = Date.parse(s + (s.length === 16 ? ':00' : '') + '+03:00');
+    return isNaN(ms) ? null : ms;
+  }
+  function pickKpi(id, label) {
+    if (kpiFilter && kpiFilter.id === id) { setKpiFilter(null); return; }
+    const now = Date.now();
+    const H12 = 12 * 3600 * 1000;
+    const H24 = 24 * 3600 * 1000;
+    const preds = {
+      kpi_underProcess: r => r.status === 'under_process',
+      kpi_confirmed:    r => r.status === 'flight_confirmed',
+      kpi_closed:       r => r.status === 'closed',
+      kpi_total:        () => true,
+      kpi_nusuk: r => r.pax_type === 'Umrah' && r.status === 'flight_confirmed'
+                     && !r.nusuk_received && r.new_datetime
+                     && (parseMs(r.new_datetime) - now) >= H24,
+      kpi_departedRecent: r => {
+        if (r.status !== 'closed' || !r.new_datetime) return false;
+        const ms = parseMs(r.new_datetime); if (!ms) return false;
+        const d = now - ms; return d >= 0 && d <= H12;
+      },
+      kpi_atAirportSoon: r => {
+        if (r.status !== 'flight_confirmed' || !r.new_datetime) return false;
+        const ms = parseMs(r.new_datetime); if (!ms) return false;
+        const d = ms - now; return d > 0 && d < H12;
+      },
+      kpi_atAirportLater: r => {
+        if (r.status !== 'flight_confirmed' || !r.new_datetime) return false;
+        const ms = parseMs(r.new_datetime); if (!ms) return false;
+        return (ms - now) >= H12;
+      },
+      kpi_stuck24: r => {
+        if (r.status === 'closed' || !r.prev_datetime) return false;
+        const ms = parseMs(r.prev_datetime); if (!ms) return false;
+        return (now - ms) >= H24;
+      },
+    };
+    if (preds[id]) setKpiFilter({ id, label, predicate: preds[id] });
+  }
+  function clearKpiFilter() { setKpiFilter(null); }
 
   const jeddahTime = clock.toLocaleString('en-GB', {
     timeZone: 'Asia/Riyadh',
@@ -413,7 +459,9 @@ export default function Analytics() {
                        cases={kpi.underProcessCases}
                        pax={kpi.underProcessPax}
                        status={kpi.underProcessCases > 0 ? 'Needs action' : 'All clear'}
-                       color="#ff8c42" accent="#ffb366" />
+                       color="#ff8c42" accent="#ffb366"
+                       active={kpiFilter?.id === 'kpi_underProcess'}
+                       onClick={() => pickKpi('kpi_underProcess', 'Under Process')} />
             )}
             {on('kpi_nusuk') && (
               <KpiCard label="NUSUK INTERVENTION"
@@ -422,7 +470,9 @@ export default function Analytics() {
                        pax={kpi.needsNusukPax}
                        status={kpi.needsNusukCases > 0 ? '⚠ Notify Ministry' : '✓ Up to date'}
                        color="#1abc9c" accent="#26d7b3"
-                       flash={kpi.needsNusukCases > 0} />
+                       flash={kpi.needsNusukCases > 0}
+                       active={kpiFilter?.id === 'kpi_nusuk'}
+                       onClick={() => pickKpi('kpi_nusuk', 'Nusuk Intervention')} />
             )}
             {on('kpi_departedRecent') && (
               <KpiCard label="DEPARTED · LAST 12H"
@@ -430,7 +480,9 @@ export default function Analytics() {
                        cases={kpi.departedRecentCases}
                        pax={kpi.departedRecentPax}
                        status="Process completed"
-                       color="#4ade80" accent="#86efac" />
+                       color="#4ade80" accent="#86efac"
+                       active={kpiFilter?.id === 'kpi_departedRecent'}
+                       onClick={() => pickKpi('kpi_departedRecent', 'Departed (last 12h)')} />
             )}
             {on('kpi_atAirportSoon') && (
               <KpiCard label="NEW FLIGHT < 12H"
@@ -438,7 +490,9 @@ export default function Analytics() {
                        cases={kpi.atAirportSoonCases}
                        pax={kpi.atAirportSoonPax}
                        status="At airport · departing soon"
-                       color="#fb923c" accent="#fdba74" />
+                       color="#fb923c" accent="#fdba74"
+                       active={kpiFilter?.id === 'kpi_atAirportSoon'}
+                       onClick={() => pickKpi('kpi_atAirportSoon', 'New flight < 12h')} />
             )}
             {on('kpi_atAirportLater') && (
               <KpiCard label="NEW FLIGHT ≥ 12H"
@@ -446,7 +500,9 @@ export default function Analytics() {
                        cases={kpi.atAirportLaterCases}
                        pax={kpi.atAirportLaterPax}
                        status="At airport · 12h+ wait"
-                       color="#60a5fa" accent="#93c5fd" />
+                       color="#60a5fa" accent="#93c5fd"
+                       active={kpiFilter?.id === 'kpi_atAirportLater'}
+                       onClick={() => pickKpi('kpi_atAirportLater', 'New flight ≥ 12h')} />
             )}
             {on('kpi_stuck24') && (
               <KpiCard label="AT AIRPORT > 24H"
@@ -455,7 +511,9 @@ export default function Analytics() {
                        pax={kpi.stuck24Pax}
                        status={kpi.stuck24Cases > 0 ? '⚠ Extended stay' : '✓ None'}
                        color="#ef476f" accent="#ff7a9e"
-                       flash={kpi.stuck24Cases > 0} />
+                       flash={kpi.stuck24Cases > 0}
+                       active={kpiFilter?.id === 'kpi_stuck24'}
+                       onClick={() => pickKpi('kpi_stuck24', 'At airport > 24h')} />
             )}
             {on('kpi_confirmed') && (
               <KpiCard label="FLIGHT CONFIRMED"
@@ -463,14 +521,18 @@ export default function Analytics() {
                        cases={kpi.confirmedCases}
                        pax={kpi.confirmedPax}
                        status="Awaiting departure"
-                       color="#22c55e" />
+                       color="#22c55e"
+                       active={kpiFilter?.id === 'kpi_confirmed'}
+                       onClick={() => pickKpi('kpi_confirmed', 'Flight Confirmed')} />
             )}
             {on('kpi_closed') && (
               <KpiCard label="CLOSED"
                        value={kpi.closedCases}
                        cases={kpi.closedCases}
                        pax={kpi.closedPax}
-                       status="Departed" color="#64748b" />
+                       status="Departed" color="#64748b"
+                       active={kpiFilter?.id === 'kpi_closed'}
+                       onClick={() => pickKpi('kpi_closed', 'Closed')} />
             )}
             {on('kpi_total') && (
               <KpiCard label="TOTAL CASES"
@@ -479,7 +541,9 @@ export default function Analytics() {
                        pax={kpi.totalPax}
                        status={RANGE_LABELS[range] || 'Range'}
                        spark={kpi.sparkCases}
-                       color="#39d0d8" />
+                       color="#39d0d8"
+                       active={kpiFilter?.id === 'kpi_total'}
+                       onClick={() => pickKpi('kpi_total', 'All Cases')} />
             )}
             {on('kpi_rebook') && (
               <KpiCard label="AVG REBOOK TIME"
@@ -682,13 +746,23 @@ export default function Analytics() {
               </div>
             )}
 
-            {on('table_drill') && (
+            {on('table_drill') && (() => {
+              const filteredReports = kpiFilter
+                ? data.reports.filter(kpiFilter.predicate)
+                : data.reports;
+              return (
               <div className="xpanel xspan-12">
                 <div className="xpanel-head">
                   <h3>RECENT CASES</h3>
-                  <span className="xtag">{data.reports.length} reports · click row to open</span>
+                  {kpiFilter ? (
+                    <span className="xtag xtag-hot" style={{cursor:'pointer'}} onClick={clearKpiFilter}>
+                      Filtered: {kpiFilter.label} ({filteredReports.length}) ✕
+                    </span>
+                  ) : (
+                    <span className="xtag">{filteredReports.length} reports · click a card or row</span>
+                  )}
                 </div>
-                {data.reports.length === 0 ? <div className="xchart-empty">No reports match current filters</div> : (
+                {filteredReports.length === 0 ? <div className="xchart-empty">No reports match current filters</div> : (
                   <div className="xtable-wrap">
                     <table className="xtable">
                       <thead>
@@ -699,7 +773,7 @@ export default function Analytics() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.reports.slice(0, 30).map(r => {
+                        {filteredReports.slice(0, 30).map(r => {
                           const hr = parseInt((r.created_at || '').slice(11, 13));
                           const sh = isNaN(hr) ? '?' :
                                     hr >= 6 && hr < 14 ? 'A' : hr >= 14 && hr < 22 ? 'B' : 'C';
@@ -723,7 +797,8 @@ export default function Analytics() {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
           </section>
         </>
       )}
