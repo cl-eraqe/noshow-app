@@ -3614,5 +3614,29 @@
     "country": "Ethiopia",
     "nationality": "Ethiopian",
     "terminal": "T1"
+  },
+  "XY591": {
+    "destination": "DAM",
+    "std": "12:00",
+    "city": "Damascus",
+    "country": "Syria",
+    "nationality": "Syrian",
+    "terminal": "T1"
+  },
+  "KU784": {
+    "destination": "KWI",
+    "std": "02:30",
+    "city": "Kuwait City",
+    "country": "Kuwait",
+    "nationality": "Kuwaiti",
+    "terminal": "T1"
+  },
+  "SV796": {
+    "destination": "PEW",
+    "std": "02:55",
+    "city": "Peshawar",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "T1"
   }
 }

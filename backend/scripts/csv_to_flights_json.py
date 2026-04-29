@@ -121,6 +121,21 @@ def assign_terminal(flight_number):
     return TERMINAL_MAP.get(prefix, "UNKNOWN")
 
 
+def fix_excel_scientific(val):
+    """
+    Excel converts e.g. 6E0092 -> 6.00E+92 when saving as CSV.
+    This converts it back to 6E92 (IndiGo style).
+    """
+    val = val.strip()
+    # Match patterns like 6.00E+92 or 6E+92
+    m = re.match(r'^(\d+)(?:\.\d+)?[Ee]\+?(\d+)$', val)
+    if m:
+        prefix = m.group(1)       # e.g. "6"
+        exponent = m.group(2)     # e.g. "92"
+        return f"{prefix}E{exponent}"
+    return val
+
+
 def format_std(raw):
     """Normalize STD from 'H:MM' or 'HH:MM' to 'HH:MM'."""
     raw = raw.strip()
@@ -149,7 +164,7 @@ def main():
         # Strip whitespace from header names (e.g. 'Country  ')
         reader.fieldnames = [h.strip() for h in reader.fieldnames]
         for row in reader:
-            fn = row["Flight Number"].strip()
+            fn = fix_excel_scientific(row["Flight Number"].strip())
             if not fn:
                 continue
 
