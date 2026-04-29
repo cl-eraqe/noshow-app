@@ -43,6 +43,10 @@ const RANGE_LABELS = {
 const WIDGETS = [
   { id: 'kpi_underProcess',  label: 'KPI · Under Process',      defaultOn: true },
   { id: 'kpi_nusuk',         label: 'KPI · Nusuk Intervention', defaultOn: true },
+  { id: 'kpi_departedRecent',label: 'KPI · Departed (last 12h)',defaultOn: true },
+  { id: 'kpi_atAirportSoon', label: 'KPI · New Flight < 12h',   defaultOn: true },
+  { id: 'kpi_atAirportLater',label: 'KPI · New Flight ≥ 12h',   defaultOn: true },
+  { id: 'kpi_stuck24',       label: 'KPI · At Airport > 24h',   defaultOn: true },
   { id: 'kpi_confirmed',     label: 'KPI · Flight Confirmed',   defaultOn: true },
   { id: 'kpi_closed',        label: 'KPI · Closed',             defaultOn: true },
   { id: 'kpi_total',         label: 'KPI · Total Cases',        defaultOn: true },
@@ -419,6 +423,39 @@ export default function Analytics() {
                        status={kpi.needsNusukCases > 0 ? '⚠ Notify Ministry' : '✓ Up to date'}
                        color="#1abc9c" accent="#26d7b3"
                        flash={kpi.needsNusukCases > 0} />
+            )}
+            {on('kpi_departedRecent') && (
+              <KpiCard label="DEPARTED · LAST 12H"
+                       value={kpi.departedRecentCases}
+                       cases={kpi.departedRecentCases}
+                       pax={kpi.departedRecentPax}
+                       status="Process completed"
+                       color="#4ade80" accent="#86efac" />
+            )}
+            {on('kpi_atAirportSoon') && (
+              <KpiCard label="NEW FLIGHT < 12H"
+                       value={kpi.atAirportSoonCases}
+                       cases={kpi.atAirportSoonCases}
+                       pax={kpi.atAirportSoonPax}
+                       status="At airport · departing soon"
+                       color="#fb923c" accent="#fdba74" />
+            )}
+            {on('kpi_atAirportLater') && (
+              <KpiCard label="NEW FLIGHT ≥ 12H"
+                       value={kpi.atAirportLaterCases}
+                       cases={kpi.atAirportLaterCases}
+                       pax={kpi.atAirportLaterPax}
+                       status="At airport · 12h+ wait"
+                       color="#60a5fa" accent="#93c5fd" />
+            )}
+            {on('kpi_stuck24') && (
+              <KpiCard label="AT AIRPORT > 24H"
+                       value={kpi.stuck24Cases}
+                       cases={kpi.stuck24Cases}
+                       pax={kpi.stuck24Pax}
+                       status={kpi.stuck24Cases > 0 ? '⚠ Extended stay' : '✓ None'}
+                       color="#ef476f" accent="#ff7a9e"
+                       flash={kpi.stuck24Cases > 0} />
             )}
             {on('kpi_confirmed') && (
               <KpiCard label="FLIGHT CONFIRMED"

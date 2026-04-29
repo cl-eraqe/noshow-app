@@ -109,7 +109,55 @@ router.get('/dashboard', async (req, res) => {
     const confirmedPax = confirmedList.reduce((s, r) => s + (r.pax_count || 0), 0);
 
     const now = Date.now();
+    const twelveHoursMs = 12 * 60 * 60 * 1000;
     const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+
+    // Process completed: closed AND new (confirmed) flight departed within last 12 hrs
+    const departedRecentList = filtered.filter(r => {
+      if (r.status !== 'closed') return false;
+      if (!r.new_datetime) return false;
+      const ms = parseJeddahMs(r.new_datetime);
+      if (!ms) return false;
+      const diff = now - ms;
+      return diff >= 0 && diff <= twelveHoursMs;
+    });
+    const departedRecentCases = departedRecentList.length;
+    const departedRecentPax = departedRecentList.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+    // Currently at airport with a new flight departing in <12 hrs
+    const atAirportSoonList = filtered.filter(r => {
+      if (r.status !== 'flight_confirmed') return false;
+      if (!r.new_datetime) return false;
+      const ms = parseJeddahMs(r.new_datetime);
+      if (!ms) return false;
+      const diff = ms - now;
+      return diff > 0 && diff < twelveHoursMs;
+    });
+    const atAirportSoonCases = atAirportSoonList.length;
+    const atAirportSoonPax = atAirportSoonList.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+    // Currently at airport with a new flight departing in >=12 hrs
+    const atAirportLaterList = filtered.filter(r => {
+      if (r.status !== 'flight_confirmed') return false;
+      if (!r.new_datetime) return false;
+      const ms = parseJeddahMs(r.new_datetime);
+      if (!ms) return false;
+      return (ms - now) >= twelveHoursMs;
+    });
+    const atAirportLaterCases = atAirportLaterList.length;
+    const atAirportLaterPax = atAirportLaterList.reduce((s, r) => s + (r.pax_count || 0), 0);
+
+    // Pax at airport over 24 hrs: not closed AND prev (missed) flight was >24h ago
+    const stuck24List = filtered.filter(r => {
+      if (r.status === 'closed') return false;
+      if (!r.prev_datetime) return false;
+      const ms = parseJeddahMs(r.prev_datetime);
+      if (!ms) return false;
+      return (now - ms) >= twentyFourHoursMs;
+    });
+    const stuck24Cases = stuck24List.length;
+    const stuck24Pax = stuck24List.reduce((s, r) => s + (r.pax_count || 0), 0);
+
     const needsNusukList = filtered.filter(r => {
       if (r.pax_type !== 'Umrah') return false;
       if (r.status !== 'flight_confirmed') return false;
@@ -246,7 +294,7 @@ router.get('/dashboard', async (req, res) => {
 
     res.json({
       meta: { range: { from: fromDate, to: toDate }, filters: { shift, status, airline, nationality, destination, terminal, pax_type }, totalMatched: filtered.length },
-      kpi: { totalCases, totalPax, active, activePax, underProcessCases, underProcessPax, confirmedCases, confirmedPax, closedCases, closedPax, needsNusukCases, needsNusukPax, needsNusukList, avgRebookHrs, avgCloseHrs, avgDaysAtAirport, busPct, sparkCases, sparkPax, sparkDays },
+      kpi: { totalCases, totalPax, active, activePax, underProcessCases, underProcessPax, confirmedCases, confirmedPax, closedCases, closedPax, needsNusukCases, needsNusukPax, needsNusukList, departedRecentCases, departedRecentPax, atAirportSoonCases, atAirportSoonPax, atAirportLaterCases, atAirportLaterPax, stuck24Cases, stuck24Pax, avgRebookHrs, avgCloseHrs, avgDaysAtAirport, busPct, sparkCases, sparkPax, sparkDays },
       byNationality: { data: byNationality, ...highlights(byNationality) },
       byAirline: { data: byAirline, ...highlights(byAirline) },
       byDestination: { data: byDestination, ...highlights(byDestination) },
