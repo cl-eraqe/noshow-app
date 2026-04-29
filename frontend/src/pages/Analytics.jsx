@@ -211,7 +211,7 @@ export default function Analytics() {
   const [error, setError]   = useState('');
 
   // Filters
-  const [range, setRange]   = useState('today');
+  const [range, setRange]   = useState('all');
   const [from, setFrom]     = useState('');
   const [to, setTo]         = useState('');
   const [shift, setShift]   = useState('');
