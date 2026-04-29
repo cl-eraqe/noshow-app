@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>دليل المستخدم – الفصل الأول: المقدمة وتسجيل الدخول</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Cairo', Arial, sans-serif;
+    font-size: 14pt;
+    line-height: 1.9;
+    color: #1a1a1a;
+    background: #fff;
+    direction: rtl;
+  }
+
+  .page {
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 25mm 20mm;
+  }
+
+  /* ===== COVER PAGE ===== */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    border: 3px solid #1a3c5e;
+    padding: 40mm 20mm;
+    margin-bottom: 20mm;
+  }
+
+  .cover-logo-placeholder {
+    width: 140px;
+    height: 140px;
+    border: 2px dashed #aaa;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+    font-size: 11pt;
+    margin: 0 auto 14mm;
+  }
+
+  .cover-title {
+    font-size: 28pt;
+    font-weight: 900;
+    color: #1a3c5e;
+    margin-bottom: 6mm;
+  }
+
+  .cover-subtitle {
+    font-size: 16pt;
+    font-weight: 600;
+    color: #2c6fad;
+    margin-bottom: 10mm;
+  }
+
+  .cover-chapter {
+    font-size: 20pt;
+    font-weight: 700;
+    color: #e67e22;
+    border: 2px solid #e67e22;
+    padding: 4mm 12mm;
+    border-radius: 8px;
+    margin-bottom: 10mm;
+  }
+
+  .cover-meta {
+    font-size: 12pt;
+    color: #666;
+    margin-top: 14mm;
+  }
+
+  /* ===== HEADINGS ===== */
+  h1 {
+    font-size: 22pt;
+    font-weight: 900;
+    color: #1a3c5e;
+    border-bottom: 3px solid #2c6fad;
+    padding-bottom: 4mm;
+    margin-bottom: 8mm;
+    margin-top: 12mm;
+  }
+
+  h2 {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #2c6fad;
+    margin-top: 10mm;
+    margin-bottom: 5mm;
+    padding-right: 4mm;
+    border-right: 4px solid #e67e22;
+  }
+
+  h3 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #1a3c5e;
+    margin-top: 7mm;
+    margin-bottom: 3mm;
+  }
+
+  p {
+    margin-bottom: 5mm;
+    text-align: justify;
+  }
+
+  /* ===== IMAGE PLACEHOLDER ===== */
+  .img-placeholder {
+    width: 100%;
+    min-height: 65mm;
+    border: 2px dashed #2c6fad;
+    border-radius: 8px;
+    background: #f0f6ff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #2c6fad;
+    font-size: 12pt;
+    font-weight: 600;
+    margin: 6mm 0;
+    padding: 8mm;
+    text-align: center;
+  }
+
+  .img-placeholder .img-icon { font-size: 28pt; margin-bottom: 3mm; }
+  .img-placeholder .img-label { font-size: 11pt; color: #888; margin-top: 2mm; }
+
+  /* ===== NOTE / TIP BOX ===== */
+  .note {
+    background: #fff8e1;
+    border: 1px solid #f9a825;
+    border-right: 5px solid #f9a825;
+    border-radius: 6px;
+    padding: 4mm 5mm;
+    margin: 5mm 0;
+    font-size: 12.5pt;
+  }
+
+  .note-title {
+    font-weight: 700;
+    color: #e65100;
+    margin-bottom: 2mm;
+  }
+
+  .tip {
+    background: #e8f5e9;
+    border: 1px solid #66bb6a;
+    border-right: 5px solid #43a047;
+    border-radius: 6px;
+    padding: 4mm 5mm;
+    margin: 5mm 0;
+    font-size: 12.5pt;
+  }
+
+  .tip-title { font-weight: 700; color: #2e7d32; margin-bottom: 2mm; }
+
+  .warning {
+    background: #fce4ec;
+    border: 1px solid #e57373;
+    border-right: 5px solid #c62828;
+    border-radius: 6px;
+    padding: 4mm 5mm;
+    margin: 5mm 0;
+    font-size: 12.5pt;
+  }
+
+  .warning-title { font-weight: 700; color: #b71c1c; margin-bottom: 2mm; }
+
+  /* ===== STEPS ===== */
+  .steps { margin: 5mm 0; padding-right: 0; list-style: none; }
+
+  .steps li {
+    display: flex;
+    align-items: flex-start;
+    gap: 4mm;
+    margin-bottom: 4mm;
+    font-size: 13pt;
+  }
+
+  .step-num {
+    min-width: 8mm;
+    height: 8mm;
+    background: #2c6fad;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 11pt;
+    flex-shrink: 0;
+    margin-top: 1mm;
+  }
+
+  /* ===== BADGE ===== */
+  .badge {
+    display: inline-block;
+    padding: 1mm 4mm;
+    border-radius: 4px;
+    font-size: 11pt;
+    font-weight: 700;
+  }
+
+  .badge-blue  { background: #e3f2fd; color: #1565c0; }
+  .badge-green { background: #e8f5e9; color: #2e7d32; }
+  .badge-red   { background: #fce4ec; color: #b71c1c; }
+  .badge-orange{ background: #fff3e0; color: #e65100; }
+  .badge-grey  { background: #f5f5f5; color: #424242; }
+
+  /* ===== TABLE ===== */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 5mm 0;
+    font-size: 12.5pt;
+  }
+
+  th {
+    background: #1a3c5e;
+    color: #fff;
+    padding: 3mm 4mm;
+    text-align: right;
+    font-weight: 700;
+  }
+
+  td {
+    padding: 3mm 4mm;
+    border: 1px solid #ddd;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: #f7f9fc; }
+
+  /* ===== PAGE BREAK ===== */
+  .page-break { page-break-after: always; margin-bottom: 10mm; }
+
+  /* ===== SECTION NUMBER ===== */
+  .section-tag {
+    display: inline-block;
+    background: #e67e22;
+    color: #fff;
+    font-size: 10pt;
+    font-weight: 700;
+    padding: 1mm 4mm;
+    border-radius: 4px;
+    margin-left: 3mm;
+    vertical-align: middle;
+  }
+
+  /* ===== DIVIDER ===== */
+  hr { border: none; border-top: 1px solid #ddd; margin: 8mm 0; }
+
+  /* ===== FIELD DESCRIPTION ===== */
+  .field-box {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 4mm 5mm;
+    margin: 3mm 0;
+    background: #fafafa;
+  }
+
+  .field-name {
+    font-weight: 700;
+    color: #1a3c5e;
+    font-size: 12.5pt;
+  }
+
+  .field-desc {
+    color: #444;
+    font-size: 12pt;
+    margin-top: 1mm;
+  }
+
+  @media print {
+    .page { padding: 15mm; }
+    .cover { min-height: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ======================================================
+       COVER PAGE
+  ======================================================= -->
+  <div class="cover">
+    <div class="cover-logo-placeholder">
+      <span>أضف شعار JEDCO هنا</span>
+    </div>
+    <div class="cover-title">دليل المستخدم</div>
+    <div class="cover-subtitle">تطبيق إدارة حالات No-Show<br>مطار الملك عبدالعزيز الدولي – جدة</div>
+    <div class="cover-chapter">الفصل الأول — المقدمة وتسجيل الدخول</div>
+    <div class="cover-meta">
+      إعداد: قسم عمليات المحطة — JEDCO<br>
+      التاريخ: أبريل 2026<br>
+      الإصدار: 1.0
+    </div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- ======================================================
+       CHAPTER 1 — INTRODUCTION
+  ======================================================= -->
+  <h1>الفصل الأول: المقدمة وتسجيل الدخول</h1>
+
+  <!-- 1.1 What is the app -->
+  <h2>١٫١ ما هو تطبيق No-Show؟</h2>
+
+  <p>
+    تطبيق <strong>No-Show</strong> هو نظام إلكتروني داخلي مخصص لفريق عمليات المحطة في
+    مطار الملك عبدالعزيز الدولي بجدة. صُمِّم هذا التطبيق لتسجيل ومتابعة حالات الركاب
+    الذين فاتتهم رحلاتهم أو لم يمكنهم الصعود إليها لأي سبب كان.
+  </p>
+
+  <p>
+    يُتيح التطبيق للموظفين تسجيل هذه الحالات بشكل منظّم وسريع، ومتابعة حالة كل راكب
+    من لحظة التعرف عليه حتى مغادرته المطار على رحلة جديدة أو إغلاق حالته.
+  </p>
+
+  <h2>١٫٢ ماذا يستطيع الموظف أن يفعل؟</h2>
+
+  <table>
+    <tr>
+      <th>المهمة</th>
+      <th>متاحة للموظف؟</th>
+    </tr>
+    <tr>
+      <td>إنشاء تقرير حالة جديد</td>
+      <td><span class="badge badge-green">✓ نعم</span></td>
+    </tr>
+    <tr>
+      <td>تعديل تقرير موجود</td>
+      <td><span class="badge badge-green">✓ نعم</span></td>
+    </tr>
+    <tr>
+      <td>تأكيد الرحلة الجديدة للراكب</td>
+      <td><span class="badge badge-green">✓ نعم</span></td>
+    </tr>
+    <tr>
+      <td>إغلاق الحالة وإعادة فتحها</td>
+      <td><span class="badge badge-green">✓ نعم</span></td>
+    </tr>
+    <tr>
+      <td>إرفاق ملفات وصور بالتقرير</td>
+      <td><span class="badge badge-green">✓ نعم</span></td>
+    </tr>
+    <tr>
+      <td>نسخ رسالة WhatsApp للتقرير</td>
+      <td><span class="badge badge-green">✓ نعم</span></td>
+    </tr>
+    <tr>
+      <td>مشاهدة ملخص الوردية والتسليم</td>
+      <td><span class="badge badge-green">✓ نعم</span></td>
+    </tr>
+    <tr>
+      <td>حذف تقرير</td>
+      <td><span class="badge badge-red">✗ للمشرفين فقط</span></td>
+    </tr>
+    <tr>
+      <td>الإحصاءات والتحليلات (Analytics)</td>
+      <td><span class="badge badge-red">✗ للمشرفين فقط</span></td>
+    </tr>
+    <tr>
+      <td>إدارة الرحلات والمستخدمين</td>
+      <td><span class="badge badge-red">✗ للمشرفين فقط</span></td>
+    </tr>
+  </table>
+
+  <h2>١٫٣ كيف تصل إلى التطبيق؟</h2>
+
+  <p>
+    التطبيق يعمل مباشرة من المتصفح — لا يحتاج إلى تحميل أو تثبيت.
+    افتح المتصفح على الجهاز (هاتف، تابلت، أو حاسوب) واكتب عنوان التطبيق في شريط
+    العنوان.
+  </p>
+
+  <div class="tip">
+    <div class="tip-title">💡 نصيحة — أضفه للشاشة الرئيسية</div>
+    على الجوال، افتح التطبيق في Safari (iOS) أو Chrome (Android) ثم اختر
+    <strong>«Add to Home Screen»</strong> / <strong>«أضف إلى الشاشة الرئيسية»</strong>
+    ليظهر كأيقونة تطبيق مباشرة ويُفتح بدون شريط عنوان.
+  </div>
+
+  <div class="img-placeholder">
+    <div class="img-icon">📸</div>
+    <strong>صورة: أيقونة التطبيق على شاشة الجوال</strong>
+    <div class="img-label">أضف الصورة هنا</div>
+  </div>
+
+  <hr>
+
+  <!-- ======================================================
+       1.4 LOGIN
+  ======================================================= -->
+  <h2>١٫٤ تسجيل الدخول</h2>
+
+  <p>
+    عند فتح التطبيق لأول مرة أو بعد انتهاء الجلسة، ستظهر لك شاشة تسجيل الدخول.
+  </p>
+
+  <div class="img-placeholder">
+    <div class="img-icon">📸</div>
+    <strong>صورة: شاشة تسجيل الدخول كاملة</strong>
+    <div class="img-label">أضف الصورة هنا</div>
+  </div>
+
+  <h3>ما تراه على الشاشة:</h3>
+  <ul style="margin: 3mm 0 5mm 0; padding-right: 6mm;">
+    <li style="margin-bottom: 2mm;">شعار JEDCO في الأعلى</li>
+    <li style="margin-bottom: 2mm;">اسم التطبيق: <strong>"No-Show App"</strong></li>
+    <li style="margin-bottom: 2mm;">حقل إدخال الـ <strong>Staff PIN</strong></li>
+    <li style="margin-bottom: 2mm;">زر <strong>Sign In</strong></li>
+  </ul>
+
+  <h3>خطوات الدخول:</h3>
+  <ul class="steps">
+    <li>
+      <div class="step-num">١</div>
+      <div>افتح التطبيق — سيظهر حقل الـ <strong>Staff PIN</strong> تلقائياً وسيكون جاهزاً للإدخال.</div>
+    </li>
+    <li>
+      <div class="step-num">٢</div>
+      <div>اكتب الـ PIN الخاص بك (أرقام فقط، مخفية بنقاط ●●●● لحماية خصوصيتك).</div>
+    </li>
+    <li>
+      <div class="step-num">٣</div>
+      <div>اضغط <strong>Sign In</strong> أو اضغط Enter على لوحة المفاتيح.</div>
+    </li>
+    <li>
+      <div class="step-num">٤</div>
+      <div>
+        ستظهر رسالة <strong>"Verifying…"</strong> للحظة، ثم ينقلك التطبيق مباشرة
+        إلى لوحة التحكم.
+      </div>
+    </li>
+  </ul>
+
+  <div class="img-placeholder">
+    <div class="img-icon">📸</div>
+    <strong>صورة: حقل Staff PIN مع الأرقام المخفية وزر Sign In</strong>
+    <div class="img-label">أضف الصورة هنا</div>
+  </div>
+
+  <div class="warning">
+    <div class="warning-title">⚠ PIN خاطئ</div>
+    إذا أدخلت PIN غير صحيح ستظهر رسالة:
+    <br><br>
+    <em>"Incorrect PIN. Please try again."</em>
+    <br><br>
+    امسح الإدخال وأعد المحاولة. تأكد من إيقاف تشغيل الأحرف الكبيرة (Caps Lock)
+    إذا كنت تستخدم لوحة مفاتيح.
+  </div>
+
+  <div class="note">
+    <div class="note-title">📌 ملاحظة — الـ PIN</div>
+    الـ PIN يُعطى لك من المشرف المسؤول. لا تشاركه مع أحد.
+    إذا نسيته أو احتجت تغييره، تواصل مع المشرف مباشرة.
+  </div>
+
+  <h3>بعد الدخول:</h3>
+  <p>
+    بمجرد الدخول الناجح، ينقلك التطبيق تلقائياً إلى <strong>لوحة التحكم (Dashboard)</strong>
+    حيث تجد جميع التقارير النشطة وأدوات العمل اليومي.
+    سنشرح لوحة التحكم بالتفصيل في الفصل الثاني.
+  </p>
+
+  <div class="img-placeholder">
+    <div class="img-icon">📸</div>
+    <strong>صورة: لوحة التحكم مباشرة بعد تسجيل الدخول</strong>
+    <div class="img-label">أضف الصورة هنا</div>
+  </div>
+
+  <hr>
+
+  <!-- ======================================================
+       1.5 SIGN OUT
+  ======================================================= -->
+  <h2>١٫٥ تسجيل الخروج</h2>
+
+  <p>
+    عند انتهاء وردية أو عند ترك الجهاز، يجب تسجيل الخروج من التطبيق.
+  </p>
+
+  <ul class="steps">
+    <li>
+      <div class="step-num">١</div>
+      <div>في لوحة التحكم، ابحث عن زر <strong>Sign out</strong> في الشريط العلوي (يمين الصفحة).</div>
+    </li>
+    <li>
+      <div class="step-num">٢</div>
+      <div>اضغط عليه — سيعود التطبيق فوراً إلى شاشة تسجيل الدخول.</div>
+    </li>
+  </ul>
+
+  <div class="img-placeholder">
+    <div class="img-icon">📸</div>
+    <strong>صورة: موقع زر Sign out في الشريط العلوي</strong>
+    <div class="img-label">أضف الصورة هنا</div>
+  </div>
+
+  <div class="tip">
+    <div class="tip-title">💡 نصيحة — الأجهزة المشتركة</div>
+    إذا كنت تستخدم جهازاً مشتركاً مع زملائك، احرص دائماً على تسجيل الخروج
+    عند انتهائك حتى لا يتم إجراء أي تعديلات باسمك.
+  </div>
+
+  <hr>
+
+  <!-- ======================================================
+       SUMMARY TABLE
+  ======================================================= -->
+  <h2>ملخص الفصل الأول</h2>
+
+  <table>
+    <tr>
+      <th>الموضوع</th>
+      <th>الملخص</th>
+    </tr>
+    <tr>
+      <td>ما هو التطبيق؟</td>
+      <td>نظام لتسجيل ومتابعة حالات الركاب الذين فاتتهم رحلاتهم</td>
+    </tr>
+    <tr>
+      <td>كيف أفتحه؟</td>
+      <td>من المتصفح مباشرة — لا يحتاج تثبيت</td>
+    </tr>
+    <tr>
+      <td>تسجيل الدخول</td>
+      <td>أدخل Staff PIN ثم اضغط Sign In</td>
+    </tr>
+    <tr>
+      <td>PIN خاطئ</td>
+      <td>تظهر رسالة خطأ — أعد المحاولة أو تواصل مع المشرف</td>
+    </tr>
+    <tr>
+      <td>تسجيل الخروج</td>
+      <td>زر Sign out في الشريط العلوي للوحة التحكم</td>
+    </tr>
+  </table>
+
+  <div class="note">
+    <div class="note-title">📖 الفصل التالي</div>
+    في الفصل الثاني سنشرح <strong>لوحة التحكم (Dashboard)</strong> بالكامل:
+    التبويبات، جدول التقارير، وأدوات البحث والفلترة.
+  </div>
+
+</div>
+</body>
+</html>
