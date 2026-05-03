@@ -288,6 +288,8 @@ export const AIRLINE_CODES = {
   FH: 'Freebird Airlines',
   UZ: 'Buraq Air',
   XC: 'Corendon Airlines',
+  J9: 'Jazeera Airways',
+  ER: 'SereneAir',
   // Other (kept for reference)
   LH: 'Lufthansa',
   AF: 'Air France',
@@ -313,13 +315,13 @@ const TERMINAL_MAP = {
   '3T': 'North', SM: 'North', J4: 'North', AI: 'North', ET: 'North',
   NP: 'North', HY: 'North', SZ: 'North', RB: 'North', D3: 'North',
   SD: 'North', DV: 'North', OV: 'North', IX: 'North', TU: 'North',
-  W9: 'North', E5: 'North',
+  W9: 'North', E5: 'North', J9: 'North',
   // Hajj Terminal — bus needed 🚌 (22 airlines)
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
   GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '9P': 'Hajj', QP: 'Hajj',
   JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', TK: 'T1', D7: 'Hajj',
   '2S': 'Hajj', '7Q': 'Hajj', BJ: 'Hajj', BM: 'Hajj', FH: 'Hajj',
-  UZ: 'Hajj', XC: 'Hajj',
+  UZ: 'Hajj', XC: 'Hajj', ER: 'Hajj',
 };
 
 export function getTerminal(flightNumber) {
