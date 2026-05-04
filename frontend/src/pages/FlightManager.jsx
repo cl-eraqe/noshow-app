@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lookupFlight, getCustomFlights, saveFlight, deleteFlight } from '../utils/api';
 
@@ -47,14 +47,7 @@ export default function FlightManager() {
 
   function startEdit(row) {
     setEditKey(row.flight_number);
-    setForm({
-      flight_number: row.flight_number,
-      destination:   row.destination || '',
-      std:           row.std || '',
-      city:          row.city || '',
-      country:       row.country || '',
-      nationality:   row.nationality || '',
-    });
+    setForm(Object.fromEntries(Object.keys(EMPTY).map(k => [k, row[k] || ''])));
     setLookupStatus('idle');
     setError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -93,11 +86,14 @@ export default function FlightManager() {
     }
   }
 
-  const filtered = customs.filter(r =>
-    !search || r.flight_number.toLowerCase().includes(search.toLowerCase()) ||
-    (r.city || '').toLowerCase().includes(search.toLowerCase()) ||
-    (r.destination || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return !q ? customs : customs.filter(r =>
+      r.flight_number.toLowerCase().includes(q) ||
+      (r.city || '').toLowerCase().includes(q) ||
+      (r.destination || '').toLowerCase().includes(q)
+    );
+  }, [customs, search]);
 
   return (
     <div className="page-wrap">
@@ -107,7 +103,7 @@ export default function FlightManager() {
         <p className="page-sub">Add, edit, or remove flights from the lookup database</p>
       </div>
 
-      {/* ── Add / Edit Form */}
+
       <div className="form-card">
         <h2 className="section-title">{editKey ? `Editing ${editKey}` : 'Add / Update Flight'}</h2>
 
@@ -176,7 +172,7 @@ export default function FlightManager() {
         </form>
       </div>
 
-      {/* ── Custom flights list */}
+
       <div className="form-card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h2 className="section-title" style={{ margin: 0 }}>
@@ -230,7 +226,7 @@ export default function FlightManager() {
         )}
       </div>
 
-      {/* ── Delete confirmation */}
+
       {confirmDel && (
         <div className="modal-overlay" onClick={() => setConfirmDel(null)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>

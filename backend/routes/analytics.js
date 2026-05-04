@@ -6,7 +6,7 @@ function getShift(dtStr) {
   if (!dtStr) return null;
   const hour = parseInt(String(dtStr).slice(11, 13));
   if (isNaN(hour)) return null;
-  if (hour >= 6 && hour < 14) return 'A';
+  if (hour >= 6  && hour < 14) return 'A';
   if (hour >= 14 && hour < 22) return 'B';
   return 'C';
 }
@@ -24,39 +24,41 @@ function parseJeddahMs(dtStr) {
 
 function computeRange({ range, from, to }) {
   const today = jeddahNowDateOnly();
-  let fromDate = today, toDate = today;
-  if (range === 'today') {
-    fromDate = today; toDate = today;
-  } else if (range === 'yesterday') {
-    const d = new Date(today + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() - 1);
-    fromDate = toDate = d.toISOString().slice(0, 10);
-  } else if (range === 'week') {
-    const d = new Date(today + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() - 6);
-    fromDate = d.toISOString().slice(0, 10); toDate = today;
-  } else if (range === 'month') {
-    const d = new Date(today + 'T00:00:00Z');
-    d.setUTCDate(1);
-    fromDate = d.toISOString().slice(0, 10); toDate = today;
-  } else if (range === 'year') {
-    fromDate = today.slice(0, 4) + '-01-01'; toDate = today;
-  } else if (range === 'all') {
-    fromDate = '1970-01-01'; toDate = '2099-12-31';
-  } else if (from || to) {
-    fromDate = from || '1970-01-01'; toDate = to || '2099-12-31';
-  }
-  return { fromDate, toDate };
+  const offset = n => { const d = new Date(today + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  if (range === 'yesterday') { const d = offset(-1); return { fromDate: d, toDate: d }; }
+  if (range === 'week')      return { fromDate: offset(-6),  toDate: today };
+  if (range === 'month')     return { fromDate: today.slice(0, 8) + '01', toDate: today };
+  if (range === 'year')      return { fromDate: today.slice(0, 4) + '-01-01', toDate: today };
+  if (range === 'all')       return { fromDate: '1970-01-01', toDate: '2099-12-31' };
+  if (from || to)            return { fromDate: from || '1970-01-01', toDate: to || '2099-12-31' };
+  return { fromDate: today, toDate: today };
 }
 
 function highlights(arr) {
-  if (!arr || arr.length === 0) return { most: null, least: null };
-  let most = arr[0], least = arr[0];
-  arr.forEach(r => {
-    if (r.value > most.value) most = r;
-    if (r.value < least.value) least = r;
+  if (!arr?.length) return { most: null, least: null };
+  return arr.reduce(
+    (acc, r) => ({ most: r.value > acc.most.value ? r : acc.most, least: r.value < acc.least.value ? r : acc.least }),
+    { most: arr[0], least: arr[0] }
+  );
+}
+
+function tally(list) {
+  return { cases: list.length, pax: list.reduce((s, r) => s + (r.pax_count || 0), 0), list };
+}
+
+const avgHrs = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length / 3600000 : null;
+const avg    = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+function groupCount(data, key, extractor) {
+  const map = {};
+  data.forEach(r => {
+    const k = extractor ? extractor(r) : r[key];
+    if (!k) return;
+    if (!map[k]) map[k] = { name: k, value: 0, pax: 0 };
+    map[k].value++;
+    map[k].pax += r.pax_count || 0;
   });
-  return { most, least };
+  return Object.values(map).sort((a, b) => b.value - a.value);
 }
 
 router.get('/dashboard', async (req, res) => {
@@ -83,140 +85,77 @@ router.get('/dashboard', async (req, res) => {
         const code = (r.prev_destination || '').match(/\(([A-Z]{3})\)/)?.[1] || r.prev_destination;
         if (code !== destination && r.prev_destination !== destination) return false;
       }
-      if (terminal) {
-        const t = TERMINAL_MAP[getAirlineCode(r.prev_flight)] || 'T1';
-        if (t !== terminal) return false;
-      }
+      if (terminal && (TERMINAL_MAP[getAirlineCode(r.prev_flight)] || 'T1') !== terminal) return false;
       if (pax_type && r.pax_type !== pax_type) return false;
       return true;
     });
 
-    const totalCases = filtered.length;
-    const totalPax = filtered.reduce((s, r) => s + (r.pax_count || 0), 0);
-    const active = filtered.filter(r => r.status !== 'closed').length;
-    const activePax = filtered.filter(r => r.status !== 'closed').reduce((s, r) => s + (r.pax_count || 0), 0);
-
-    const underProcessList = filtered.filter(r => r.status === 'under_process');
-    const underProcessCases = underProcessList.length;
-    const underProcessPax = underProcessList.reduce((s, r) => s + (r.pax_count || 0), 0);
-
-    const closedList = filtered.filter(r => r.status === 'closed');
-    const closedCases = closedList.length;
-    const closedPax = closedList.reduce((s, r) => s + (r.pax_count || 0), 0);
-
-    const confirmedList = filtered.filter(r => r.status === 'flight_confirmed');
-    const confirmedCases = confirmedList.length;
-    const confirmedPax = confirmedList.reduce((s, r) => s + (r.pax_count || 0), 0);
-
     const now = Date.now();
-    const twelveHoursMs = 12 * 60 * 60 * 1000;
-    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+    const H12 = 12 * 60 * 60 * 1000;
+    const H24 = 24 * 60 * 60 * 1000;
 
-    // Process completed: closed AND new (confirmed) flight departed within last 12 hrs
-    const departedRecentList = filtered.filter(r => {
-      if (r.status !== 'closed') return false;
-      if (!r.new_datetime) return false;
+    const totalCases = filtered.length;
+    const totalPax   = filtered.reduce((s, r) => s + (r.pax_count || 0), 0);
+    const { cases: active, pax: activePax } = tally(filtered.filter(r => r.status !== 'closed'));
+
+    const { cases: underProcessCases, pax: underProcessPax } = tally(filtered.filter(r => r.status === 'under_process'));
+    const { cases: closedCases,       pax: closedPax }       = tally(filtered.filter(r => r.status === 'closed'));
+    const { cases: confirmedCases,    pax: confirmedPax }    = tally(filtered.filter(r => r.status === 'flight_confirmed'));
+
+    const { cases: departedRecentCases, pax: departedRecentPax } = tally(filtered.filter(r => {
+      if (r.status !== 'closed' || !r.new_datetime) return false;
+      const ms = parseJeddahMs(r.new_datetime); if (!ms) return false;
+      const diff = now - ms; return diff >= 0 && diff <= H12;
+    }));
+
+    const { cases: atAirportSoonCases, pax: atAirportSoonPax } = tally(filtered.filter(r => {
+      if (r.status !== 'flight_confirmed' || !r.new_datetime) return false;
+      const ms = parseJeddahMs(r.new_datetime); if (!ms) return false;
+      const diff = ms - now; return diff > 0 && diff < H12;
+    }));
+
+    const { cases: atAirportLaterCases, pax: atAirportLaterPax } = tally(filtered.filter(r => {
+      if (r.status !== 'flight_confirmed' || !r.new_datetime) return false;
       const ms = parseJeddahMs(r.new_datetime);
-      if (!ms) return false;
-      const diff = now - ms;
-      return diff >= 0 && diff <= twelveHoursMs;
-    });
-    const departedRecentCases = departedRecentList.length;
-    const departedRecentPax = departedRecentList.reduce((s, r) => s + (r.pax_count || 0), 0);
+      return ms != null && (ms - now) >= H12;
+    }));
 
-    // Currently at airport with a new flight departing in <12 hrs
-    const atAirportSoonList = filtered.filter(r => {
-      if (r.status !== 'flight_confirmed') return false;
-      if (!r.new_datetime) return false;
-      const ms = parseJeddahMs(r.new_datetime);
-      if (!ms) return false;
-      const diff = ms - now;
-      return diff > 0 && diff < twelveHoursMs;
-    });
-    const atAirportSoonCases = atAirportSoonList.length;
-    const atAirportSoonPax = atAirportSoonList.reduce((s, r) => s + (r.pax_count || 0), 0);
-
-    // Currently at airport with a new flight departing in >=12 hrs
-    const atAirportLaterList = filtered.filter(r => {
-      if (r.status !== 'flight_confirmed') return false;
-      if (!r.new_datetime) return false;
-      const ms = parseJeddahMs(r.new_datetime);
-      if (!ms) return false;
-      return (ms - now) >= twelveHoursMs;
-    });
-    const atAirportLaterCases = atAirportLaterList.length;
-    const atAirportLaterPax = atAirportLaterList.reduce((s, r) => s + (r.pax_count || 0), 0);
-
-    // Pax at airport over 24 hrs: not closed AND prev (missed) flight was >24h ago
-    const stuck24List = filtered.filter(r => {
-      if (r.status === 'closed') return false;
-      if (!r.prev_datetime) return false;
+    const { cases: stuck24Cases, pax: stuck24Pax } = tally(filtered.filter(r => {
+      if (r.status === 'closed' || !r.prev_datetime) return false;
       const ms = parseJeddahMs(r.prev_datetime);
-      if (!ms) return false;
-      return (now - ms) >= twentyFourHoursMs;
-    });
-    const stuck24Cases = stuck24List.length;
-    const stuck24Pax = stuck24List.reduce((s, r) => s + (r.pax_count || 0), 0);
+      return ms != null && (now - ms) >= H24;
+    }));
 
-    const needsNusukList = filtered.filter(r => {
-      if (r.pax_type !== 'Umrah') return false;
-      if (r.status !== 'flight_confirmed') return false;
-      if (!r.new_datetime) return false;
-      if (r.nusuk_received) return false;
-      const newMs = parseJeddahMs(r.new_datetime);
-      if (!newMs) return false;
-      return (newMs - now) >= twentyFourHoursMs;
-    });
-    const needsNusukCases = needsNusukList.length;
-    const needsNusukPax = needsNusukList.reduce((s, r) => s + (r.pax_count || 0), 0);
+    const { cases: needsNusukCases, pax: needsNusukPax, list: needsNusukList } = tally(filtered.filter(r => {
+      if (r.pax_type !== 'Umrah' || r.status !== 'flight_confirmed' || !r.new_datetime || r.nusuk_received) return false;
+      const ms = parseJeddahMs(r.new_datetime);
+      return ms != null && (ms - now) >= H24;
+    }));
 
-    let rebookMs = [], closeMs = [];
+    const rebookMs = [], closeMs = [];
     filtered.forEach(r => {
       const createdMs = parseJeddahMs(r.created_at);
-      if (r.confirmed_at && createdMs) {
-        const c = parseJeddahMs(r.confirmed_at);
-        if (c && c >= createdMs) rebookMs.push(c - createdMs);
-      }
-      if (r.closed_at && createdMs) {
-        const c = parseJeddahMs(r.closed_at);
-        if (c && c >= createdMs) closeMs.push(c - createdMs);
-      }
+      if (!createdMs) return;
+      if (r.confirmed_at) { const c = parseJeddahMs(r.confirmed_at); if (c && c >= createdMs) rebookMs.push(c - createdMs); }
+      if (r.closed_at)    { const c = parseJeddahMs(r.closed_at);    if (c && c >= createdMs) closeMs.push(c - createdMs); }
     });
-    const avgRebookHrs = rebookMs.length ? (rebookMs.reduce((a,b)=>a+b,0) / rebookMs.length / 3600000) : null;
-    const avgCloseHrs = closeMs.length ? (closeMs.reduce((a,b)=>a+b,0) / closeMs.length / 3600000) : null;
+    const avgRebookHrs = avgHrs(rebookMs);
+    const avgCloseHrs  = avgHrs(closeMs);
 
-    const daysAtAirport = filtered.map(r => r.days_at_airport).filter(d => d != null && !isNaN(d));
-    const avgDaysAtAirport = daysAtAirport.length ? daysAtAirport.reduce((a,b)=>a+b,0) / daysAtAirport.length : null;
+    const daysAtAirport    = filtered.map(r => r.days_at_airport).filter(d => d != null && !isNaN(d));
+    const avgDaysAtAirport = avg(daysAtAirport);
 
-    const busCount = filtered.filter(r => {
-      const t = TERMINAL_MAP[getAirlineCode(r.new_flight)] || 'T1';
-      return t === 'North' || t === 'Hajj';
-    }).length;
-    const busPct = totalCases > 0 ? (busCount / totalCases) * 100 : 0;
+    const busCount = filtered.filter(r => { const t = TERMINAL_MAP[getAirlineCode(r.new_flight)] || 'T1'; return t === 'North' || t === 'Hajj'; }).length;
+    const busPct   = totalCases > 0 ? (busCount / totalCases) * 100 : 0;
 
-    function groupCount(key, extractor) {
-      const map = {};
-      filtered.forEach(r => {
-        const k = extractor ? extractor(r) : r[key];
-        if (!k) return;
-        if (!map[k]) map[k] = { name: k, value: 0, pax: 0 };
-        map[k].value += 1;
-        map[k].pax += (r.pax_count || 0);
-      });
-      return Object.values(map).sort((a,b) => b.value - a.value);
-    }
-
-    const byNationality = groupCount('nationality').slice(0, 10);
-    const byAirline = groupCount('prev_airline').slice(0, 10);
-    const byDestination = groupCount(null, r => {
-      const m = (r.prev_destination || '').match(/\(([A-Z]{3})\)/);
-      return m ? m[1] : r.prev_destination;
-    }).slice(0, 10);
-    const byPaxType = groupCount('pax_type');
-    const byShift = groupCount(null, r => getShift(r.created_at));
-    ['A','B','C'].forEach(s => { if (!byShift.find(x => x.name === s)) byShift.push({name:s, value:0, pax:0}); });
-    byShift.sort((a,b) => a.name.localeCompare(b.name));
-    const byTerminal = groupCount(null, r => TERMINAL_MAP[getAirlineCode(r.prev_flight)] || 'T1');
+    const byNationality = groupCount(filtered, 'nationality').slice(0, 10);
+    const byAirline     = groupCount(filtered, 'prev_airline').slice(0, 10);
+    const byDestination = groupCount(filtered, null, r => { const m = (r.prev_destination || '').match(/\(([A-Z]{3})\)/); return m ? m[1] : r.prev_destination; }).slice(0, 10);
+    const byPaxType     = groupCount(filtered, 'pax_type');
+    const byShift       = groupCount(filtered, null, r => getShift(r.created_at));
+    const byTerminal    = groupCount(filtered, null, r => TERMINAL_MAP[getAirlineCode(r.prev_flight)] || 'T1');
+    ['A','B','C'].forEach(s => { if (!byShift.find(x => x.name === s)) byShift.push({ name: s, value: 0, pax: 0 }); });
+    byShift.sort((a, b) => a.name.localeCompare(b.name));
 
     const daysBuckets = { '0d': 0, '1d': 0, '2d': 0, '3d': 0, '4d+': 0 };
     daysAtAirport.forEach(d => {
@@ -228,47 +167,44 @@ router.get('/dashboard', async (req, res) => {
     });
     const daysHistogram = Object.entries(daysBuckets).map(([name, value]) => ({ name, value }));
 
-    const resBuckets = { '<1h':0, '1-4h':0, '4-12h':0, '12-24h':0, '24h+':0 };
+    const resBuckets = { '<1h': 0, '1-4h': 0, '4-12h': 0, '12-24h': 0, '24h+': 0 };
     rebookMs.forEach(ms => {
       const h = ms / 3600000;
       if (h < 1) resBuckets['<1h']++;
-      else if (h < 4) resBuckets['1-4h']++;
+      else if (h < 4)  resBuckets['1-4h']++;
       else if (h < 12) resBuckets['4-12h']++;
       else if (h < 24) resBuckets['12-24h']++;
       else resBuckets['24h+']++;
     });
     const resolutionHistogram = Object.entries(resBuckets).map(([name, value]) => ({ name, value }));
 
-    const heatmap = Array.from({length: 7}, () => Array(24).fill(0));
-    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const heatmap  = Array.from({ length: 7 }, () => Array(24).fill(0));
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     filtered.forEach(r => {
       if (!r.created_at || r.created_at.length < 13) return;
-      const jeddahHour = parseInt(r.created_at.slice(11, 13));
-      const jeddahDay  = new Date(r.created_at.slice(0, 10) + 'T12:00:00Z').getUTCDay();
-      if (isNaN(jeddahHour) || isNaN(jeddahDay)) return;
-      heatmap[jeddahDay][jeddahHour] += 1;
+      const h = parseInt(r.created_at.slice(11, 13));
+      const d = new Date(r.created_at.slice(0, 10) + 'T12:00:00Z').getUTCDay();
+      if (!isNaN(h) && !isNaN(d)) heatmap[d][h]++;
     });
     const heatmapData = [];
-    for (let d = 0; d < 7; d++) {
-      for (let h = 0; h < 24; h++) {
+    for (let d = 0; d < 7; d++)
+      for (let h = 0; h < 24; h++)
         heatmapData.push({ day: dayNames[d], dayIdx: d, hour: h, value: heatmap[d][h] });
-      }
-    }
 
-    const byDay = {};
-    filtered.forEach(r => {
-      const day = String(r.created_at || '').slice(0, 10);
-      if (!day) return;
-      if (!byDay[day]) byDay[day] = { date: day, value: 0, pax: 0 };
-      byDay[day].value += 1;
-      byDay[day].pax += (r.pax_count || 0);
-    });
-    const trend = Object.values(byDay).sort((a,b) => a.date.localeCompare(b.date));
+    const trend = Object.values(
+      filtered.reduce((acc, r) => {
+        const day = String(r.created_at || '').slice(0, 10);
+        if (!day) return acc;
+        if (!acc[day]) acc[day] = { date: day, value: 0, pax: 0 };
+        acc[day].value++;
+        acc[day].pax += r.pax_count || 0;
+        return acc;
+      }, {})
+    ).sort((a, b) => a.date.localeCompare(b.date));
 
-    // 7-day sparkline — compute 6-days-ago date in JS
-    const sixDaysAgoD = new Date(jeddahNowDateOnly() + 'T00:00:00Z');
+    const todayBase = new Date(jeddahNowDateOnly() + 'T00:00:00Z');
+    const sixDaysAgoD = new Date(todayBase);
     sixDaysAgoD.setUTCDate(sixDaysAgoD.getUTCDate() - 6);
-    const sixDaysAgo = sixDaysAgoD.toISOString().slice(0, 10);
 
     const { rows: last7DaysRaw } = await pool.query(
       `SELECT LEFT(created_at, 10) as day, COUNT(*) as cases, SUM(pax_count) as pax,
@@ -278,29 +214,29 @@ router.get('/dashboard', async (req, res) => {
        WHERE LEFT(created_at, 10) >= $1
        GROUP BY LEFT(created_at, 10)
        ORDER BY day ASC`,
-      [sixDaysAgo]
+      [sixDaysAgoD.toISOString().slice(0, 10)]
     );
 
     const sparkCases = [], sparkPax = [], sparkDays = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(jeddahNowDateOnly() + 'T00:00:00Z');
+      const d = new Date(todayBase);
       d.setUTCDate(d.getUTCDate() - i);
       const key = d.toISOString().slice(0, 10);
-      const found = last7DaysRaw.find(r => r.day === key);
-      sparkCases.push({ day: key, value: found ? parseInt(found.cases) : 0 });
-      sparkPax.push({ day: key, value: found ? (parseInt(found.pax) || 0) : 0 });
-      sparkDays.push({ day: key, value: found && found.avg_days != null ? parseFloat(parseFloat(found.avg_days).toFixed(1)) : 0 });
+      const f = last7DaysRaw.find(r => r.day === key);
+      sparkCases.push({ day: key, value: f ? parseInt(f.cases) : 0 });
+      sparkPax.push({ day: key, value: f ? (parseInt(f.pax) || 0) : 0 });
+      sparkDays.push({ day: key, value: f?.avg_days != null ? parseFloat(parseFloat(f.avg_days).toFixed(1)) : 0 });
     }
 
     res.json({
       meta: { range: { from: fromDate, to: toDate }, filters: { shift, status, airline, nationality, destination, terminal, pax_type }, totalMatched: filtered.length },
       kpi: { totalCases, totalPax, active, activePax, underProcessCases, underProcessPax, confirmedCases, confirmedPax, closedCases, closedPax, needsNusukCases, needsNusukPax, needsNusukList, departedRecentCases, departedRecentPax, atAirportSoonCases, atAirportSoonPax, atAirportLaterCases, atAirportLaterPax, stuck24Cases, stuck24Pax, avgRebookHrs, avgCloseHrs, avgDaysAtAirport, busPct, sparkCases, sparkPax, sparkDays },
       byNationality: { data: byNationality, ...highlights(byNationality) },
-      byAirline: { data: byAirline, ...highlights(byAirline) },
+      byAirline:     { data: byAirline,     ...highlights(byAirline) },
       byDestination: { data: byDestination, ...highlights(byDestination) },
-      byPaxType: { data: byPaxType },
-      byShift: { data: byShift, ...highlights(byShift) },
-      byTerminal: { data: byTerminal },
+      byPaxType:     { data: byPaxType },
+      byShift:       { data: byShift, ...highlights(byShift) },
+      byTerminal:    { data: byTerminal },
       daysHistogram, resolutionHistogram, heatmapData, trend,
       reports: filtered,
     });
@@ -318,12 +254,17 @@ router.get('/filter-options', async (_req, res) => {
       pool.query("SELECT DISTINCT prev_destination AS v FROM reports WHERE prev_destination IS NOT NULL AND prev_destination != '' ORDER BY prev_destination"),
       pool.query("SELECT DISTINCT pax_type AS v FROM reports WHERE pax_type IS NOT NULL AND pax_type != '' ORDER BY pax_type"),
     ]);
-    const airlines = a.rows.map(r => r.v);
-    const nationalities = n.rows.map(r => r.v);
     const destinationsFull = d.rows.map(r => r.v).filter(Boolean);
-    const destinations = destinationsFull.map(v => { const m = (v || '').match(/\(([A-Z]{3})\)/); return m ? m[1] : v; }).filter((v, i, arr) => v && arr.indexOf(v) === i).sort();
-    const paxTypes = p.rows.map(r => r.v);
-    res.json({ airlines, nationalities, destinations, destinationsFull, paxTypes });
+    const destinations = destinationsFull
+      .map(v => { const m = (v || '').match(/\(([A-Z]{3})\)/); return m ? m[1] : v; })
+      .filter((v, i, arr) => v && arr.indexOf(v) === i)
+      .sort();
+    res.json({
+      airlines:       a.rows.map(r => r.v),
+      nationalities:  n.rows.map(r => r.v),
+      destinations, destinationsFull,
+      paxTypes:       p.rows.map(r => r.v),
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -333,16 +274,13 @@ router.get('/audit-log', async (req, res) => {
   try {
     const pool = getDb();
     const limit = parseInt(req.query.limit) || 500;
-    const reportId = req.query.report_id;
-    let rows;
-    if (reportId) {
-      ({ rows } = await pool.query('SELECT * FROM audit_log WHERE report_id = $1 ORDER BY id DESC LIMIT $2', [reportId, limit]));
-    } else {
-      ({ rows } = await pool.query('SELECT * FROM audit_log ORDER BY id DESC LIMIT $1', [limit]));
-    }
+    const { report_id } = req.query;
+    const { rows } = report_id
+      ? await pool.query('SELECT * FROM audit_log WHERE report_id = $1 ORDER BY id DESC LIMIT $2', [report_id, limit])
+      : await pool.query('SELECT * FROM audit_log ORDER BY id DESC LIMIT $1', [limit]);
     res.json(rows.map(r => ({
       ...r,
-      changes: r.changes ? JSON.parse(r.changes) : null,
+      changes:  r.changes  ? JSON.parse(r.changes)  : null,
       snapshot: r.snapshot ? JSON.parse(r.snapshot) : null,
     })));
   } catch (e) {

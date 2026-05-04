@@ -126,15 +126,12 @@ async function logAudit({ user, action, reportId, changes, snapshot }) {
 }
 
 function diffFields(oldRow, newRow, fields) {
-  const changes = {};
-  fields.forEach(f => {
-    const a = oldRow[f];
-    const b = newRow[f];
-    if (a !== b && !(a == null && b == null)) {
-      changes[f] = { from: a, to: b };
-    }
-  });
-  return Object.keys(changes).length > 0 ? changes : null;
+  const changes = fields.reduce((acc, f) => {
+    const [a, b] = [oldRow[f], newRow[f]];
+    if (a !== b && !(a == null && b == null)) acc[f] = { from: a, to: b };
+    return acc;
+  }, {});
+  return Object.keys(changes).length ? changes : null;
 }
 
 async function autoCloseReports() {

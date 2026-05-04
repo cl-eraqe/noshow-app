@@ -23,14 +23,9 @@ export default function AccessManagement() {
 
   async function reload() {
     setLoading(true);
-    try {
-      const rows = await getExportTokens();
-      setTokens(rows);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    try { setTokens(await getExportTokens()); }
+    catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   }
 
   useEffect(() => { reload(); }, []);
@@ -81,10 +76,6 @@ export default function AccessManagement() {
     } catch (e) { setError(e.message); }
   }
 
-  function copyToClipboard(text) {
-    navigator.clipboard?.writeText(text);
-  }
-
   return (
     <div className="page access-page">
       <div className="page-header">
@@ -105,7 +96,6 @@ export default function AccessManagement() {
 
       {error && <div className="form-error" style={{ marginBottom: 16 }}>{error}</div>}
 
-      {/* ── Create form */}
       <form className="token-form" onSubmit={handleCreate}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <label className="field-label">User Email</label>
@@ -125,7 +115,6 @@ export default function AccessManagement() {
         <button type="submit" className="btn btn-primary">+ Create Magic Link</button>
       </form>
 
-      {/* ── Magic link (shown once after creation/rotation) */}
       {newMagic && (
         <div className="magic-link-box">
           <div className="magic-link-title">
@@ -134,12 +123,12 @@ export default function AccessManagement() {
           <label className="field-label">Live State (reports)</label>
           <code>{newMagic.liveStateUrl}</code>
           <button type="button" className="btn btn-xs btn-secondary"
-            onClick={() => copyToClipboard(newMagic.liveStateUrl)}>Copy</button>
+            onClick={() => navigator.clipboard?.writeText(newMagic.liveStateUrl)}>Copy</button>
           <div style={{ height: 10 }}/>
           <label className="field-label">Audit Log</label>
           <code>{newMagic.auditLogUrl}</code>
           <button type="button" className="btn btn-xs btn-secondary"
-            onClick={() => copyToClipboard(newMagic.auditLogUrl)}>Copy</button>
+            onClick={() => navigator.clipboard?.writeText(newMagic.auditLogUrl)}>Copy</button>
           <div className="hint">
             In Excel: <strong>Data → Get Data → From Web</strong> → paste URL → Load.
             Right-click table → <strong>Properties</strong> → enable "Refresh every 1 minute".
@@ -149,7 +138,6 @@ export default function AccessManagement() {
         </div>
       )}
 
-      {/* ── Token list */}
       <div className="chart-card">
         <h2 className="chart-title">Active Access ({tokens.length})</h2>
         {loading ? (
