@@ -16,6 +16,23 @@ const NATIONALITY_FLAGS = {
   Ethiopian: 'et', Ethiopia: 'et',
   Ugandan: 'ug', Uganda: 'ug',
   Moroccan: 'ma', Morocco: 'ma',
+  Sudanese: 'sd', Sudan: 'sd',
+  Tajik: 'tj', Tajikistan: 'tj',
+  Uzbek: 'uz', Uzbekistan: 'uz',
+  Algerian: 'dz', Algeria: 'dz',
+  American: 'us', 'United States': 'us',
+  Belgian: 'be', Belgium: 'be',
+  British: 'gb', 'United Kingdom': 'gb',
+  Canadian: 'ca', Canada: 'ca',
+  Chadian: 'td', Chad: 'td',
+  Filipino: 'ph', Philippines: 'ph',
+  Indonesian: 'id', Indonesia: 'id',
+  Jordanian: 'jo', Jordan: 'jo',
+  Kenyan: 'ke', Kenya: 'ke',
+  Malian: 'ml', Mali: 'ml',
+  Nepali: 'np', Nepal: 'np',
+  Nigerien: 'ne', Niger: 'ne',
+  Saudi: 'sa', 'Saudi Arabia': 'sa',
 };
 const flagUrl = (nat) => {
   const code = NATIONALITY_FLAGS[nat];
