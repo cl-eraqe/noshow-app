@@ -8,6 +8,7 @@ const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 
 const PAX_TYPES = [
   'Umrah',
+  'Hajj Group',
   'Tourist',
   'Resident',
   'Transit',

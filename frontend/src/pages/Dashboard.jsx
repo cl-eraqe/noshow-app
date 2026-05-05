@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -23,6 +24,39 @@ function liveDays(prevDatetime) {
   const diff = (Date.now() - new Date(prevDatetime).getTime()) / (1000 * 60 * 60 * 24);
   if (isNaN(diff) || diff < 0) return null;
   return parseFloat(diff.toFixed(1));
+}
+
+// ── Excel export helpers (Last 24h)
+const EXP_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtDayMonth(dt) {
+  if (!dt) return '';
+  const d = new Date(typeof dt === 'string' ? dt.replace(' ', 'T') : dt);
+  if (isNaN(d)) return '';
+  return `${d.getDate()}-${EXP_MONTHS[d.getMonth()]}`;
+}
+function fmtTime24(dt) {
+  if (!dt) return '';
+  const d = new Date(typeof dt === 'string' ? dt.replace(' ', 'T') : dt);
+  if (isNaN(d)) return '';
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function statusToText(s) {
+  return s === 'closed' ? 'Departed' : 'In progress';
+}
+function actionTakenText(s) {
+  if (s === 'closed') return 'Departed';
+  if (s === 'flight_confirmed') return 'Scheduled an Alternative Flight';
+  return 'Under Process';
+}
+function paxTypeColumn(visa) {
+  return (visa === 'Umrah' || visa === 'Hajj Group') ? 'Umrah / Hajj Grp' : 'Normal Pax';
+}
+function terminalLabel(prevFlight) {
+  const t = getTerminal(prevFlight);
+  if (t === 'T1') return 'Terminal 1';
+  if (t === 'Hajj') return 'Hajj Terminal';
+  if (t === 'North') return 'North Terminal';
+  return t || '';
 }
 
 const STATUS_LABELS = {
@@ -443,6 +477,56 @@ export default function Dashboard() {
     await loadHandover(shift);
   }
 
+  // ── Export last 24h cases to Excel (supervisor only)
+  async function exportLast24hExcel() {
+    try {
+      const all = await getReports();
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const recent = all.filter(r => {
+        if (!r.created_at) return false;
+        const t = new Date(r.created_at.replace(' ', 'T')).getTime();
+        return !isNaN(t) && t >= cutoff;
+      });
+
+      if (recent.length === 0) {
+        alert('No reports were recorded in the last 24 hours.');
+        return;
+      }
+
+      const rows = recent.map(r => ({
+        'Recorded Date': fmtDayMonth(r.created_at),
+        'Recorded Time': fmtTime24(r.created_at),
+        'Terminal': terminalLabel(r.prev_flight),
+        'Original Departure Time': fmtTime24(r.prev_datetime),
+        'Original Departure Date': fmtDayMonth(r.prev_datetime),
+        'Original Flight Number': r.prev_flight || '',
+        'Visa Type': r.pax_type || '',
+        'Pax Type': paxTypeColumn(r.pax_type),
+        'Nationality': r.nationality || '',
+        'Total Pax': r.pax_count || 0,
+        'Status': statusToText(r.status),
+        'Root Causes': 'Late Arrivals',
+        'Action Taken': actionTakenText(r.status),
+        'Responsible Stakeholder of Passenger': '',
+        'Notes': r.comment || '',
+        'Welfare (Food / Drinks)': 'Yes',
+        'New Departure Time': fmtTime24(r.new_datetime),
+        'New Departure Date': fmtDayMonth(r.new_datetime),
+        'New Flight Number': r.new_flight || '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Last 24h');
+
+      const today = fmtDayMonth(new Date()).toLowerCase();
+      XLSX.writeFile(wb, `no-show-last-24h-${today}.xlsx`);
+    } catch (err) {
+      alert('Failed to export Excel: ' + err.message);
+    }
+  }
+
   function copyHandover() {
     if (!handoverData) return;
     let text = handoverData.text;
@@ -561,8 +645,8 @@ export default function Dashboard() {
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/analytics')}>
                 Analytics
               </button>
-              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/access-management')} title="Manage Excel export access">
-                Access
+              <button className="btn btn-secondary btn-sm" onClick={exportLast24hExcel} title="Export last 24h cases to Excel">
+                📊 Excel
               </button>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/flight-manager')} title="Manage flight database">
                 ✈ Flights
