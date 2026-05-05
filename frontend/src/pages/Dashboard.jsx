@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -493,35 +493,97 @@ export default function Dashboard() {
         return;
       }
 
-      const rows = recent.map(r => ({
-        'Recorded Date': fmtDayMonth(r.created_at),
-        'Recorded Time': fmtTime24(r.created_at),
-        'Terminal': terminalLabel(r.prev_flight),
-        'Original Departure Time': fmtTime24(r.prev_datetime),
-        'Original Departure Date': fmtDayMonth(r.prev_datetime),
-        'Original Flight Number': r.prev_flight || '',
-        'Visa Type': r.pax_type || '',
-        'Pax Type': paxTypeColumn(r.pax_type),
-        'Nationality': r.nationality || '',
-        'Total Pax': r.pax_count || 0,
-        'Status': statusToText(r.status),
-        'Root Causes': 'Late Arrivals',
-        'Action Taken': actionTakenText(r.status),
-        'Responsible Stakeholder of Passenger': '',
-        'Notes': r.comment || '',
-        'Welfare (Food / Drinks)': 'Yes',
-        'New Departure Time': fmtTime24(r.new_datetime),
-        'New Departure Date': fmtDayMonth(r.new_datetime),
-        'New Flight Number': r.new_flight || '',
-      }));
+      const headers = [
+        'Recorded Date', 'Recorded Time', 'Terminal',
+        'Original Departure Time', 'Original Departure Date', 'Original Flight Number',
+        'Visa Type', 'Pax Type', 'Nationality', 'Total Pax',
+        'Status', 'Root Causes', 'Action Taken',
+        'Responsible Stakeholder of Passenger', 'Notes', 'Welfare (Food / Drinks)',
+        'New Departure Time', 'New Departure Date', 'New Flight Number',
+      ];
 
-      const ws = XLSX.utils.json_to_sheet(rows);
-      ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Last 24h');
+      const ORIGINAL_HEADERS = new Set(['Original Departure Time', 'Original Departure Date', 'Original Flight Number']);
+      const NEW_HEADERS = new Set(['New Departure Time', 'New Departure Date', 'New Flight Number']);
 
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Last 24h');
+
+      ws.addRow(headers);
+
+      recent.forEach(r => {
+        ws.addRow([
+          fmtDayMonth(r.created_at),
+          fmtTime24(r.created_at),
+          terminalLabel(r.prev_flight),
+          fmtTime24(r.prev_datetime),
+          fmtDayMonth(r.prev_datetime),
+          r.prev_flight || '',
+          r.pax_type || '',
+          paxTypeColumn(r.pax_type),
+          r.nationality || '',
+          r.pax_count || 0,
+          statusToText(r.status),
+          'Late Arrivals',
+          actionTakenText(r.status),
+          '',
+          r.comment || '',
+          'Yes',
+          fmtTime24(r.new_datetime),
+          fmtDayMonth(r.new_datetime),
+          r.new_flight || '',
+        ]);
+      });
+
+      // Style header row
+      const headerRow = ws.getRow(1);
+      headerRow.height = 22;
+      headerRow.eachCell((cell, colNumber) => {
+        const headerName = headers[colNumber - 1];
+        let bg = 'FF002060';
+        if (ORIGINAL_HEADERS.has(headerName)) bg = 'FF375623';
+        else if (NEW_HEADERS.has(headerName)) bg = 'FF0070C0';
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF000000' } },
+          left: { style: 'thin', color: { argb: 'FF000000' } },
+          bottom: { style: 'thin', color: { argb: 'FF000000' } },
+          right: { style: 'thin', color: { argb: 'FF000000' } },
+        };
+      });
+
+      // Borders + alignment for body rows
+      for (let i = 2; i <= recent.length + 1; i++) {
+        const row = ws.getRow(i);
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+            left: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+            bottom: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+            right: { style: 'thin', color: { argb: 'FFBFBFBF' } },
+          };
+        });
+      }
+
+      // Column widths
+      ws.columns.forEach((col, idx) => {
+        col.width = Math.max(headers[idx].length + 2, 14);
+      });
+      ws.views = [{ state: 'frozen', ySplit: 1 }];
+
+      const buf = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
       const today = fmtDayMonth(new Date()).toLowerCase();
-      XLSX.writeFile(wb, `no-show-last-24h-${today}.xlsx`);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `no-show-last-24h-${today}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err) {
       alert('Failed to export Excel: ' + err.message);
     }
