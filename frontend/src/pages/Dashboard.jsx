@@ -722,16 +722,16 @@ export default function Dashboard() {
                 </button>
                 {excelMenu && (
                   <div style={{
-                    position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
-                    background: 'var(--card-bg, #0f1a2e)', border: '1px solid var(--border, #2b3a5a)',
-                    borderRadius: 8, minWidth: 150, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                    position: 'absolute', left: 0, top: '100%', marginTop: 4, zIndex: 50,
+                    background: '#0f1a2e', border: '1px solid #2b3a5a',
+                    borderRadius: 8, minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                   }}>
                     {[{ label: 'Last 24 hours', range: '24h' }, { label: 'Last 7 days', range: 'week' }].map(({ label, range }) => (
                       <button key={range}
-                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
-                          background: 'none', border: 'none', color: 'var(--text, #e6eefb)',
-                          cursor: 'pointer', fontSize: '0.9rem' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg, #1a2a45)'}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px',
+                          background: 'none', border: 'none', color: '#e6eefb',
+                          cursor: 'pointer', fontSize: '0.92rem', fontWeight: 500 }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#1a2a45'}
                         onMouseLeave={e => e.currentTarget.style.background = 'none'}
                         onClick={() => exportExcel(range)}
                       >
