@@ -25,6 +25,28 @@ const STATUS_LABELS = { under_process: 'Under Process', flight_confirmed: 'Fligh
 const STATUS_COLORS = { under_process: '#e67e22', flight_confirmed: '#27ae60', closed: '#95a5a6' };
 const EMPTY_FLIGHT  = { new_flight: '', new_datetime: '', new_destination: '', new_airline: '' };
 
+const CSV_COLS = ['id','status','created_at','prev_flight','prev_datetime','prev_destination',
+  'prev_airline','nationality','pax_type','pax_count','new_flight','new_datetime',
+  'new_destination','new_airline','days_at_airport','comment','submitted_by'];
+
+function csvExport(reports, range) {
+  const now = Date.now();
+  const cutoff = { '24h': 24 * 3600000, 'week': 7 * 24 * 3600000 };
+  const rows = range === 'all' ? reports : reports.filter(r => {
+    const ms = new Date(String(r.created_at || '').replace(' ', 'T') + '+03:00').getTime();
+    return !isNaN(ms) && (now - ms) <= cutoff[range];
+  });
+  const esc = v => v == null ? '' : `"${String(v).replace(/"/g, '""')}"`;
+  const csv = [CSV_COLS.join(','), ...rows.map(r => CSV_COLS.map(c => esc(r[c])).join(','))].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = `noshow-${range}-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 const _jeddahHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' })).getHours();
 const INIT_SHIFT = _jeddahHour >= 6 && _jeddahHour < 14 ? 'A' : _jeddahHour >= 14 && _jeddahHour < 22 ? 'B' : 'C';
 
@@ -65,12 +87,19 @@ export default function Dashboard() {
   const [handoverCopied, setHandoverCopied] = useState(false);
   const [handoverShift, setHandoverShift]   = useState(INIT_SHIFT);
   const [knownDestinations, setKnownDestinations] = useState([]);
+  const [exportMenu, setExportMenu] = useState(false);
+  const exportRef = useRef(null);
 
   const role = getRole();
 
   useEffect(() => { load(); }, []);
   useEffect(() => {
     getFilterOptions().then(o => setKnownDestinations(o.destinationsFull || [])).catch(() => {});
+  }, []);
+  useEffect(() => {
+    function onDown(e) { if (exportRef.current && !exportRef.current.contains(e.target)) setExportMenu(false); }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
   async function load() {
@@ -441,6 +470,33 @@ export default function Dashboard() {
           {airlines.map(a => <option key={a} value={a}>{a}</option>)}
         </select>
         <span className="report-count">{sorted.length} report{sorted.length !== 1 ? 's' : ''}</span>
+        <div ref={exportRef} style={{ position: 'relative' }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setExportMenu(m => !m)}>⬇ Export</button>
+          {exportMenu && (
+            <div style={{
+              position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
+              background: 'var(--card-bg, #0f1a2e)', border: '1px solid var(--border, #2b3a5a)',
+              borderRadius: 8, minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            }}>
+              {[
+                { label: 'Last 24 hours', range: '24h' },
+                { label: 'Last 7 days',   range: 'week' },
+                { label: 'All reports',   range: 'all' },
+              ].map(({ label, range }) => (
+                <button key={range}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
+                    background: 'none', border: 'none', color: 'var(--text, #e6eefb)',
+                    cursor: 'pointer', fontSize: '0.9rem' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg, #1a2a45)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                  onClick={() => { csvExport(reports, range); setExportMenu(false); }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button className="btn btn-ghost btn-sm" onClick={load}>↻ Refresh</button>
       </div>
 
