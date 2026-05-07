@@ -129,10 +129,17 @@ export default function Dashboard() {
 
   const role = getRole();
   const [knownDestinations, setKnownDestinations] = useState([]);
+  const [excelMenu, setExcelMenu] = useState(false);
+  const excelMenuRef = useRef(null);
 
   useEffect(() => { load(); }, []);
   useEffect(() => {
     getFilterOptions().then(o => setKnownDestinations(o.destinationsFull || [])).catch(() => {});
+  }, []);
+  useEffect(() => {
+    function onDown(e) { if (excelMenuRef.current && !excelMenuRef.current.contains(e.target)) setExcelMenu(false); }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
   async function load() {
@@ -477,11 +484,13 @@ export default function Dashboard() {
     await loadHandover(shift);
   }
 
-  // ── Export last 24h cases to Excel (supervisor only)
-  async function exportLast24hExcel() {
+  // ── Export cases to Excel (supervisor only) — range: '24h' | 'week'
+  async function exportExcel(range) {
+    setExcelMenu(false);
     try {
       const all = await getReports();
-      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const ms = range === 'week' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+      const cutoff = Date.now() - ms;
       const recent = all.filter(r => {
         if (!r.created_at) return false;
         const t = new Date(r.created_at.replace(' ', 'T')).getTime();
@@ -489,7 +498,7 @@ export default function Dashboard() {
       });
 
       if (recent.length === 0) {
-        alert('No reports were recorded in the last 24 hours.');
+        alert(`No reports were recorded in the last ${range === 'week' ? '7 days' : '24 hours'}.`);
         return;
       }
 
@@ -506,7 +515,7 @@ export default function Dashboard() {
       const NEW_HEADERS = new Set(['New Departure Time', 'New Departure Date', 'New Flight Number']);
 
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet('Last 24h');
+      const ws = wb.addWorksheet(range === 'week' ? 'Last 7 Days' : 'Last 24h');
 
       ws.addRow(headers);
 
@@ -579,13 +588,13 @@ export default function Dashboard() {
       const today = fmtDayMonth(new Date()).toLowerCase();
       const a = document.createElement('a');
       a.href = url;
-      a.download = `no-show-last-24h-${today}.xlsx`;
+      a.download = `no-show-last-${range}-${today}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      alert('Failed to export Excel: ' + err.message);
+      alert('Failed to export: ' + err.message);
     }
   }
 
@@ -707,9 +716,31 @@ export default function Dashboard() {
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/analytics')}>
                 Analytics
               </button>
-              <button className="btn btn-secondary btn-sm" onClick={exportLast24hExcel} title="Export last 24h cases to Excel">
-                📊 Excel
-              </button>
+              <div ref={excelMenuRef} style={{ position: 'relative' }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setExcelMenu(m => !m)} title="Export to Excel">
+                  📊 Excel ▾
+                </button>
+                {excelMenu && (
+                  <div style={{
+                    position: 'absolute', right: 0, top: '100%', marginTop: 4, zIndex: 50,
+                    background: 'var(--card-bg, #0f1a2e)', border: '1px solid var(--border, #2b3a5a)',
+                    borderRadius: 8, minWidth: 150, boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+                  }}>
+                    {[{ label: 'Last 24 hours', range: '24h' }, { label: 'Last 7 days', range: 'week' }].map(({ label, range }) => (
+                      <button key={range}
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
+                          background: 'none', border: 'none', color: 'var(--text, #e6eefb)',
+                          cursor: 'pointer', fontSize: '0.9rem' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--hover-bg, #1a2a45)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                        onClick={() => exportExcel(range)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/flight-manager')} title="Manage flight database">
                 ✈ Flights
               </button>
