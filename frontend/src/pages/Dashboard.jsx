@@ -1272,9 +1272,16 @@ export default function Dashboard() {
             )}
 
             {quickView.tab === 'comment' && (
-              <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text, #e6eefb)', margin: 0 }}>
-                {quickView.report.comment || '—'}
-              </p>
+              <div>
+                <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text, #e6eefb)', margin: '0 0 16px' }}>
+                  {quickView.report.comment || '—'}
+                </p>
+                {navigator.share && quickView.report.comment && (
+                  <button className="btn btn-sm btn-secondary" onClick={() =>
+                    navigator.share({ text: quickView.report.comment }).catch(() => {})
+                  }>Share 🔗</button>
+                )}
+              </div>
             )}
 
             {quickView.tab === 'attachments' && (() => {
@@ -1292,6 +1299,17 @@ export default function Dashboard() {
                           getFileObjectUrl(fp).then(({ url }) => { win.location.href = url; }).catch(() => { win.close(); alert('Failed to open'); });
                         }}>Open</button>
                         <button className="btn btn-sm btn-primary" onClick={() => downloadFile(fp, fname).catch(() => alert('Download failed'))}>Download</button>
+                        {navigator.canShare && (
+                          <button className="btn btn-sm btn-secondary" onClick={async () => {
+                            try {
+                              const { url, type } = await getFileObjectUrl(fp);
+                              const blob = await (await fetch(url)).blob();
+                              const file = new File([blob], fname, { type: type || blob.type });
+                              if (navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: fname });
+                              else await navigator.share({ title: fname });
+                            } catch (err) { if (err?.name !== 'AbortError') alert('Share failed'); }
+                          }}>Share</button>
+                        )}
                         {role === 'supervisor' && (
                           <button className="btn btn-sm btn-danger" disabled={qvDeleting === fname}
                             onClick={async () => {
