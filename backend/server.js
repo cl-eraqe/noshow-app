@@ -4,7 +4,7 @@ const cors    = require('cors');
 const path    = require('path');
 const fs      = require('fs');
 const { initDb, autoCloseReports } = require('./db');
-const { getFileUrl, USE_R2, LOCAL_DIR } = require('./storage');
+const { streamFile, USE_R2, LOCAL_DIR } = require('./storage');
 
 const authRoutes      = require('./routes/auth');
 const flightRoutes    = require('./routes/flights');
@@ -21,16 +21,16 @@ if (!USE_R2 && !fs.existsSync(LOCAL_DIR)) fs.mkdirSync(LOCAL_DIR, { recursive: t
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(express.json());
 
-// Protected file downloads
+// Protected file downloads — proxy through backend to avoid CORS issues with R2
 app.get('/api/files/:filename', requireAuth, async (req, res) => {
   const filename = path.basename(req.params.filename);
   if (USE_R2) {
     try {
-      const url = await getFileUrl(filename);
-      return res.redirect(url);
+      await streamFile(filename, res);
     } catch {
-      return res.status(404).json({ error: 'File not found' });
+      res.status(404).json({ error: 'File not found' });
     }
+    return;
   }
   const filepath = path.join(LOCAL_DIR, filename);
   if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });

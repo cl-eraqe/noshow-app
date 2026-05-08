@@ -30,12 +30,22 @@ async function uploadFile(filename, buffer, mimetype) {
   return `/uploads/${filename}`;
 }
 
-// Returns a URL for the file — either a signed R2 URL or null (local served via express)
+// Stream a file from R2 directly to an Express response (avoids CORS redirect issues)
+async function streamFile(filename, res) {
+  if (!USE_R2) return false;
+  const response = await s3.send(new presigner.GetObjectCommand({ Bucket: BUCKET, Key: `uploads/${filename}` }));
+  if (response.ContentType) res.setHeader('Content-Type', response.ContentType);
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+  response.Body.pipe(res);
+  return true;
+}
+
+// Returns a signed R2 URL (kept for internal use / future needs)
 async function getFileUrl(filename) {
   if (USE_R2) {
     return getSignedUrl(s3, new presigner.GetObjectCommand({ Bucket: BUCKET, Key: `uploads/${filename}` }), { expiresIn: 3600 });
   }
-  return null; // local: caller uses res.sendFile
+  return null;
 }
 
 async function deleteFile(filename) {
@@ -47,4 +57,4 @@ async function deleteFile(filename) {
   }
 }
 
-module.exports = { uploadFile, getFileUrl, deleteFile, USE_R2, LOCAL_DIR };
+module.exports = { uploadFile, getFileUrl, streamFile, deleteFile, USE_R2, LOCAL_DIR };
