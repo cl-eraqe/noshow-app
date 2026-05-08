@@ -160,11 +160,20 @@ async function autoCloseReports() {
   );
 
   if (rowCount > 0) {
+    // Lazy-load to avoid circular dependency
+    const { deleteFile } = require('./storage');
     for (const r of toClose) {
       await logAudit({
         user: 'system', action: 'auto_close', reportId: r.id,
         changes: { status: { from: 'flight_confirmed', to: 'closed' } },
       });
+      // Purge attachments — case is closed, files no longer needed
+      const { rows: fr } = await pool.query('SELECT file_paths FROM reports WHERE id = $1', [r.id]);
+      const paths = JSON.parse(fr[0]?.file_paths || '[]');
+      if (paths.length) {
+        await Promise.all(paths.map(p => deleteFile(p.split('/').pop()).catch(() => {})));
+        await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', ['[]', r.id]);
+      }
     }
     console.log(`Auto-closed ${rowCount} report(s) at Jeddah time ${jeddahNow}`);
   }

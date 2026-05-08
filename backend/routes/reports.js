@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 const path   = require('path');
 const fs     = require('fs');
-const { uploadFile } = require('../storage');
+const { uploadFile, deleteFile } = require('../storage');
 const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
 const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
 
@@ -59,10 +59,19 @@ function fmtTimeShort(dt) {
 function makeFilename(originalname) {
   return `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalname)}`;
 }
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 async function saveFiles(files) {
   return Promise.all(files.map(f => uploadFile(makeFilename(f.originalname), f.buffer, f.mimetype)));
+}
+
+async function purgeFiles(pool, reportId) {
+  const { rows } = await pool.query('SELECT file_paths FROM reports WHERE id = $1', [reportId]);
+  if (!rows[0]) return;
+  const paths = JSON.parse(rows[0].file_paths || '[]');
+  if (!paths.length) return;
+  await Promise.all(paths.map(p => deleteFile(p.split('/').pop()).catch(() => {})));
+  await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', ['[]', reportId]);
 }
 
 // ── Analytics summary (must be before /:id) ───────────────────────────
@@ -425,6 +434,7 @@ router.put('/:id', upload.array('files', 10), async (req, res) => {
     }
     if (existing.status !== 'closed' && reportStatus === 'closed' && !existing.closed_at) {
       await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+      await purgeFiles(pool, req.params.id);
     }
 
     const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
@@ -497,6 +507,7 @@ router.patch('/:id', express.json(), async (req, res) => {
     }
     if (status && report.status !== 'closed' && status === 'closed' && !report.closed_at) {
       await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+      await purgeFiles(pool, req.params.id);
     }
 
     const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
