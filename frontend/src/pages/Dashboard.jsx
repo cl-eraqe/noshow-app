@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExcelJS from 'exceljs';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 import { getRole, isSupervisor, logout as authLogout } from '../utils/auth';
@@ -129,6 +129,10 @@ export default function Dashboard() {
 
   const role = getRole();
   const [knownDestinations, setKnownDestinations] = useState([]);
+
+  // Quick-view modal (comment / attachments from emoji click)
+  const [quickView, setQuickView] = useState(null); // { report, tab: 'comment'|'attachments' }
+  const [qvDeleting, setQvDeleting] = useState(null); // filename being deleted
   const [excelMenu, setExcelMenu] = useState(false);
   const excelMenuRef = useRef(null);
 
@@ -860,9 +864,13 @@ export default function Dashboard() {
                         )}
                         <td data-label="#" className="col-id">
                           #{r.id}
-                          {r.comment && <span className="comment-indicator" title={r.comment}>💬</span>}
+                          {r.comment && (
+                            <span className="comment-indicator" title="View comment" style={{ cursor: 'pointer' }}
+                              onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'comment' }); }}>💬</span>
+                          )}
                           {(() => { try { return JSON.parse(r.file_paths || '[]').length > 0; } catch { return false; } })() && (
-                            <span className="comment-indicator" title="Has attachments">📎</span>
+                            <span className="comment-indicator" title="View attachments" style={{ cursor: 'pointer' }}
+                              onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'attachments' }); }}>📎</span>
                           )}
                         </td>
                         <td data-label="Prev Flight" className="col-flight">
@@ -1245,7 +1253,73 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Quick View Modal (comment / attachments) */}
+      {quickView && (
+        <div className="modal-overlay" onClick={() => setQuickView(null)}>
+          <div className="modal-content" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <h2 className="modal-title">Report #{quickView.report.id}</h2>
 
+            {/* Tab switcher when both exist */}
+            {quickView.report.comment && (() => { try { return JSON.parse(quickView.report.file_paths || '[]').length > 0; } catch { return false; } })() && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                {['comment', 'attachments'].map(t => (
+                  <button key={t} className={`btn btn-sm ${quickView.tab === t ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setQuickView(v => ({ ...v, tab: t }))}>
+                    {t === 'comment' ? '💬 Comment' : '📎 Attachments'}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {quickView.tab === 'comment' && (
+              <p style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'var(--text, #e6eefb)', margin: 0 }}>
+                {quickView.report.comment || '—'}
+              </p>
+            )}
+
+            {quickView.tab === 'attachments' && (() => {
+              const filePaths = (() => { try { return JSON.parse(quickView.report.file_paths || '[]'); } catch { return []; } })();
+              return (
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {filePaths.length === 0 && <li style={{ color: '#aaa' }}>No attachments</li>}
+                  {filePaths.map((fp, i) => {
+                    const fname = fp.split('/').pop();
+                    return (
+                      <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid #2b3a5a', flexWrap: 'wrap' }}>
+                        <span style={{ flex: 1, wordBreak: 'break-all', fontSize: '0.9rem' }}>📄 {fname}</span>
+                        <button className="btn btn-sm btn-secondary" onClick={() => {
+                          const win = window.open('', '_blank');
+                          getFileObjectUrl(fp).then(({ url }) => { win.location.href = url; }).catch(() => { win.close(); alert('Failed to open'); });
+                        }}>Open</button>
+                        <button className="btn btn-sm btn-primary" onClick={() => downloadFile(fp, fname).catch(() => alert('Download failed'))}>Download</button>
+                        {role === 'supervisor' && (
+                          <button className="btn btn-sm btn-danger" disabled={qvDeleting === fname}
+                            onClick={async () => {
+                              if (!confirm('Delete this attachment?')) return;
+                              setQvDeleting(fname);
+                              try {
+                                const { file_paths } = await deleteReportFile(quickView.report.id, fname);
+                                setReports(rs => rs.map(r => r.id === quickView.report.id ? { ...r, file_paths: JSON.stringify(file_paths) } : r));
+                                setQuickView(v => ({ ...v, report: { ...v.report, file_paths: JSON.stringify(file_paths) } }));
+                              } catch { alert('Failed to delete'); }
+                              finally { setQvDeleting(null); }
+                            }}>
+                            {qvDeleting === fname ? '…' : 'Delete'}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              );
+            })()}
+
+            <div className="modal-actions" style={{ marginTop: 20 }}>
+              <button className="btn btn-secondary" onClick={() => setQuickView(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -81,6 +81,10 @@ export async function createReport(formData) {
   return res.json();
 }
 
+export async function deleteReportFile(reportId, filename) {
+  return request(`/api/reports/${reportId}/files/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+}
+
 export async function updateReport(id, data) {
   return request(`/api/reports/${id}`, {
     method: 'PATCH',

@@ -528,6 +528,26 @@ router.patch('/:id', express.json(), async (req, res) => {
   }
 });
 
+// ── Delete single attachment ───────────────────────────────────────────
+router.delete('/:id/files/:filename', async (req, res) => {
+  try {
+    if (req.role !== 'supervisor') return res.status(403).json({ error: 'Forbidden' });
+    const pool = getDb();
+    const { rows } = await pool.query('SELECT file_paths FROM reports WHERE id = $1', [req.params.id]);
+    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    const paths = JSON.parse(rows[0].file_paths || '[]');
+    const fname = req.params.filename;
+    const newPaths = paths.filter(p => p.split('/').pop() !== fname);
+    if (newPaths.length === paths.length) return res.status(404).json({ error: 'File not in report' });
+    await deleteFile(fname).catch(() => {});
+    await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', [JSON.stringify(newPaths), req.params.id]);
+    await logAudit({ user: req.query.user || 'supervisor', action: 'delete_attachment', reportId: Number(req.params.id), changes: { removed: fname } });
+    res.json({ success: true, file_paths: newPaths });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── DELETE report ──────────────────────────────────────────────────────
 
 // ── Attach additional files to an existing report (no other fields changed)
