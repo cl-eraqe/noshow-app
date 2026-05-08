@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
+const path   = require('path');
+const fs     = require('fs');
+const { uploadFile } = require('../storage');
 const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
 const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
 
@@ -53,17 +54,16 @@ function fmtTimeShort(dt) {
   return String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
 }
 
-// ── Multer (file uploads) ──────────────────────────────────────────────
+// ── Multer (memory storage — files uploaded to cloud/local via storage.js) ──
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadsDir),
-  filename: (_req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, unique + path.extname(file.originalname));
-  },
-});
-const upload = multer({ storage, limits: { fileSize: 15 * 1024 * 1024 } });
+function makeFilename(originalname) {
+  return `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalname)}`;
+}
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+
+async function saveFiles(files) {
+  return Promise.all(files.map(f => uploadFile(makeFilename(f.originalname), f.buffer, f.mimetype)));
+}
 
 // ── Analytics summary (must be before /:id) ───────────────────────────
 
@@ -299,7 +299,7 @@ router.post('/', upload.array('files', 10), async (req, res) => {
       submitted_by, status, comment,
     } = req.body;
 
-    const filePaths = req.files ? req.files.map(f => `/uploads/${f.filename}`) : [];
+    const filePaths = req.files?.length ? await saveFiles(req.files) : [];
     const reportStatus = status || 'under_process';
 
     let computedDays = parseFloat(days_at_airport) || null;
@@ -379,14 +379,10 @@ router.put('/:id', upload.array('files', 10), async (req, res) => {
 
     const reportStatus = status || existing.status || 'under_process';
 
-    let filePaths;
-    if (req.files && req.files.length > 0) {
-      const newPaths = req.files.map(f => `/uploads/${f.filename}`);
-      const oldPaths = JSON.parse(existing.file_paths || '[]');
-      filePaths = [...oldPaths, ...newPaths];
-    } else {
-      filePaths = JSON.parse(existing.file_paths || '[]');
-    }
+    const oldPaths = JSON.parse(existing.file_paths || '[]');
+    const filePaths = req.files?.length
+      ? [...oldPaths, ...await saveFiles(req.files)]
+      : oldPaths;
 
     let computedDays = parseFloat(days_at_airport) || null;
     if (!computedDays && prev_datetime) {
@@ -532,7 +528,7 @@ router.post('/:id/files', upload.array('files', 10), async (req, res) => {
     if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
 
     const oldPaths = JSON.parse(rows[0].file_paths || '[]');
-    const newPaths = req.files.map(f => `/uploads/${f.filename}`);
+    const newPaths = await saveFiles(req.files);
     const filePaths = [...oldPaths, ...newPaths];
 
     await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', [JSON.stringify(filePaths), req.params.id]);
