@@ -30,13 +30,15 @@ async function uploadFile(filename, buffer, mimetype) {
   return `/uploads/${filename}`;
 }
 
-// Stream a file from R2 directly to an Express response (avoids CORS redirect issues)
+// Serve a file from R2 directly through the Express response
 async function streamFile(filename, res) {
   if (!USE_R2) return false;
   const response = await s3.send(new presigner.GetObjectCommand({ Bucket: BUCKET, Key: `uploads/${filename}` }));
   if (response.ContentType) res.setHeader('Content-Type', response.ContentType);
   res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
-  response.Body.pipe(res);
+  // transformToByteArray is the SDK v3-safe way (Body.pipe is unreliable with web-stream Body)
+  const bytes = await response.Body.transformToByteArray();
+  res.send(Buffer.from(bytes));
   return true;
 }
 

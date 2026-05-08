@@ -27,8 +27,9 @@ app.get('/api/files/:filename', requireAuth, async (req, res) => {
   if (USE_R2) {
     try {
       await streamFile(filename, res);
-    } catch {
-      res.status(404).json({ error: 'File not found' });
+    } catch (err) {
+      console.error('R2 file fetch error:', err?.message || err);
+      if (!res.headersSent) res.status(404).json({ error: 'File not found' });
     }
     return;
   }
