@@ -565,10 +565,7 @@ router.delete('/:id', async (req, res) => {
 
     try {
       const files = JSON.parse(report.file_paths || '[]');
-      files.forEach(fp => {
-        const full = path.join(__dirname, '..', fp);
-        if (fs.existsSync(full)) fs.unlinkSync(full);
-      });
+      await Promise.all(files.map(fp => deleteFile(fp.split('/').pop()).catch(() => {})));
     } catch (_) {}
 
     await pool.query('DELETE FROM reports WHERE id = $1', [req.params.id]);
