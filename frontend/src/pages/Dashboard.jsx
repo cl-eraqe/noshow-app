@@ -28,6 +28,23 @@ function liveDays(prevDatetime) {
 
 // ── Excel export helpers (Last 24h)
 const EXP_MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+
+function friendlyFilename(report, originalPath, index, total) {
+  const ext     = originalPath.includes('.') ? originalPath.split('.').pop().toLowerCase() : '';
+  const pax     = report.pax_count || 1;
+  const paxType = (report.pax_type || 'PAX').trim();
+  const rawDest = report.new_destination || report.prev_destination || '';
+  const dest    = (rawDest.match(/\(([A-Z]{3})\)/)?.[1] || rawDest).toUpperCase().replace(/[^A-Z0-9]/g, '') || '';
+  const flight  = (report.new_flight || report.prev_flight || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const dt      = report.new_datetime || report.prev_datetime || '';
+  let dayMonth  = '';
+  if (dt) { const d = new Date(dt.replace(' ', 'T')); if (!isNaN(d)) dayMonth = `${d.getDate()} ${EXP_MONTHS[d.getMonth()]}`; }
+  const parts  = [`${pax} PAX`, paxType, dest, flight, dayMonth].filter(Boolean);
+  const base   = parts.join(' - ');
+  const suffix = total > 1 ? ` (${index + 1})` : '';
+  return ext ? `${base}${suffix}.${ext}` : `${base}${suffix}`;
+}
+
 function fmtDayMonth(dt) {
   if (!dt) return '';
   const d = new Date(typeof dt === 'string' ? dt.replace(' ', 'T') : dt);
@@ -1290,23 +1307,24 @@ export default function Dashboard() {
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                   {filePaths.length === 0 && <li style={{ color: '#aaa' }}>No attachments</li>}
                   {filePaths.map((fp, i) => {
-                    const fname = fp.split('/').pop();
+                    const fname     = fp.split('/').pop();
+                    const saveName  = friendlyFilename(quickView.report, fname, i, filePaths.length);
                     return (
                       <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid #2b3a5a', flexWrap: 'wrap' }}>
-                        <span style={{ flex: 1, wordBreak: 'break-all', fontSize: '0.9rem' }}>📄 {fname}</span>
+                        <span style={{ flex: 1, wordBreak: 'break-all', fontSize: '0.9rem' }}>📄 {saveName}</span>
                         <button className="btn btn-sm btn-secondary" onClick={() => {
                           const win = window.open('', '_blank');
                           getFileObjectUrl(fp).then(({ url }) => { win.location.href = url; }).catch(() => { win.close(); alert('Failed to open'); });
                         }}>Open</button>
-                        <button className="btn btn-sm btn-primary" onClick={() => downloadFile(fp, fname).catch(() => alert('Download failed'))}>Download</button>
+                        <button className="btn btn-sm btn-primary" onClick={() => downloadFile(fp, saveName).catch(() => alert('Download failed'))}>Download</button>
                         {navigator.canShare && (
                           <button className="btn btn-sm btn-secondary" onClick={async () => {
                             try {
                               const { url, type } = await getFileObjectUrl(fp);
                               const blob = await (await fetch(url)).blob();
-                              const file = new File([blob], fname, { type: type || blob.type });
-                              if (navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: fname });
-                              else await navigator.share({ title: fname });
+                              const file = new File([blob], saveName, { type: type || blob.type });
+                              if (navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: saveName });
+                              else await navigator.share({ title: saveName });
                             } catch (err) { if (err?.name !== 'AbortError') alert('Share failed'); }
                           }}>Share</button>
                         )}
