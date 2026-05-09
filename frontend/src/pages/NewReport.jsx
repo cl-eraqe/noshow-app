@@ -1,8 +1,52 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
+import imageCompression from 'browser-image-compression';
+import { jsPDF } from 'jspdf';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { getRole } from '../utils/auth';
+
+const IMG_TYPES = /^image\/(jpeg|jpg|png|gif|webp|bmp)$/i;
+
+async function compressImageToPdf(file) {
+  const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 2000, useWebWorker: true });
+  const dataUrl = await imageCompression.getDataUrlFromFile(compressed);
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataUrl; });
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'px', format: [w, h] });
+  pdf.addImage(dataUrl, 'JPEG', 0, 0, w, h);
+  return new File([pdf.output('blob')], file.name.replace(/\.[^.]+$/, '.pdf'), { type: 'application/pdf' });
+}
+
+async function processIncomingFiles(newFiles) {
+  return Promise.all(newFiles.map(f => IMG_TYPES.test(f.type) ? compressImageToPdf(f) : Promise.resolve(f)));
+}
+
+async function mergeAllToPdf(files) {
+  let pdf = null;
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    let dataUrl, w, h;
+    if (IMG_TYPES.test(file.type)) {
+      const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 2000, useWebWorker: true });
+      dataUrl = await imageCompression.getDataUrlFromFile(compressed);
+      const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = dataUrl; });
+      w = img.naturalWidth; h = img.naturalHeight;
+    } else {
+      // For PDFs, render first page via canvas is complex — just skip non-image files in merge
+      continue;
+    }
+    const orientation = w >= h ? 'landscape' : 'portrait';
+    if (!pdf) {
+      pdf = new jsPDF({ orientation, unit: 'px', format: [w, h] });
+    } else {
+      pdf.addPage([w, h], orientation);
+    }
+    pdf.addImage(dataUrl, 'JPEG', 0, 0, w, h);
+  }
+  if (!pdf) return null;
+  return new File([pdf.output('blob')], 'merged.pdf', { type: 'application/pdf' });
+}
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 
@@ -208,6 +252,7 @@ export default function NewReport({ editMode }) {
   });
 
   const [files, setFiles] = useState([]);
+  const [converting, setConverting] = useState(false);
   const [pasteStatus, setPasteStatus] = useState('idle'); // idle | pasting | done | error
   const [existingFiles, setExistingFiles] = useState([]);
   const [prevStatus, setPrevStatus]   = useState('idle');
@@ -227,9 +272,20 @@ export default function NewReport({ editMode }) {
   }, []);
 
   // Pick up files passed in via Web Share Target (?shared=1)
+  async function addFiles(incoming) {
+    if (!incoming.length) return;
+    setConverting(true);
+    try {
+      const processed = await processIncomingFiles(incoming);
+      setFiles(prev => [...prev, ...processed]);
+    } finally {
+      setConverting(false);
+    }
+  }
+
   useEffect(() => {
     if (!location.search.includes('shared=1')) return;
-    readSharedFiles().then(shared => { if (shared.length) setFiles(prev => [...prev, ...shared]); });
+    readSharedFiles().then(shared => { if (shared.length) addFiles(shared); });
   }, [location.search]);
 
   // Global paste listener — catches Cmd/Ctrl+V and iOS long-press-paste anywhere on the page
@@ -246,7 +302,7 @@ export default function NewReport({ editMode }) {
       }
       if (pasted.length) {
         e.preventDefault();
-        setFiles(prev => [...prev, ...pasted]);
+        addFiles(pasted);
         setPasteStatus('done');
         setTimeout(() => setPasteStatus('idle'), 2000);
       }
@@ -270,7 +326,7 @@ export default function NewReport({ editMode }) {
         }
       }
       if (pasted.length) {
-        setFiles(prev => [...prev, ...pasted]);
+        await addFiles(pasted);
         setPasteStatus('done');
       } else {
         setPasteStatus('error');
@@ -695,7 +751,7 @@ export default function NewReport({ editMode }) {
             <label className="field-label">{isEdit ? 'Add More Files' : 'File Attachments'}</label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
               <input type="file" className="field-input" multiple style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
-                onChange={e => setFiles(prev => [...prev, ...Array.from(e.target.files)])} />
+                onChange={e => { addFiles(Array.from(e.target.files)); e.target.value = ''; }} />
               <button
                 type="button"
                 className={`btn btn-sm ${pasteStatus === 'done' ? 'btn-success' : pasteStatus === 'error' ? 'btn-danger' : 'btn-secondary'}`}
@@ -710,16 +766,38 @@ export default function NewReport({ editMode }) {
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 6px' }}>
               Tip: Copy a scan in CamScanner, then tap Paste here — no need to save the file first.
             </p>
+            {converting && (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 8px' }}>
+                ⏳ Converting images to PDF…
+              </p>
+            )}
             {files.length > 0 && (
-              <ul className="file-list">
-                {files.map((f, i) => (
-                  <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ flex: 1 }}>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
-                    <button type="button" className="btn btn-xs btn-danger"
-                      onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}>✕</button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="file-list">
+                  {files.map((f, i) => (
+                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ flex: 1 }}>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
+                      <button type="button" className="btn btn-xs btn-danger"
+                        onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                    </li>
+                  ))}
+                </ul>
+                {files.filter(f => IMG_TYPES.test(f.type)).length >= 2 && (
+                  <button type="button" className="btn btn-sm btn-secondary" style={{ marginTop: 8 }}
+                    disabled={converting}
+                    onClick={async () => {
+                      setConverting(true);
+                      try {
+                        const merged = await mergeAllToPdf(files.filter(f => IMG_TYPES.test(f.type)));
+                        if (merged) {
+                          setFiles(prev => [...prev.filter(f => !IMG_TYPES.test(f.type)), merged]);
+                        }
+                      } finally { setConverting(false); }
+                    }}>
+                    🗂 Merge images into one PDF
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
