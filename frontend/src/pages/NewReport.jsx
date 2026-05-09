@@ -18,34 +18,31 @@ async function compressImageToPdf(file) {
   return new File([pdf.output('blob')], file.name.replace(/\.[^.]+$/, '.pdf'), { type: 'application/pdf' });
 }
 
-async function processIncomingFiles(newFiles) {
-  return Promise.all(newFiles.map(f => IMG_TYPES.test(f.type) ? compressImageToPdf(f) : Promise.resolve(f)));
-}
-
-async function mergeAllToPdf(files) {
+async function mergeImagesToPdf(imageFiles) {
   let pdf = null;
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    let dataUrl, w, h;
-    if (IMG_TYPES.test(file.type)) {
-      const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 2000, useWebWorker: true });
-      dataUrl = await imageCompression.getDataUrlFromFile(compressed);
-      const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = dataUrl; });
-      w = img.naturalWidth; h = img.naturalHeight;
-    } else {
-      // For PDFs, render first page via canvas is complex — just skip non-image files in merge
-      continue;
-    }
+  for (const file of imageFiles) {
+    const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 2000, useWebWorker: true });
+    const dataUrl = await imageCompression.getDataUrlFromFile(compressed);
+    const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = dataUrl; });
+    const w = img.naturalWidth, h = img.naturalHeight;
     const orientation = w >= h ? 'landscape' : 'portrait';
-    if (!pdf) {
-      pdf = new jsPDF({ orientation, unit: 'px', format: [w, h] });
-    } else {
-      pdf.addPage([w, h], orientation);
-    }
+    if (!pdf) { pdf = new jsPDF({ orientation, unit: 'px', format: [w, h] }); }
+    else { pdf.addPage([w, h], orientation); }
     pdf.addImage(dataUrl, 'JPEG', 0, 0, w, h);
   }
-  if (!pdf) return null;
-  return new File([pdf.output('blob')], 'merged.pdf', { type: 'application/pdf' });
+  return pdf ? new File([pdf.output('blob')], 'merged.pdf', { type: 'application/pdf' }) : null;
+}
+
+// Prepare files for upload: convert images to PDF (merged or individual)
+async function prepareFilesForUpload(files, merge) {
+  const images = files.filter(f => IMG_TYPES.test(f.type));
+  const pdfs   = files.filter(f => !IMG_TYPES.test(f.type));
+  if (images.length === 0) return files;
+  if (merge && images.length >= 2) {
+    const merged = await mergeImagesToPdf(images);
+    return merged ? [...pdfs, merged] : [...pdfs, ...await Promise.all(images.map(compressImageToPdf))];
+  }
+  return [...pdfs, ...await Promise.all(images.map(compressImageToPdf))];
 }
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
@@ -252,6 +249,7 @@ export default function NewReport({ editMode }) {
   });
 
   const [files, setFiles] = useState([]);
+  const [mergeImages, setMergeImages] = useState(false);
   const [converting, setConverting] = useState(false);
   const [pasteStatus, setPasteStatus] = useState('idle'); // idle | pasting | done | error
   const [existingFiles, setExistingFiles] = useState([]);
@@ -272,15 +270,9 @@ export default function NewReport({ editMode }) {
   }, []);
 
   // Pick up files passed in via Web Share Target (?shared=1)
-  async function addFiles(incoming) {
+  function addFiles(incoming) {
     if (!incoming.length) return;
-    setConverting(true);
-    try {
-      const processed = await processIncomingFiles(incoming);
-      setFiles(prev => [...prev, ...processed]);
-    } finally {
-      setConverting(false);
-    }
+    setFiles(prev => [...prev, ...incoming]);
   }
 
   useEffect(() => {
@@ -451,7 +443,9 @@ export default function NewReport({ editMode }) {
         fd.append('new_airline', form.new_airline || '');
         fd.append('days_at_airport', daysAtAirport);
       }
-      files.forEach(f => fd.append('files', f));
+      const hasImages = files.some(f => IMG_TYPES.test(f.type));
+      const uploadFiles = hasImages ? await (setConverting(true), prepareFilesForUpload(files, mergeImages).finally(() => setConverting(false))) : files;
+      uploadFiles.forEach(f => fd.append('files', f));
 
       let report;
       if (isEdit) {
@@ -766,35 +760,28 @@ export default function NewReport({ editMode }) {
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 6px' }}>
               Tip: Copy a scan in CamScanner, then tap Paste here — no need to save the file first.
             </p>
-            {converting && (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 8px' }}>
-                ⏳ Converting images to PDF…
-              </p>
-            )}
             {files.length > 0 && (
               <>
                 <ul className="file-list">
                   {files.map((f, i) => (
                     <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ flex: 1 }}>{f.name} ({(f.size / 1024).toFixed(1)} KB)</span>
+                      <span style={{ flex: 1 }}>
+                        {IMG_TYPES.test(f.type) ? '📷' : '📄'} {f.name}
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: 4 }}>
+                          ({(f.size / 1024).toFixed(0)} KB{IMG_TYPES.test(f.type) ? ' → PDF' : ''})
+                        </span>
+                      </span>
                       <button type="button" className="btn btn-xs btn-danger"
                         onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}>✕</button>
                     </li>
                   ))}
                 </ul>
                 {files.filter(f => IMG_TYPES.test(f.type)).length >= 2 && (
-                  <button type="button" className="btn btn-sm btn-secondary" style={{ marginTop: 8 }}
-                    disabled={converting}
-                    onClick={async () => {
-                      setConverting(true);
-                      try {
-                        const merged = await mergeAllToPdf(files.filter(f => IMG_TYPES.test(f.type)));
-                        if (merged) {
-                          setFiles(prev => [...prev.filter(f => !IMG_TYPES.test(f.type)), merged]);
-                        }
-                      } finally { setConverting(false); }
-                    }}>
-                    🗂 Merge images into one PDF
+                  <button type="button"
+                    className={`btn btn-sm ${mergeImages ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ marginTop: 8 }}
+                    onClick={() => setMergeImages(m => !m)}>
+                    🗂 {mergeImages ? 'Merge ON — all photos → one PDF ✓' : 'Merge photos into one PDF'}
                   </button>
                 )}
               </>
@@ -808,8 +795,8 @@ export default function NewReport({ editMode }) {
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/dashboard')}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? 'Saving…' : (isEdit ? 'Save Changes' : 'Submit Report')}
+          <button type="submit" className="btn btn-primary" disabled={submitting || converting}>
+            {converting ? 'Converting…' : submitting ? 'Saving…' : (isEdit ? 'Save Changes' : 'Submit Report')}
           </button>
         </div>
       </form>
