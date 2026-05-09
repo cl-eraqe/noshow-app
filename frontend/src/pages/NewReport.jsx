@@ -7,28 +7,43 @@ import SearchableSelect from '../components/SearchableSelect';
 import { getRole } from '../utils/auth';
 
 const IMG_TYPES = /^image\/(jpeg|jpg|png|gif|webp|bmp)$/i;
+const A4 = { w: 210, h: 297 }; // mm
+
+function imageToA4DataUrl(img) {
+  // Fit image into A4 preserving aspect ratio, render on canvas, return compressed JPEG dataUrl
+  const landscape = img.naturalWidth > img.naturalHeight;
+  const pageW = landscape ? A4.h : A4.w;
+  const pageH = landscape ? A4.w : A4.h;
+  const scale = Math.min((pageW * 3.7795) / img.naturalWidth, (pageH * 3.7795) / img.naturalHeight); // mm→px at 96dpi
+  const cw = Math.round(img.naturalWidth * scale);
+  const ch = Math.round(img.naturalHeight * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = cw; canvas.height = ch;
+  canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+  return { dataUrl: canvas.toDataURL('image/jpeg', 0.75), pageW, pageH, cw, ch };
+}
 
 async function compressImageToPdf(file) {
-  const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 2000, useWebWorker: true });
+  const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 2480, useWebWorker: true });
   const dataUrl = await imageCompression.getDataUrlFromFile(compressed);
   const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataUrl; });
-  const w = img.naturalWidth, h = img.naturalHeight;
-  const pdf = new jsPDF({ orientation: w >= h ? 'landscape' : 'portrait', unit: 'px', format: [w, h] });
-  pdf.addImage(dataUrl, 'JPEG', 0, 0, w, h);
+  const { dataUrl: jpegUrl, pageW, pageH } = imageToA4DataUrl(img);
+  const pdf = new jsPDF({ orientation: pageW > pageH ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  pdf.addImage(jpegUrl, 'JPEG', 0, 0, pageW, pageH);
   return new File([pdf.output('blob')], file.name.replace(/\.[^.]+$/, '.pdf'), { type: 'application/pdf' });
 }
 
 async function mergeImagesToPdf(imageFiles) {
   let pdf = null;
   for (const file of imageFiles) {
-    const compressed = await imageCompression(file, { maxSizeMB: 0.8, maxWidthOrHeight: 2000, useWebWorker: true });
+    const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 2480, useWebWorker: true });
     const dataUrl = await imageCompression.getDataUrlFromFile(compressed);
     const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = dataUrl; });
-    const w = img.naturalWidth, h = img.naturalHeight;
-    const orientation = w >= h ? 'landscape' : 'portrait';
-    if (!pdf) { pdf = new jsPDF({ orientation, unit: 'px', format: [w, h] }); }
-    else { pdf.addPage([w, h], orientation); }
-    pdf.addImage(dataUrl, 'JPEG', 0, 0, w, h);
+    const { dataUrl: jpegUrl, pageW, pageH } = imageToA4DataUrl(img);
+    const orientation = pageW > pageH ? 'landscape' : 'portrait';
+    if (!pdf) { pdf = new jsPDF({ orientation, unit: 'mm', format: 'a4' }); }
+    else { pdf.addPage('a4', orientation); }
+    pdf.addImage(jpegUrl, 'JPEG', 0, 0, pageW, pageH);
   }
   return pdf ? new File([pdf.output('blob')], 'merged.pdf', { type: 'application/pdf' }) : null;
 }
