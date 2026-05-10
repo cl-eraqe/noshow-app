@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>دليل المستخدم — تطبيق No-Show | JEDCO</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+    background: #f5f6fa;
+    color: #1a2233;
+    font-size: 14px;
+    line-height: 1.9;
+  }
+
+  .page {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+  }
+
+  /* Cover */
+  .cover {
+    background: linear-gradient(135deg, #0f1a2e 0%, #1a2f52 60%, #1e3a6e 100%);
+    color: white;
+    padding: 80px 60px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    page-break-after: always;
+  }
+
+  .cover-logo {
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .cover-sub {
+    font-size: 16px;
+    color: #a0b4d0;
+    margin-bottom: 60px;
+    letter-spacing: 1px;
+  }
+
+  .cover-title {
+    font-size: 36px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 16px;
+    line-height: 1.4;
+  }
+
+  .cover-subtitle {
+    font-size: 18px;
+    color: #7eb3e0;
+    margin-bottom: 60px;
+  }
+
+  .cover-divider {
+    width: 80px;
+    height: 4px;
+    background: #3b82f6;
+    border-radius: 2px;
+    margin: 0 auto 60px;
+  }
+
+  .cover-meta {
+    font-size: 13px;
+    color: #6b8aad;
+  }
+
+  /* TOC */
+  .toc-page {
+    padding: 60px 60px;
+    min-height: 60vh;
+    page-break-after: always;
+  }
+
+  .toc-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f1a2e;
+    margin-bottom: 32px;
+    padding-bottom: 12px;
+    border-bottom: 3px solid #3b82f6;
+  }
+
+  .toc-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px dashed #e0e6f0;
+    font-size: 15px;
+  }
+
+  .toc-item:last-child { border-bottom: none; }
+
+  .toc-chapter {
+    font-weight: 700;
+    color: #1a2f52;
+  }
+
+  .toc-num {
+    background: #3b82f6;
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Chapter */
+  .chapter {
+    padding: 60px 60px 40px;
+    page-break-before: always;
+  }
+
+  .chapter-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid #3b82f6;
+  }
+
+  .chapter-num {
+    background: #0f1a2e;
+    color: white;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 900;
+    flex-shrink: 0;
+  }
+
+  .chapter-title {
+    font-size: 26px;
+    font-weight: 900;
+    color: #0f1a2e;
+  }
+
+  h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #1a2f52;
+    margin: 28px 0 12px;
+    padding-right: 12px;
+    border-right: 4px solid #3b82f6;
+  }
+
+  p {
+    margin-bottom: 12px;
+    color: #2d3a4a;
+  }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 13.5px;
+  }
+
+  th {
+    background: #0f1a2e;
+    color: white;
+    padding: 10px 14px;
+    text-align: right;
+    font-weight: 700;
+  }
+
+  td {
+    padding: 9px 14px;
+    border-bottom: 1px solid #e8edf5;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: #f7f9fc; }
+
+  /* Info box */
+  .info-box {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-size: 13.5px;
+    color: #1e3a6e;
+  }
+
+  .info-box.warning {
+    background: #fff7ed;
+    border-color: #fed7aa;
+    color: #7c2d12;
+  }
+
+  .info-box.success {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+    color: #14532d;
+  }
+
+  /* Steps */
+  .steps { margin: 16px 0; }
+
+  .step {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin-bottom: 14px;
+  }
+
+  .step-num {
+    background: #3b82f6;
+    color: white;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .step-text { flex: 1; }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 0 2px;
+  }
+
+  .badge-blue { background: #dbeafe; color: #1e40af; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-orange { background: #fed7aa; color: #9a3412; }
+  .badge-gray { background: #f1f5f9; color: #475569; }
+  .badge-red { background: #fee2e2; color: #991b1b; }
+  .badge-dark { background: #0f1a2e; color: white; }
+
+  /* Field label */
+  .field-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+    align-items: flex-start;
+  }
+
+  .field-num {
+    font-weight: 700;
+    color: #3b82f6;
+    min-width: 24px;
+  }
+
+  ul {
+    padding-right: 20px;
+    margin: 8px 0 16px;
+  }
+
+  ul li { margin-bottom: 6px; }
+
+  /* Print */
+  @media print {
+    body { background: white; }
+    .page { max-width: 100%; }
+    .chapter { page-break-before: always; }
+    .cover { page-break-after: always; min-height: auto; padding: 60px 40px; }
+    @page { margin: 0; size: A4; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="cover-logo">JEDCO</div>
+    <div class="cover-sub">Jeddah Airports Company</div>
+    <div class="cover-divider"></div>
+    <div class="cover-title">دليل المستخدم<br>تطبيق No-Show</div>
+    <div class="cover-subtitle">إدارة حالات المسافرين الغائبين<br>مطار الملك عبدالعزيز الدولي — جدة</div>
+    <div class="cover-divider"></div>
+    <div class="cover-meta">الإصدار 1.0 &nbsp;|&nbsp; 2026</div>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc-page">
+    <div class="toc-title">المحتويات</div>
+    <div class="toc-item">
+      <span class="toc-chapter">البداية — التثبيت والدخول وصلاحيات المستخدم</span>
+      <span class="toc-num">١</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-chapter">لوحة التحكم — عرض الحالات والمتابعة اليومية</span>
+      <span class="toc-num">٢</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-chapter">إنشاء تقرير جديد وإدارة المرفقات</span>
+      <span class="toc-num">٣</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-chapter">متابعة الحالات — تأكيد الرحلة والإغلاق</span>
+      <span class="toc-num">٤</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-chapter">تسليم الوردية وملخص الشيفت</span>
+      <span class="toc-num">٥</span>
+    </div>
+  </div>
+
+  <!-- CHAPTER 1 -->
+  <div class="chapter">
+    <div class="chapter-header">
+      <div class="chapter-num">١</div>
+      <div class="chapter-title">البداية — التثبيت والدخول وصلاحيات المستخدم</div>
+    </div>
+
+    <h3>تثبيت التطبيق على الجهاز</h3>
+    <p>التطبيق يعمل عبر المتصفح مباشرةً ويدعم التثبيت على الشاشة الرئيسية كتطبيق مستقل دون الحاجة لمتجر التطبيقات.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">١</div>
+        <div class="step-text">افتح التطبيق في متصفح <strong>Safari</strong> على iPhone.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">٢</div>
+        <div class="step-text">اضغط على زر المشاركة <strong>□↑</strong> في أسفل الشاشة.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">٣</div>
+        <div class="step-text">اختر <strong>Add to Home Screen</strong> من القائمة.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">٤</div>
+        <div class="step-text">تأكد أن خيار <strong>Open as Web App</strong> مفعّل ثم اضغط <strong>Add</strong>.</div>
+      </div>
+    </div>
+
+    <div class="info-box success">
+      بعد التثبيت يظهر أيقونة التطبيق <strong>N</strong> على الشاشة الرئيسية ويفتح بشاشة كاملة بدون شريط المتصفح — تماماً كالتطبيقات العادية.
+    </div>
+
+    <h3>الدخول إلى التطبيق</h3>
+    <p>عند فتح التطبيق تظهر شاشة تسجيل الدخول. أدخل رمز PIN المخصص لك واضغط تأكيد.</p>
+
+    <div class="info-box warning">
+      لا تشارك رمز PIN الخاص بك مع أحد. كل إجراء يتم تسجيله في النظام باسم المستخدم المرتبط بالرمز.
+    </div>
+
+    <h3>صلاحيات المستخدمين</h3>
+    <p>يحدد رمز PIN صلاحية المستخدم تلقائياً عند الدخول:</p>
+
+    <table>
+      <tr>
+        <th>الصلاحية</th>
+        <th>ما يستطيع فعله</th>
+      </tr>
+      <tr>
+        <td><span class="badge badge-gray">Staff — موظف</span></td>
+        <td>رفع التقارير، متابعة الحالات، إنشاء نص واتساب، تسليم الوردية</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-dark">Supervisor — مشرف</span></td>
+        <td>جميع صلاحيات الموظف + حذف التقارير والمرفقات + تصدير Excel + إدارة الوصول</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- CHAPTER 2 -->
+  <div class="chapter">
+    <div class="chapter-header">
+      <div class="chapter-num">٢</div>
+      <div class="chapter-title">لوحة التحكم — عرض الحالات والمتابعة اليومية</div>
+    </div>
+
+    <h3>نظرة عامة</h3>
+    <p>لوحة التحكم هي الشاشة الرئيسية بعد الدخول. تعرض جميع حالات الـ No-Show المسجلة مقسّمةً على ثلاث تبويبات:</p>
+
+    <table>
+      <tr>
+        <th>التبويب</th>
+        <th>اللون</th>
+        <th>المعنى</th>
+      </tr>
+      <tr>
+        <td><strong>Under Process</strong></td>
+        <td><span class="badge badge-orange">برتقالي</span></td>
+        <td>حالات جارية لم تُحل بعد</td>
+      </tr>
+      <tr>
+        <td><strong>Flight Confirmed</strong></td>
+        <td><span class="badge badge-green">أخضر</span></td>
+        <td>تم تأكيد رحلة بديلة للمسافر</td>
+      </tr>
+      <tr>
+        <td><strong>Closed</strong></td>
+        <td><span class="badge badge-gray">رمادي</span></td>
+        <td>الحالة مغلقة — المسافر غادر أو انتهت الحالة</td>
+      </tr>
+    </table>
+
+    <p>كل تبويب يعرض عداد الحالات وإجمالي عدد المسافرين (pax) بشكل فوري.</p>
+
+    <h3>البحث والفلترة</h3>
+    <table>
+      <tr>
+        <th>الأداة</th>
+        <th>الوظيفة</th>
+      </tr>
+      <tr>
+        <td>Search reports…</td>
+        <td>بحث نصي في رقم الرحلة أو الجنسية أو الوجهة</td>
+      </tr>
+      <tr>
+        <td>All Airlines</td>
+        <td>فلترة الحالات حسب الناقل الجوي</td>
+      </tr>
+      <tr>
+        <td>Refresh</td>
+        <td>تحديث البيانات يدوياً</td>
+      </tr>
+    </table>
+
+    <h3>بطاقة التقرير</h3>
+    <p>كل حالة تظهر كبطاقة تحتوي:</p>
+
+    <table>
+      <tr>
+        <th>العنصر</th>
+        <th>الوصف</th>
+      </tr>
+      <tr>
+        <td><strong>#133</strong></td>
+        <td>رقم التقرير التسلسلي</td>
+      </tr>
+      <tr>
+        <td>💬</td>
+        <td>يوجد تعليق — اضغط لعرضه ومشاركته</td>
+      </tr>
+      <tr>
+        <td>📎</td>
+        <td>يوجد مرفقات — اضغط لعرضها وتنزيلها أو مشاركتها</td>
+      </tr>
+      <tr>
+        <td>Prev Flight</td>
+        <td>رقم الرحلة السابقة الفائتة</td>
+      </tr>
+      <tr>
+        <td>Destination</td>
+        <td>وجهة الرحلة السابقة</td>
+      </tr>
+      <tr>
+        <td>Nationality</td>
+        <td>جنسية المسافر</td>
+      </tr>
+      <tr>
+        <td>Pax Type</td>
+        <td>نوع المسافر (عمرة، ترانزيت، إلخ)</td>
+      </tr>
+      <tr>
+        <td>Pax</td>
+        <td>عدد المسافرين — قابل للتعديل بالضغط عليه مباشرةً</td>
+      </tr>
+      <tr>
+        <td>Days</td>
+        <td>عدد الأيام منذ تسجيل الحالة — يُحسب تلقائياً</td>
+      </tr>
+    </table>
+
+    <h3>ألوان البطاقات ومؤشرات التنبيه</h3>
+
+    <table>
+      <tr>
+        <th>اللون</th>
+        <th>المعنى</th>
+      </tr>
+      <tr>
+        <td><span class="badge badge-gray">أبيض</span></td>
+        <td>حالة طبيعية لا تستوجب تنبيهاً</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-orange">برتقالي فاتح</span></td>
+        <td>رحلة بديلة مؤكدة وموعد إقلاعها قريب</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-red">وردي / أحمر فاتح</span></td>
+        <td>المسافر أمضى يوماً كاملاً أو أكثر في المطار — يستوجب متابعة عاجلة</td>
+      </tr>
+    </table>
+
+    <p>مؤشر الأيام يتحول للون <span class="badge badge-red">أحمر</span> تلقائياً عند تجاوز يوم كامل.</p>
+
+    <div class="info-box">
+      🚌 <strong>مؤشر الباص:</strong> يظهر تلقائياً على البطاقة عندما تنطلق الرحلة البديلة من صالة الحج أو المحطة الشمالية — تذكير بضرورة ترتيب نقل المسافر.
+    </div>
+
+    <h3>عرض التعليقات والمرفقات السريع</h3>
+    <p>اضغط مباشرةً على أيقونة 💬 أو 📎 في أي بطاقة لفتح نافذة سريعة دون الحاجة لفتح التقرير كاملاً.</p>
+
+    <table>
+      <tr>
+        <th>النافذة</th>
+        <th>المحتوى والخيارات</th>
+      </tr>
+      <tr>
+        <td>💬 التعليق</td>
+        <td>عرض نص التعليق كاملاً + زر <strong>Share</strong> لمشاركته</td>
+      </tr>
+      <tr>
+        <td>📎 المرفقات</td>
+        <td>قائمة الملفات مع خيارات: <strong>Open</strong> / <strong>Download</strong> / <strong>Share</strong> / <strong>Delete</strong> (للمشرف)</td>
+      </tr>
+    </table>
+
+    <p>إذا كان التقرير يحتوي تعليقاً ومرفقات معاً تظهر تبويبتان للتنقل بينهما في نفس النافذة.</p>
+
+    <h3>أزرار الإجراءات السريعة</h3>
+
+    <table>
+      <tr>
+        <th>الزر</th>
+        <th>الوظيفة</th>
+        <th>من يراه</th>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">✈ Confirm</span></td>
+        <td>تأكيد رحلة بديلة للمسافر</td>
+        <td>الجميع</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-gray">Dup</span></td>
+        <td>نسخ التقرير كحالة مكررة</td>
+        <td>الجميع</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-green">WA</span></td>
+        <td>نسخ نص جاهز للإرسال عبر واتساب</td>
+        <td>الجميع</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-blue">Nusuk?</span></td>
+        <td>تأكيد إشعار نظام نسك (لمسافري العمرة)</td>
+        <td>الجميع</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-gray">✓ Close</span></td>
+        <td>إغلاق الحالة يدوياً</td>
+        <td>الجميع</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-red">Del</span></td>
+        <td>حذف التقرير نهائياً</td>
+        <td>المشرف فقط</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- CHAPTER 3 -->
+  <div class="chapter">
+    <div class="chapter-header">
+      <div class="chapter-num">٣</div>
+      <div class="chapter-title">إنشاء تقرير جديد وإدارة المرفقات</div>
+    </div>
+
+    <h3>بدء التقرير</h3>
+    <p>اضغط <strong>+ New Report</strong> من القائمة العلوية. تنقسم الاستمارة إلى أقسام متسلسلة:</p>
+
+    <h3>القسم الأول — التعريف (Identification)</h3>
+    <div class="field-row">
+      <div class="field-num">١.</div>
+      <div><strong>تاريخ ووقت التعرف على المسافر</strong> — اضغط الحقل لفتح التقويم، اختر التاريخ والوقت ثم اضغط ✓.</div>
+    </div>
+
+    <h3>القسم الثاني — الرحلة السابقة (Previous Flight)</h3>
+    <div class="field-row">
+      <div class="field-num">٢.</div>
+      <div><strong>رقم الرحلة السابقة</strong> — اكتب الرقم (مثال: SV309) ثم اضغط <strong>Look up</strong>. عند العثور عليها يظهر <span class="badge badge-green">✓ Found</span> وتتعبأ بيانات المحطة تلقائياً.</div>
+    </div>
+    <div class="field-row">
+      <div class="field-num">٣.</div>
+      <div><strong>تاريخ ووقت الرحلة</strong> — يتعبأ تلقائياً عند البحث.</div>
+    </div>
+    <div class="field-row">
+      <div class="field-num">٤.</div>
+      <div><strong>الوجهة السابقة</strong> — قائمة بحث بجميع المطارات.</div>
+    </div>
+    <div class="field-row">
+      <div class="field-num">٥.</div>
+      <div><strong>الناقل الجوي</strong> — يتعبأ تلقائياً أو يمكن تعديله يدوياً.</div>
+    </div>
+
+    <h3>القسم الثالث — بيانات المسافر (Passenger Details)</h3>
+    <div class="field-row">
+      <div class="field-num">٦.</div>
+      <div><strong>الجنسية</strong> — قائمة بحث بجميع الجنسيات.</div>
+    </div>
+    <div class="field-row">
+      <div class="field-num">٧.</div>
+      <div><strong>نوع المسافر</strong> — اختر من القائمة:</div>
+    </div>
+
+    <table>
+      <tr>
+        <th>النوع</th>
+        <th>الوصف</th>
+      </tr>
+      <tr><td>Umrah</td><td>مسافر عمرة</td></tr>
+      <tr><td>Hajj Group</td><td>مجموعة حج</td></tr>
+      <tr><td>Tourist</td><td>سياحي</td></tr>
+      <tr><td>Resident</td><td>مقيم</td></tr>
+      <tr><td>Transit</td><td>عبور</td></tr>
+      <tr><td>Transit Visa 3-day</td><td>عبور بتأشيرة 3 أيام</td></tr>
+      <tr><td>Family Visit</td><td>زيارة عائلية</td></tr>
+      <tr><td>Final Exit</td><td>خروج نهائي</td></tr>
+    </table>
+
+    <div class="field-row">
+      <div class="field-num">١٣.</div>
+      <div><strong>عدد المسافرين</strong> — رقم.</div>
+    </div>
+
+    <h3>القسم الرابع — الحالة (Status)</h3>
+    <p>اختر الحالة الابتدائية للتقرير:</p>
+    <ul>
+      <li><span class="badge badge-orange">Under Process</span> — الحالة قيد المعالجة (الافتراضي)</li>
+      <li><span class="badge badge-green">Flight Confirmed</span> — تم تأكيد رحلة بديلة</li>
+      <li><span class="badge badge-gray">Closed</span> — الحالة مغلقة</li>
+    </ul>
+
+    <h3>القسم الخامس — ملاحظات (Comment)</h3>
+    <p>حقل نصي حر لأي ملاحظات إضافية مثل: "المسافر يحتاج مساعدة في تسجيل الدخول" أو "ترانزيت JED-NBO-BJM".</p>
+
+    <h3>القسم السادس — المرفقات (Attachments)</h3>
+    <p>لإرفاق وثائق المسافر (جواز السفر، التذاكر، إلخ) يوجد ثلاث طرق:</p>
+
+    <table>
+      <tr>
+        <th>الطريقة</th>
+        <th>الاستخدام</th>
+      </tr>
+      <tr>
+        <td><strong>Choose Files</strong></td>
+        <td>اختيار ملفات أو صور من معرض الجهاز</td>
+      </tr>
+      <tr>
+        <td><strong>📋 Paste</strong></td>
+        <td>لصق صورة أو PDF منسوخ من CamScanner أو أي مصدر آخر</td>
+      </tr>
+      <tr>
+        <td><strong>لصق عالمي</strong></td>
+        <td>انسخ الصورة ثم اضغط أي مكان في الصفحة (Ctrl+V أو الضغط المطول)</td>
+      </tr>
+    </table>
+
+    <div class="info-box success">
+      <strong>تحويل تلقائي للصور:</strong> أي صورة يتم اختيارها (JPG، PNG، إلخ) تُحوَّل تلقائياً إلى ملف PDF بحجم A4 مضغوط عند الرفع — لا حاجة لأي خطوة إضافية.
+    </div>
+
+    <h3>دمج الصور في ملف PDF واحد</h3>
+    <p>عند اختيار صورتين أو أكثر يظهر زر:</p>
+    <p style="text-align:center; margin: 12px 0;">
+      <span class="badge badge-gray" style="font-size:14px; padding: 8px 16px;">🗂 Merge photos into one PDF</span>
+    </p>
+    <p>اضغطه لتفعيل الدمج — يتحول لـ <strong>"Merge ON — all photos → one PDF ✓"</strong> (باللون الداكن). عند الإرسال تُدمج جميع الصور في ملف PDF واحد متعدد الصفحات.</p>
+
+    <div class="info-box">
+      الحد الأقصى لحجم كل ملف: <strong>20 MB</strong>. الملفات تُخزَّن بشكل آمن في السحابة وتُحذف تلقائياً عند إغلاق الحالة.
+    </div>
+
+    <h3>إرسال التقرير</h3>
+    <p>بعد تعبئة جميع الحقول المطلوبة اضغط <strong>Submit Report</strong>. إذا كانت هناك صور يظهر الزر <strong>"Converting…"</strong> أثناء التحويل ثم يُرسل التقرير تلقائياً.</p>
+  </div>
+
+  <!-- CHAPTER 4 -->
+  <div class="chapter">
+    <div class="chapter-header">
+      <div class="chapter-num">٤</div>
+      <div class="chapter-title">متابعة الحالات — تأكيد الرحلة والإغلاق</div>
+    </div>
+
+    <h3>تأكيد رحلة بديلة</h3>
+    <p>من لوحة التحكم اضغط <span class="badge badge-green">✈ Confirm</span> على أي تقرير لفتح نافذة تأكيد الرحلة.</p>
+
+    <p>تعرض النافذة ملخص الحالة تلقائياً:</p>
+    <div class="info-box">
+      <strong>مثال:</strong> 1× Umrah (Egyptian) &nbsp;|&nbsp; Previous: SV309 → Cairo (CAI)
+    </div>
+
+    <p>أدخل بيانات الرحلة الجديدة:</p>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">١</div>
+        <div class="step-text">اكتب <strong>رقم الرحلة الجديدة</strong> واضغط <strong>Look up</strong> — يتعبأ التاريخ والوجهة تلقائياً.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">٢</div>
+        <div class="step-text">تحقق من <strong>التاريخ والوقت</strong> والوجهة.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">٣</div>
+        <div class="step-text">اضغط <strong>Confirm Flight</strong> — ينتقل التقرير تلقائياً لتبويب <span class="badge badge-green">Flight Confirmed</span>.</div>
+      </div>
+    </div>
+
+    <h3>إشعار نسك (للمسافرين من نوع Umrah)</h3>
+    <p>عند تأكيد رحلة لمسافر عمرة يظهر زر <span class="badge badge-blue">Nusuk?</span> على بطاقة التقرير. اضغطه بعد إرسال الإشعار لنظام نسك لتسجيله في السجل.</p>
+
+    <div class="info-box warning">
+      إشعار نسك مطلوب عندما تكون الرحلة الجديدة بعد 24 ساعة أو أكثر من الآن.
+    </div>
+
+    <h3>إغلاق الحالة</h3>
+    <p>يوجد طريقتان لإغلاق الحالة:</p>
+
+    <table>
+      <tr>
+        <th>الطريقة</th>
+        <th>آلية العمل</th>
+      </tr>
+      <tr>
+        <td><strong>يدوي</strong></td>
+        <td>اضغط <span class="badge badge-gray">✓ Close</span> على البطاقة بعد تأكد مغادرة المسافر</td>
+      </tr>
+      <tr>
+        <td><strong>تلقائي</strong></td>
+        <td>النظام يغلق الحالة تلقائياً بعد موعد إقلاع الرحلة الجديدة دون تدخل</td>
+      </tr>
+    </table>
+
+    <div class="info-box success">
+      عند إغلاق الحالة تُحذف جميع المرفقات المرتبطة بها تلقائياً من التخزين السحابي.
+    </div>
+
+    <h3>تحرير التقرير</h3>
+    <p>اضغط على أي بطاقة تقرير لفتحها وتعديل بياناتها أو إضافة مرفقات جديدة أو تغيير الحالة.</p>
+
+    <h3>نسخ التقرير (Duplicate)</h3>
+    <p>اضغط <span class="badge badge-gray">Dup</span> لنسخ التقرير الحالي كحالة جديدة — مفيد عند وجود عدة مسافرين بنفس بيانات الرحلة.</p>
+
+    <h3>مشاركة بيانات المسافر عبر الواتساب</h3>
+    <p>اضغط <span class="badge badge-green">WA</span> لنسخ نص جاهز يحتوي جميع بيانات الحالة بتنسيق مناسب للإرسال عبر الواتساب أو أي قناة تواصل أخرى.</p>
+  </div>
+
+  <!-- CHAPTER 5 -->
+  <div class="chapter">
+    <div class="chapter-header">
+      <div class="chapter-num">٥</div>
+      <div class="chapter-title">تسليم الوردية وملخص الشيفت</div>
+    </div>
+
+    <h3>تقرير تسليم الوردية (Handover)</h3>
+    <p>اضغط <strong>Handover</strong> من القائمة العلوية لفتح نافذة التسليم.</p>
+
+    <p>اختر الوردية المناسبة:</p>
+    <table>
+      <tr>
+        <th>الوردية</th>
+        <th>التوقيت</th>
+      </tr>
+      <tr>
+        <td><strong>A → B</strong></td>
+        <td>06:00 — 14:00</td>
+      </tr>
+      <tr>
+        <td><strong>B → C</strong></td>
+        <td>14:00 — 22:00</td>
+      </tr>
+      <tr>
+        <td><strong>C → A</strong></td>
+        <td>22:00 — 06:00</td>
+      </tr>
+    </table>
+
+    <div class="info-box">
+      التطبيق يختار الوردية الصحيحة تلقائياً بناءً على الوقت الحالي بتوقيت جدة.
+    </div>
+
+    <h3>محتوى تقرير التسليم</h3>
+    <p>يتولد التقرير تلقائياً ويشمل قسمين رئيسيين:</p>
+
+    <table>
+      <tr>
+        <th>القسم</th>
+        <th>المحتوى</th>
+      </tr>
+      <tr>
+        <td>🚌 <strong>BUS TRANSFER NEEDED</strong></td>
+        <td>قائمة المسافرين الذين يحتاجون باصاً للمحطة (الحج أو الشمالية)</td>
+      </tr>
+      <tr>
+        <td>📋 <strong>FOLLOW UP SV</strong></td>
+        <td>جميع الحالات المفتوحة مع تفاصيل الرحلة البديلة والتعليقات</td>
+      </tr>
+    </table>
+
+    <h3>ملاحظات الوردية</h3>
+    <p>في أسفل النافذة حقل نصي لإضافة أي ملاحظات تريد إيصالها للوردية القادمة.</p>
+    <div class="info-box">
+      <strong>مثال:</strong> "EgyptAir counter closes at 22:00, remind pax to check-in early."
+    </div>
+
+    <p>بعد إضافة الملاحظات اضغط <strong>Copy for WhatsApp</strong> لنسخ التقرير كاملاً وإرساله.</p>
+
+    <h3>ملخص الشيفت (Shift Summary)</h3>
+    <p>اضغط <strong>Shift Summary</strong> للحصول على ملخص إحصائي للشيفت الحالي يشمل إجمالي الحالات والمسافرين موزعةً حسب الحالة والجنسية والناقل.</p>
+
+    <h3>تصدير Excel (للمشرفين)</h3>
+    <p>المشرفون يجدون زر <strong>📊 Excel ▾</strong> في القائمة العلوية مع خيارين:</p>
+    <ul>
+      <li><strong>Last 24 hours</strong> — تقرير بحالات آخر 24 ساعة</li>
+      <li><strong>Last 7 days</strong> — تقرير بحالات آخر 7 أيام</li>
+    </ul>
+    <p>يُنزَّل الملف بصيغة <strong>.xlsx</strong> جاهز للطباعة أو المشاركة.</p>
+
+  </div>
+
+</div>
+</body>
+</html>
