@@ -43,6 +43,10 @@ app.use('/api/export', exportRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
+app.get('/user-manual', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'user-manual.html'));
+});
+
 async function start() {
   await initDb();
   app.listen(PORT, () => {
