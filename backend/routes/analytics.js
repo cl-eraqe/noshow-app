@@ -1,6 +1,7 @@
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 const { getDb, jeddahNowStr } = require('../db');
+const { requireRole } = require('../middleware/auth');
 
 function getShift(dtStr) {
   if (!dtStr) return null;
@@ -305,7 +306,8 @@ router.get('/dashboard', async (req, res) => {
       reports: filtered,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /analytics/dashboard]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -325,11 +327,13 @@ router.get('/filter-options', async (_req, res) => {
     const paxTypes = p.rows.map(r => r.v);
     res.json({ airlines, nationalities, destinations, destinationsFull, paxTypes });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /analytics/filter-options]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.get('/audit-log', async (req, res) => {
+// Full audit log is sensitive — supervisor access only.
+router.get('/audit-log', requireRole('supervisor'), async (req, res) => {
   try {
     const pool = getDb();
     const limit = parseInt(req.query.limit) || 500;
@@ -346,7 +350,8 @@ router.get('/audit-log', async (req, res) => {
       snapshot: r.snapshot ? JSON.parse(r.snapshot) : null,
     })));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /analytics/audit-log]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

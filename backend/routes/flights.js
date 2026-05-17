@@ -1,7 +1,8 @@
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 const flights = require('../flights.json');
 const { getDb, jeddahNowStr } = require('../db');
+const { requireRole } = require('../middleware/auth');
 
 // GET /api/flights/custom/list — must be before /:flightNumber
 router.get('/custom/list', async (_req, res) => {
@@ -11,7 +12,8 @@ router.get('/custom/list', async (_req, res) => {
     const enriched = rows.map(r => ({ ...r, isOverride: !!flights[r.flight_number] }));
     res.json(enriched);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /flights/custom/list]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -26,7 +28,8 @@ router.get('/', async (_req, res) => {
     const customAdditions = customs.filter(c => !c.deleted && !flights[c.flight_number]).map(c => c.flight_number);
     res.json([...jsonKeys, ...customAdditions].sort());
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /flights]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -45,12 +48,13 @@ router.get('/:flightNumber', async (req, res) => {
     if (!base) return res.status(404).json({ error: `Flight ${key} not found` });
     res.json(base);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /flights/:flightNumber]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// POST /api/flights — add or update a flight
-router.post('/', express.json(), async (req, res) => {
+// POST /api/flights — add or update a flight (supervisor only)
+router.post('/', requireRole('supervisor'), express.json(), async (req, res) => {
   try {
     const { flight_number, destination, std, city, country, nationality } = req.body;
     if (!flight_number) return res.status(400).json({ error: 'flight_number required' });
@@ -67,12 +71,13 @@ router.post('/', express.json(), async (req, res) => {
     );
     res.json({ success: true, flight_number: key });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[POST /flights]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// DELETE /api/flights/:flightNumber — soft-delete
-router.delete('/:flightNumber', async (req, res) => {
+// DELETE /api/flights/:flightNumber — soft-delete (supervisor only)
+router.delete('/:flightNumber', requireRole('supervisor'), async (req, res) => {
   try {
     const key = req.params.flightNumber.toUpperCase().trim();
     const pool = getDb();
@@ -84,7 +89,8 @@ router.delete('/:flightNumber', async (req, res) => {
     );
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[DELETE /flights/:flightNumber]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

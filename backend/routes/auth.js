@@ -1,9 +1,23 @@
-const express = require('express');
-const crypto  = require('crypto');
-const router  = express.Router();
+const express   = require('express');
+const crypto    = require('crypto');
+const rateLimit = require('express-rate-limit');
+const router    = express.Router();
 
-const SECRET = () => process.env.SESSION_SECRET || 'noshow-fallback-secret-change-me';
+// Fail loudly at require-time if the secret is missing — no silent fallback.
+if (!process.env.SESSION_SECRET) {
+  throw new Error('FATAL: SESSION_SECRET environment variable is required but not set');
+}
+const SECRET = () => process.env.SESSION_SECRET;
+
 const WINDOW_MS = 12 * 3600 * 1000; // 12-hour buckets
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 function makeToken(role) {
   const w = Math.floor(Date.now() / WINDOW_MS);
@@ -24,7 +38,7 @@ function verifyToken(token) {
   return null;
 }
 
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const { pin } = req.body;
   if (!pin) return res.status(400).json({ error: 'PIN is required' });
 

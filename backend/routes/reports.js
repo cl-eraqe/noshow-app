@@ -6,6 +6,7 @@ const fs     = require('fs');
 const { uploadFile, deleteFile } = require('../storage');
 const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
 const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
+const { requireRole } = require('../middleware/auth');
 
 // ── Jeddah time helpers ────────────────────────────────────────────────
 
@@ -99,7 +100,8 @@ router.get('/analytics/summary', async (_req, res) => {
       byPaxType:       byType.rows,
     });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /reports/analytics/summary]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -216,7 +218,8 @@ router.get('/handover', async (req, res) => {
 
     res.json({ text: lines.join('\n'), shift: { current: currentShift, next: nextShift } });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /reports/handover]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -264,7 +267,8 @@ router.get('/shift-summary', async (req, res) => {
 
     res.json({ date: targetDate, shifts: result });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /reports/shift-summary]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -277,7 +281,8 @@ router.get('/', async (_req, res) => {
     const { rows } = await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /reports]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -290,7 +295,8 @@ router.get('/:id', async (req, res) => {
     if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
     res.json(rows[0]);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /reports/:id]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -360,11 +366,12 @@ router.post('/', upload.array('files', 10), async (req, res) => {
     const { rows: reportRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [id]);
     const report = reportRows[0];
 
-    await logAudit({ user: submitted_by || 'staff', action: 'create', reportId: id, snapshot: report });
+    await logAudit({ user: req.role, action: 'create', reportId: id, snapshot: report });
 
     res.status(201).json(report);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[POST /reports]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -442,12 +449,13 @@ router.put('/:id', upload.array('files', 10), async (req, res) => {
 
     const changes = diffFields(existing, updated, AUDIT_FIELDS);
     if (changes) {
-      await logAudit({ user: req.body.submitted_by || 'staff', action: 'edit', reportId: updated.id, changes });
+      await logAudit({ user: req.role, action: 'edit', reportId: updated.id, changes });
     }
 
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[PUT /reports/:id]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -519,19 +527,19 @@ router.patch('/:id', express.json(), async (req, res) => {
         changes.status?.to === 'flight_confirmed' ? 'confirm_flight' :
         changes.status?.to === 'closed'           ? 'close'          :
         changes.status?.to === 'under_process'    ? 'reopen'         : 'edit';
-      await logAudit({ user: req.body.submitted_by || 'staff', action, reportId: updated.id, changes });
+      await logAudit({ user: req.role, action, reportId: updated.id, changes });
     }
 
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[PATCH /reports/:id]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
 // ── Delete single attachment ───────────────────────────────────────────
-router.delete('/:id/files/:filename', async (req, res) => {
+router.delete('/:id/files/:filename', requireRole('supervisor'), async (req, res) => {
   try {
-    if (req.role !== 'supervisor') return res.status(403).json({ error: 'Forbidden' });
     const pool = getDb();
     const { rows } = await pool.query('SELECT file_paths FROM reports WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
@@ -541,10 +549,11 @@ router.delete('/:id/files/:filename', async (req, res) => {
     if (newPaths.length === paths.length) return res.status(404).json({ error: 'File not in report' });
     await deleteFile(fname).catch(() => {});
     await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', [JSON.stringify(newPaths), req.params.id]);
-    await logAudit({ user: req.query.user || 'supervisor', action: 'delete_attachment', reportId: Number(req.params.id), changes: { removed: fname } });
+    await logAudit({ user: req.role, action: 'delete_attachment', reportId: Number(req.params.id), changes: { removed: fname } });
     res.json({ success: true, file_paths: newPaths });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[DELETE /reports/:id/files/:filename]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -564,7 +573,7 @@ router.post('/:id/files', upload.array('files', 10), async (req, res) => {
 
     await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', [JSON.stringify(filePaths), req.params.id]);
     await logAudit({
-      user: req.body.user || req.query.user || 'unknown',
+      user: req.role,
       action: 'attach_files',
       reportId: rows[0].id,
       changes: { file_paths: { added: newPaths } },
@@ -572,11 +581,12 @@ router.post('/:id/files', upload.array('files', 10), async (req, res) => {
 
     res.json({ success: true, file_paths: filePaths, added: newPaths });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[POST /reports/:id/files]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireRole('supervisor'), async (req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
@@ -589,11 +599,12 @@ router.delete('/:id', async (req, res) => {
     } catch (_) {}
 
     await pool.query('DELETE FROM reports WHERE id = $1', [req.params.id]);
-    await logAudit({ user: req.query.user || 'supervisor', action: 'delete', reportId: report.id, snapshot: report });
+    await logAudit({ user: req.role, action: 'delete', reportId: report.id, snapshot: report });
 
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[DELETE /reports/:id]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -612,7 +623,7 @@ router.post('/:id/nusuk', express.json(), async (req, res) => {
 
     await pool.query('UPDATE reports SET nusuk_received = $1, nusuk_by = $2 WHERE id = $3', [ts, by, req.params.id]);
     await logAudit({
-      user: user || 'staff',
+      user: req.role,
       action: received ? 'nusuk_confirm' : 'nusuk_unconfirm',
       reportId: report.id,
       changes: { nusuk_received: { from: report.nusuk_received, to: ts } },
@@ -621,7 +632,8 @@ router.post('/:id/nusuk', express.json(), async (req, res) => {
     const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
     res.json(updatedRows[0]);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[POST /reports/:id/nusuk]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

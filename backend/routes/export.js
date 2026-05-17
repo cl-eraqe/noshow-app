@@ -1,8 +1,8 @@
 const express = require('express');
-const crypto = require('crypto');
-const router = express.Router();
+const crypto  = require('crypto');
+const router  = express.Router();
 const { getDb, jeddahNowStr } = require('../db');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireRole } = require('../middleware/auth');
 
 async function requireToken(req, res, next) {
   const token = req.query.token || req.headers['x-export-token'];
@@ -15,7 +15,8 @@ async function requireToken(req, res, next) {
     req.exportUser = rows[0];
     next();
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[export requireToken]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 }
 
@@ -23,17 +24,21 @@ function genToken() {
   return crypto.randomBytes(24).toString('base64url');
 }
 
-router.get('/tokens', requireAuth, async (_req, res) => {
+// ── Token management — supervisor only ────────────────────────────────────────
+// requireAuth sets req.role from the session token; requireRole checks it.
+
+router.get('/tokens', requireAuth, requireRole('supervisor'), async (_req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query('SELECT id, email, role, created_at, last_used, revoked FROM export_tokens ORDER BY created_at DESC');
     res.json(rows);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /export/tokens]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.post('/tokens', requireAuth, express.json(), async (req, res) => {
+router.post('/tokens', requireAuth, requireRole('supervisor'), express.json(), async (req, res) => {
   try {
     const { email, role } = req.body;
     if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
@@ -45,11 +50,12 @@ router.post('/tokens', requireAuth, express.json(), async (req, res) => {
     );
     res.json({ ...rows[0], token });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[POST /export/tokens]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.patch('/tokens/:id', requireAuth, express.json(), async (req, res) => {
+router.patch('/tokens/:id', requireAuth, requireRole('supervisor'), express.json(), async (req, res) => {
   try {
     const pool = getDb();
     const { revoked } = req.body;
@@ -59,21 +65,23 @@ router.patch('/tokens/:id', requireAuth, express.json(), async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM export_tokens WHERE id = $1', [req.params.id]);
     res.json(rows[0]);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[PATCH /export/tokens/:id]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.delete('/tokens/:id', requireAuth, async (req, res) => {
+router.delete('/tokens/:id', requireAuth, requireRole('supervisor'), async (req, res) => {
   try {
     const pool = getDb();
     await pool.query('DELETE FROM export_tokens WHERE id = $1', [req.params.id]);
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[DELETE /export/tokens/:id]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.post('/tokens/:id/rotate', requireAuth, async (req, res) => {
+router.post('/tokens/:id/rotate', requireAuth, requireRole('supervisor'), async (req, res) => {
   try {
     const pool = getDb();
     const newToken = genToken();
@@ -81,9 +89,12 @@ router.post('/tokens/:id/rotate', requireAuth, async (req, res) => {
     const { rows } = await pool.query('SELECT * FROM export_tokens WHERE id = $1', [req.params.id]);
     res.json({ ...rows[0], token: newToken });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[POST /export/tokens/:id/rotate]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// ── External read endpoints — export-token auth ────────────────────────────────
 
 router.get('/live-state', requireToken, async (_req, res) => {
   try {
@@ -99,7 +110,8 @@ router.get('/live-state', requireToken, async (_req, res) => {
       submitted_by: r.submitted_by,
     })));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /export/live-state]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -113,7 +125,8 @@ router.get('/audit-log', requireToken, async (req, res) => {
       report_id: r.report_id, changes: r.changes, snapshot: r.snapshot,
     })));
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    console.error('[GET /export/audit-log]', e);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
