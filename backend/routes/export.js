@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const { getDb, jeddahNowStr } = require('../db');
+const { requireAuth } = require('../middleware/auth');
 
 async function requireToken(req, res, next) {
   const token = req.query.token || req.headers['x-export-token'];
@@ -22,7 +23,7 @@ function genToken() {
   return crypto.randomBytes(24).toString('base64url');
 }
 
-router.get('/tokens', async (_req, res) => {
+router.get('/tokens', requireAuth, async (_req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query('SELECT id, email, role, created_at, last_used, revoked FROM export_tokens ORDER BY created_at DESC');
@@ -32,7 +33,7 @@ router.get('/tokens', async (_req, res) => {
   }
 });
 
-router.post('/tokens', express.json(), async (req, res) => {
+router.post('/tokens', requireAuth, express.json(), async (req, res) => {
   try {
     const { email, role } = req.body;
     if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
@@ -48,7 +49,7 @@ router.post('/tokens', express.json(), async (req, res) => {
   }
 });
 
-router.patch('/tokens/:id', express.json(), async (req, res) => {
+router.patch('/tokens/:id', requireAuth, express.json(), async (req, res) => {
   try {
     const pool = getDb();
     const { revoked } = req.body;
@@ -62,7 +63,7 @@ router.patch('/tokens/:id', express.json(), async (req, res) => {
   }
 });
 
-router.delete('/tokens/:id', async (req, res) => {
+router.delete('/tokens/:id', requireAuth, async (req, res) => {
   try {
     const pool = getDb();
     await pool.query('DELETE FROM export_tokens WHERE id = $1', [req.params.id]);
@@ -72,7 +73,7 @@ router.delete('/tokens/:id', async (req, res) => {
   }
 });
 
-router.post('/tokens/:id/rotate', async (req, res) => {
+router.post('/tokens/:id/rotate', requireAuth, async (req, res) => {
   try {
     const pool = getDb();
     const newToken = genToken();

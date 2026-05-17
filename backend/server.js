@@ -36,9 +36,9 @@ app.get('/api/files/:filename', requireAuth, (req, res) => {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/flights', flightRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/analytics', analyticsRoutes);
+app.use('/api/flights', requireAuth, flightRoutes);
+app.use('/api/reports', requireAuth, reportRoutes);
+app.use('/api/analytics', requireAuth, analyticsRoutes);
 app.use('/api/export', exportRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
