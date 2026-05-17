@@ -26,6 +26,10 @@ const { streamFile, USE_R2, LOCAL_DIR } = require('./storage');
 const app  = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust Railway's reverse proxy so express-rate-limit sees the real client IP
+// from the X-Forwarded-For header instead of the proxy's internal address.
+app.set('trust proxy', 1);
+
 // ── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
