@@ -11,6 +11,7 @@ const reportRoutes = require('./routes/reports');
 const analyticsRoutes = require('./routes/analytics');
 const exportRoutes = require('./routes/export');
 const { requireAuth } = require('./middleware/auth');
+const { streamFile, USE_R2, LOCAL_DIR } = require('./storage');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -26,10 +27,14 @@ app.use(cors({
 
 app.use(express.json());
 
-// Protected file downloads — requires a valid session token
-app.get('/api/files/:filename', requireAuth, (req, res) => {
+app.get('/api/files/:filename', requireAuth, async (req, res) => {
   const filename = path.basename(req.params.filename);
-  const filepath = path.join(uploadsDir, filename);
+  if (USE_R2) {
+    try { await streamFile(filename, res); }
+    catch (err) { console.error('R2 file fetch error:', err?.message || err); if (!res.headersSent) res.status(404).json({ error: 'File not found' }); }
+    return;
+  }
+  const filepath = path.join(LOCAL_DIR, filename);
   if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'File not found' });
   res.sendFile(filepath);
 });
@@ -42,6 +47,10 @@ app.use('/api/analytics', requireAuth, analyticsRoutes);
 app.use('/api/export', exportRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+
+app.get('/user-manual', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'user-manual.html'));
+});
 
 async function start() {
   await initDb();
