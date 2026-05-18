@@ -1,16 +1,16 @@
-import { getToken } from './auth';
+import { clearRole } from './auth';
 
 // Base URL: empty string uses Vite proxy in dev; set VITE_API_URL for production
 const BASE = import.meta.env.VITE_API_URL || '';
 
-function authHeaders(extra = {}) {
-  const token = getToken();
-  return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra };
-}
-
 async function request(path, options = {}) {
-  const opts = { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } };
+  const opts = { ...options, credentials: 'include', headers: { ...(options.headers || {}) } };
   const res = await fetch(`${BASE}${path}`, opts);
+  if (res.status === 401) {
+    clearRole();
+    window.location.replace('/login');
+    throw new Error('Session expired');
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `HTTP ${res.status}`);
@@ -18,11 +18,11 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// Download a protected file by fetching with auth header, then triggering a browser download
+// Download a protected file by fetching with auth cookie, then triggering a browser download
 export async function downloadFile(filePath, saveName) {
   const filename = filePath.split('/').pop();
   const res = await fetch(`${BASE}/api/files/${encodeURIComponent(filename)}`, {
-    headers: authHeaders(),
+    credentials: 'include',
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const blob = await res.blob();
@@ -38,7 +38,7 @@ export async function downloadFile(filePath, saveName) {
 export async function getFileObjectUrl(filePath) {
   const filename = filePath.split('/').pop();
   const res = await fetch(`${BASE}/api/files/${encodeURIComponent(filename)}`, {
-    headers: authHeaders(),
+    credentials: 'include',
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const blob = await res.blob();
@@ -52,6 +52,10 @@ export async function login(pin) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pin }),
   });
+}
+
+export async function apiLogout() {
+  await fetch(`${BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
 }
 
 // ── Flights
@@ -71,7 +75,7 @@ export async function getReport(id) {
 export async function createReport(formData) {
   const res = await fetch(`${BASE}/api/reports`, {
     method: 'POST',
-    headers: authHeaders(),
+    credentials: 'include',
     body: formData, // do NOT set Content-Type; browser sets multipart boundary
   });
   if (!res.ok) {
@@ -96,7 +100,7 @@ export async function updateReport(id, data) {
 export async function updateReportFull(id, formData) {
   const res = await fetch(`${BASE}/api/reports/${id}`, {
     method: 'PUT',
-    headers: authHeaders(),
+    credentials: 'include',
     body: formData,
   });
   if (!res.ok) {
@@ -126,7 +130,7 @@ export async function attachFilesToReport(id, fileList, user) {
   if (user) fd.append('user', user);
   const res = await fetch(`${BASE}/api/reports/${id}/files`, {
     method: 'POST',
-    headers: authHeaders(),
+    credentials: 'include',
     body: fd,
   });
   if (!res.ok) {
