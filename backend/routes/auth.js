@@ -38,6 +38,16 @@ function verifyToken(token) {
   return null;
 }
 
+// SameSite=None + Secure required for cross-origin cookies (Vercel → Railway).
+// In local dev (NODE_ENV=development) use Lax + non-secure via Vite proxy.
+const COOKIE_OPTS = {
+  httpOnly: true,
+  secure:   process.env.NODE_ENV !== 'development',
+  sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax',
+  maxAge:   24 * 60 * 60 * 1000, // 24h covers 2 rolling 12h windows
+  path:     '/',
+};
+
 router.post('/login', loginLimiter, (req, res) => {
   const { pin } = req.body;
   if (!pin) return res.status(400).json({ error: 'PIN is required' });
@@ -49,10 +59,21 @@ router.post('/login', loginLimiter, (req, res) => {
     return res.status(500).json({ error: 'Server PIN configuration missing' });
   }
 
-  if (pin === supervisorPin) return res.json({ role: 'supervisor', token: makeToken('supervisor') });
-  if (pin === staffPin)      return res.json({ role: 'staff',       token: makeToken('staff') });
+  if (pin === supervisorPin) {
+    res.cookie('noshow_token', makeToken('supervisor'), COOKIE_OPTS);
+    return res.json({ role: 'supervisor' });
+  }
+  if (pin === staffPin) {
+    res.cookie('noshow_token', makeToken('staff'), COOKIE_OPTS);
+    return res.json({ role: 'staff' });
+  }
 
   return res.status(401).json({ error: 'Invalid PIN' });
+});
+
+router.post('/logout', (_req, res) => {
+  res.clearCookie('noshow_token', { path: '/', sameSite: COOKIE_OPTS.sameSite, secure: COOKIE_OPTS.secure });
+  res.json({ success: true });
 });
 
 module.exports = router;
