@@ -57,10 +57,37 @@ function fmtTimeShort(dt) {
 
 // ── Multer (memory storage — files uploaded to cloud/local via storage.js) ──
 
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+  'application/pdf',
+]);
+
 function makeFilename(originalname) {
   return `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalname)}`;
 }
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_MIME_TYPES.has(file.mimetype)) {
+      return cb(Object.assign(new Error('نوع الملف غير مسموح. المسموح: صور (JPEG/PNG/GIF/WebP/HEIC) و PDF فقط.'), { status: 400 }));
+    }
+    cb(null, true);
+  },
+});
+
+// Wraps upload.array so multer validation errors return 400 JSON instead of crashing.
+function uploadFiles(req, res, next) {
+  upload.array('files', 10)(req, res, err => {
+    if (!err) return next();
+    const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 400 : 500);
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'حجم الملف تجاوز الحد المسموح (20MB).'
+      : (err.message || 'خطأ في رفع الملف.');
+    return res.status(status).json({ error: message });
+  });
+}
 
 async function saveFiles(files) {
   return Promise.all(files.map(f => uploadFile(makeFilename(f.originalname), f.buffer, f.mimetype)));
@@ -302,7 +329,7 @@ router.get('/:id', async (req, res) => {
 
 // ── POST create report ─────────────────────────────────────────────────
 
-router.post('/', upload.array('files', 10), async (req, res) => {
+router.post('/', uploadFiles, async (req, res) => {
   try {
     const pool = getDb();
     const {
@@ -377,7 +404,7 @@ router.post('/', upload.array('files', 10), async (req, res) => {
 
 // ── PUT full update ────────────────────────────────────────────────────
 
-router.put('/:id', upload.array('files', 10), async (req, res) => {
+router.put('/:id', uploadFiles, async (req, res) => {
   try {
     const pool = getDb();
     const { rows: existingRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
@@ -560,7 +587,7 @@ router.delete('/:id/files/:filename', requireRole('supervisor'), async (req, res
 // ── DELETE report ──────────────────────────────────────────────────────
 
 // ── Attach additional files to an existing report (no other fields changed)
-router.post('/:id/files', upload.array('files', 10), async (req, res) => {
+router.post('/:id/files', uploadFiles, async (req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
