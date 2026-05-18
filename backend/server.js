@@ -8,12 +8,11 @@ if (!process.env.FRONTEND_URL) {
   process.exit(1);
 }
 
-const express      = require('express');
-const cors         = require('cors');
-const helmet       = require('helmet');
-const cookieParser = require('cookie-parser');
-const path         = require('path');
-const fs           = require('fs');
+const express = require('express');
+const cors    = require('cors');
+const helmet  = require('helmet');
+const path    = require('path');
+const fs      = require('fs');
 const { initDb, autoCloseReports } = require('./db');
 
 const authRoutes      = require('./routes/auth');
@@ -54,7 +53,6 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(cookieParser());
 app.use(express.json());
 
 // Ensure uploads directory exists

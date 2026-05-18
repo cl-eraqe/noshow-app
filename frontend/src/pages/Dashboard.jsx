@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExcelJS from 'exceljs';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile, apiLogout } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
-import { getRole, isSupervisor, logout as clearLocalAuth } from '../utils/auth';
+import { getRole, isSupervisor, logout as authLogout } from '../utils/auth';
 
 function fmt(dt) {
   if (!dt) return '—';
@@ -631,9 +631,8 @@ export default function Dashboard() {
     });
   }
 
-  async function logout() {
-    await apiLogout();
-    clearLocalAuth();
+  function logout() {
+    authLogout();
     navigate('/login');
   }
 
