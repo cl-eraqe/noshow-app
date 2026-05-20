@@ -763,8 +763,8 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/flight-manager')} title="Manage flight database">
-                ✈ Flights
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/users')} title="Manage users">
+                Users
               </button>
             </>
           )}

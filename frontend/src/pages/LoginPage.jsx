@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../utils/api';
-import { saveRole } from '../utils/auth';
+import { saveRole, saveToken, saveUsername } from '../utils/auth';
 
 export default function LoginPage() {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState('');
+  const [name, setName]     = useState('');
+  const [pin, setPin]       = useState('');
+  const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -14,11 +15,14 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const { role } = await login(pin);
-      saveRole(role);
+      const trimmedName = name.trim();
+      const data = await login(trimmedName || null, pin);
+      saveRole(data.role);
+      saveToken(data.token);
+      if (data.username) saveUsername(data.username);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message === 'Invalid PIN' ? 'Incorrect PIN. Please try again.' : err.message);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -34,7 +38,18 @@ export default function LoginPage() {
         <p className="login-subtitle">JEDCO Terminal Operations<br />King Abdulaziz International Airport</p>
 
         <form onSubmit={handleSubmit} className="login-form">
-          <label className="field-label">Staff PIN</label>
+          <label className="field-label">Name</label>
+          <input
+            type="text"
+            autoComplete="name"
+            className="pin-input"
+            placeholder="Your name (English)"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={60}
+            autoFocus
+          />
+          <label className="field-label" style={{ marginTop: '0.75rem' }}>PIN</label>
           <input
             type="password"
             inputMode="numeric"
@@ -44,12 +59,11 @@ export default function LoginPage() {
             placeholder="• • • • • •"
             value={pin}
             onChange={e => setPin(e.target.value)}
-            maxLength={10}
+            maxLength={12}
             required
-            autoFocus
           />
           {error && <p className="login-error">{error}</p>}
-          <button type="submit" className="btn btn-primary btn-full" disabled={loading || !pin}>
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading || !pin} style={{ marginTop: '1rem' }}>
             {loading ? 'Verifying…' : 'Sign In'}
           </button>
         </form>
