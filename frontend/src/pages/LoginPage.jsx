@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../utils/api';
-import { saveRole, saveToken, saveUsername } from '../utils/auth';
+import { saveRole, saveToken, saveUsername, getUsername } from '../utils/auth';
 
 export default function LoginPage() {
-  const [name, setName]     = useState('');
+  const [name, setName]     = useState(getUsername);   // pre-fill from last login
   const [pin, setPin]       = useState('');
   const [error, setError]   = useState('');
   const [loading, setLoading] = useState(false);
