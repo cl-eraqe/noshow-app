@@ -67,7 +67,7 @@ export default function UsersPage() {
   async function handleCreateInvite(role) {
     try {
       const inv = await createInvite(role);
-      setInvites(prev => [inv, ...prev]);
+      await load(); // reload to get proper ids from DB
       const url = buildInviteUrl(inv.token);
       copyToClipboard(url);
       setCopied(inv.token);
@@ -125,7 +125,7 @@ export default function UsersPage() {
             const url     = buildInviteUrl(inv.token);
             return (
               <div
-                key={inv.id}
+                key={inv.token}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap',
                   padding: '0.6rem 0.75rem',
