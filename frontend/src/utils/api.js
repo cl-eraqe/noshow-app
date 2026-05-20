@@ -1,4 +1,4 @@
-import { clearRole, clearToken, clearUsername, getToken } from './auth';
+import { clearRole, clearToken, getToken } from './auth';
 
 // Base URL: empty string uses Vite proxy in dev; set VITE_API_URL for production
 const BASE = import.meta.env.VITE_API_URL || '';
@@ -19,7 +19,7 @@ async function request(path, options = {}) {
   if (res.status === 401) {
     clearRole();
     clearToken();
-    clearUsername();
+    // username intentionally kept so the login page can pre-fill it
     window.location.replace('/login');
     throw new Error('Session expired');
   }
