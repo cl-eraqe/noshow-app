@@ -20,5 +20,4 @@ export function isSupervisor()         { return getRole() === 'supervisor'; }
 export function logout() {
   clearRole();
   clearToken();
-  clearUsername();
 }
