@@ -1,5 +1,6 @@
 const express   = require('express');
 const crypto    = require('crypto');
+const bcrypt    = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const router    = express.Router();
 
@@ -19,8 +20,18 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-function makeToken(role) {
+// ── Token format ─────────────────────────────────────────────────────────────
+// New (individual users): role.b64name.window.sig  (4 parts)
+// Legacy (env-var PINs):  role.window.sig           (3 parts)
+
+function makeToken(role, username) {
   const w = Math.floor(Date.now() / WINDOW_MS);
+  if (username) {
+    const b64 = Buffer.from(username).toString('base64');
+    const sig  = crypto.createHmac('sha256', SECRET()).update(`${role}:${b64}:${w}`).digest('hex');
+    return `${role}.${b64}.${w}.${sig}`;
+  }
+  // legacy
   const sig = crypto.createHmac('sha256', SECRET()).update(`${role}:${w}`).digest('hex');
   return `${role}.${w}.${sig}`;
 }
@@ -28,53 +39,170 @@ function makeToken(role) {
 function verifyToken(token) {
   if (!token || typeof token !== 'string') return null;
   const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  const [role, win, sig] = parts;
-  const now = Math.floor(Date.now() / WINDOW_MS);
-  for (const w of [now, now - 1]) {
-    const expected = crypto.createHmac('sha256', SECRET()).update(`${role}:${w}`).digest('hex');
-    if (sig === expected && parseInt(win) === w) return role;
+  const now   = Math.floor(Date.now() / WINDOW_MS);
+
+  if (parts.length === 4) {
+    const [role, b64name, win, sig] = parts;
+    for (const w of [now, now - 1]) {
+      const expected = crypto.createHmac('sha256', SECRET()).update(`${role}:${b64name}:${w}`).digest('hex');
+      if (sig === expected && parseInt(win) === w) {
+        const username = Buffer.from(b64name, 'base64').toString('utf8');
+        return { role, username };
+      }
+    }
+    return null;
   }
+
+  if (parts.length === 3) {
+    const [role, win, sig] = parts;
+    for (const w of [now, now - 1]) {
+      const expected = crypto.createHmac('sha256', SECRET()).update(`${role}:${w}`).digest('hex');
+      if (sig === expected && parseInt(win) === w) return { role, username: null };
+    }
+    return null;
+  }
+
   return null;
 }
 
-// SameSite=None + Secure required for cross-origin cookies (Vercel → Railway).
-// In local dev (NODE_ENV=development) use Lax + non-secure via Vite proxy.
-const COOKIE_OPTS = {
-  httpOnly: true,
-  secure:   process.env.NODE_ENV !== 'development',
-  sameSite: process.env.NODE_ENV !== 'development' ? 'none' : 'lax',
-  maxAge:   24 * 60 * 60 * 1000, // 24h covers 2 rolling 12h windows
-  path:     '/',
-};
+// ── PIN validation helpers ────────────────────────────────────────────────────
+const COMMON_PINS = new Set([
+  '000000','111111','222222','333333','444444','555555','666666','777777','888888','999999',
+  '123456','654321','012345','987654','112233','121212','123123','696969','159753','753951',
+]);
 
-router.post('/login', loginLimiter, (req, res) => {
-  const { pin } = req.body;
-  if (!pin) return res.status(400).json({ error: 'PIN is required' });
+function validatePin(pin) {
+  if (typeof pin !== 'string' || !/^\d{6,}$/.test(pin)) {
+    return 'PIN must be at least 6 digits.';
+  }
+  if (COMMON_PINS.has(pin)) return 'PIN is too common. Choose a less predictable PIN.';
+  // sequential ascending or descending run of 6+
+  let asc = 1, desc = 1;
+  for (let i = 1; i < pin.length; i++) {
+    asc  = (pin.charCodeAt(i) - pin.charCodeAt(i - 1) === 1)  ? asc  + 1 : 1;
+    desc = (pin.charCodeAt(i) - pin.charCodeAt(i - 1) === -1) ? desc + 1 : 1;
+    if (asc >= 6 || desc >= 6) return 'PIN cannot be a sequential number sequence.';
+  }
+  if (new Set(pin.split('')).size === 1) return 'PIN cannot use all the same digit.';
+  return null;
+}
 
-  const staffPin      = process.env.STAFF_PIN;
-  const supervisorPin = process.env.SUPERVISOR_PIN;
+// ── Login ─────────────────────────────────────────────────────────────────────
+router.post('/login', loginLimiter, async (req, res) => {
+  const { name, pin } = req.body;
 
-  if (!staffPin || !supervisorPin) {
-    return res.status(500).json({ error: 'Server PIN configuration missing' });
+  // Individual user login (name + PIN)
+  if (name && pin) {
+    if (typeof name !== 'string' || !/^[A-Za-z ]{1,60}$/.test(name.trim())) {
+      return res.status(400).json({ error: 'Name must be English letters only.' });
+    }
+
+    try {
+      const { getDb } = require('../db');
+      const db = getDb();
+      const { rows } = await db.query(
+        `SELECT id, name, role, pin_hash, active FROM users WHERE LOWER(name) = LOWER($1) LIMIT 1`,
+        [name.trim()]
+      );
+      const user = rows[0];
+      if (!user) return res.status(401).json({ error: 'Invalid name or PIN.' });
+      if (!user.active) return res.status(403).json({ error: 'Account is deactivated. Contact your supervisor.' });
+
+      const ok = await bcrypt.compare(String(pin), user.pin_hash);
+      if (!ok) return res.status(401).json({ error: 'Invalid name or PIN.' });
+
+      const token = makeToken(user.role, user.name);
+      return res.json({ role: user.role, username: user.name, token });
+    } catch (err) {
+      console.error('DB login error:', err);
+      return res.status(500).json({ error: 'Login failed. Please try again.' });
+    }
   }
 
-  if (pin === supervisorPin) {
-    res.cookie('noshow_token', makeToken('supervisor'), COOKIE_OPTS);
-    return res.json({ role: 'supervisor' });
-  }
-  if (pin === staffPin) {
-    res.cookie('noshow_token', makeToken('staff'), COOKIE_OPTS);
-    return res.json({ role: 'staff' });
+  // Legacy PIN-only fallback (env vars, no name)
+  if (!name && pin) {
+    const staffPin      = process.env.STAFF_PIN;
+    const supervisorPin = process.env.SUPERVISOR_PIN;
+    if (!staffPin || !supervisorPin) {
+      return res.status(500).json({ error: 'Server PIN configuration missing.' });
+    }
+    if (pin === supervisorPin) return res.json({ role: 'supervisor', token: makeToken('supervisor', null) });
+    if (pin === staffPin)      return res.json({ role: 'staff',      token: makeToken('staff', null) });
+    return res.status(401).json({ error: 'Invalid PIN.' });
   }
 
-  return res.status(401).json({ error: 'Invalid PIN' });
+  return res.status(400).json({ error: 'Name and PIN are required.' });
 });
 
-router.post('/logout', (_req, res) => {
-  res.clearCookie('noshow_token', { path: '/', sameSite: COOKIE_OPTS.sameSite, secure: COOKIE_OPTS.secure });
-  res.json({ success: true });
+// ── Register via invite ───────────────────────────────────────────────────────
+router.post('/register', loginLimiter, async (req, res) => {
+  const { token: inviteToken, name, pin } = req.body;
+  if (!inviteToken || !name || !pin) {
+    return res.status(400).json({ error: 'Invite token, name, and PIN are required.' });
+  }
+  if (typeof name !== 'string' || !/^[A-Za-z ]{1,60}$/.test(name.trim())) {
+    return res.status(400).json({ error: 'Name must be English letters only (max 60 chars).' });
+  }
+  const pinErr = validatePin(String(pin));
+  if (pinErr) return res.status(400).json({ error: pinErr });
+
+  try {
+    const { getDb } = require('../db');
+    const db = getDb();
+
+    const { rows: irows } = await db.query(
+      `SELECT id, role, expires_at, used FROM invite_tokens WHERE token = $1 LIMIT 1`,
+      [inviteToken]
+    );
+    const invite = irows[0];
+    if (!invite) return res.status(400).json({ error: 'Invalid or expired invite link.' });
+    if (invite.used) return res.status(400).json({ error: 'This invite link has already been used.' });
+    if (new Date(invite.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'This invite link has expired.' });
+    }
+
+    const cleanName = name.trim();
+    const { rows: erows } = await db.query(
+      `SELECT id FROM users WHERE LOWER(name) = LOWER($1)`, [cleanName]
+    );
+    if (erows.length > 0) return res.status(409).json({ error: 'A user with that name already exists.' });
+
+    const hash = await bcrypt.hash(String(pin), 12);
+    await db.query(
+      `INSERT INTO users (name, role, pin_hash, active) VALUES ($1, $2, $3, true)`,
+      [cleanName, invite.role, hash]
+    );
+    await db.query(`UPDATE invite_tokens SET used = true WHERE id = $1`, [invite.id]);
+
+    const authToken = makeToken(invite.role, cleanName);
+    return res.status(201).json({ role: invite.role, username: cleanName, token: authToken });
+  } catch (err) {
+    console.error('Register error:', err);
+    return res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+});
+
+// ── Validate invite token (GET) ───────────────────────────────────────────────
+router.get('/invite/:token', async (req, res) => {
+  try {
+    const { getDb } = require('../db');
+    const db = getDb();
+    const { rows } = await db.query(
+      `SELECT role, expires_at, used FROM invite_tokens WHERE token = $1 LIMIT 1`,
+      [req.params.token]
+    );
+    const invite = rows[0];
+    if (!invite || invite.used || new Date(invite.expires_at) < new Date()) {
+      return res.status(400).json({ error: 'Invalid or expired invite link.' });
+    }
+    return res.json({ role: invite.role, expiresAt: invite.expires_at });
+  } catch (err) {
+    console.error('Invite check error:', err);
+    return res.status(500).json({ error: 'Could not validate invite.' });
+  }
 });
 
 module.exports = router;
 module.exports.verifyToken = verifyToken;
+module.exports.validatePin = validatePin;
+module.exports.makeToken   = makeToken;

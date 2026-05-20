@@ -8,12 +8,11 @@ if (!process.env.FRONTEND_URL) {
   process.exit(1);
 }
 
-const express      = require('express');
-const cors         = require('cors');
-const helmet       = require('helmet');
-const cookieParser = require('cookie-parser');
-const path         = require('path');
-const fs           = require('fs');
+const express = require('express');
+const cors    = require('cors');
+const helmet  = require('helmet');
+const path    = require('path');
+const fs      = require('fs');
 const { initDb, autoCloseReports } = require('./db');
 
 const authRoutes      = require('./routes/auth');
@@ -21,6 +20,7 @@ const flightRoutes    = require('./routes/flights');
 const reportRoutes    = require('./routes/reports');
 const analyticsRoutes = require('./routes/analytics');
 const exportRoutes    = require('./routes/export');
+const usersRoutes     = require('./routes/users');
 const { requireAuth } = require('./middleware/auth');
 const { streamFile, USE_R2, LOCAL_DIR } = require('./storage');
 
@@ -54,7 +54,6 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(cookieParser());
 app.use(express.json());
 
 // Ensure uploads directory exists
@@ -84,6 +83,7 @@ app.use('/api/analytics', requireAuth, analyticsRoutes);
 // Export router: token-management routes use per-route requireAuth+requireRole('supervisor');
 // external read endpoints (/live-state, /audit-log) use their own requireToken (export tokens).
 app.use('/api/export',    exportRoutes);
+app.use('/api/users',     requireAuth, usersRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

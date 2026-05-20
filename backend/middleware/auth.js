@@ -1,13 +1,12 @@
 const { verifyToken } = require('../routes/auth');
 
 function requireAuth(req, res, next) {
-  // Cookie is the primary auth method; Bearer header kept as fallback for non-browser clients.
-  const cookieToken = req.cookies?.noshow_token || null;
-  const header      = req.headers.authorization || '';
-  const bearerToken = header.startsWith('Bearer ') ? header.slice(7) : null;
-  const role        = verifyToken(cookieToken) || verifyToken(bearerToken);
-  if (!role) return res.status(401).json({ error: 'Unauthorized' });
-  req.role = role;
+  const header = req.headers.authorization || '';
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
+  const result = verifyToken(token);
+  if (!result) return res.status(401).json({ error: 'Unauthorized' });
+  req.role     = result.role;
+  req.username = result.username || null;
   next();
 }
 
