@@ -110,7 +110,7 @@ export async function getReport(id) {
 export async function createReport(formData) {
   const res = await fetch(`${BASE}/api/reports`, {
     method: 'POST',
-    credentials: 'include',
+    headers: authHeaders(),
     body: formData, // do NOT set Content-Type; browser sets multipart boundary
   });
   if (!res.ok) {
@@ -135,7 +135,7 @@ export async function updateReport(id, data) {
 export async function updateReportFull(id, formData) {
   const res = await fetch(`${BASE}/api/reports/${id}`, {
     method: 'PUT',
-    credentials: 'include',
+    headers: authHeaders(),
     body: formData,
   });
   if (!res.ok) {
@@ -165,7 +165,7 @@ export async function attachFilesToReport(id, fileList, user) {
   if (user) fd.append('user', user);
   const res = await fetch(`${BASE}/api/reports/${id}/files`, {
     method: 'POST',
-    credentials: 'include',
+    headers: authHeaders(),
     body: fd,
   });
   if (!res.ok) {
