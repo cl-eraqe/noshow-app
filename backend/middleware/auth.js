@@ -3,9 +3,10 @@ const { verifyToken } = require('../routes/auth');
 function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
   const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
-  const role   = verifyToken(token);
-  if (!role) return res.status(401).json({ error: 'Unauthorized' });
-  req.role = role;
+  const result = verifyToken(token);
+  if (!result) return res.status(401).json({ error: 'Unauthorized' });
+  req.role     = result.role;
+  req.username = result.username || null;
   next();
 }
 

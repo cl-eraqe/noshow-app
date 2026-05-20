@@ -393,7 +393,7 @@ router.post('/', uploadFiles, async (req, res) => {
     const { rows: reportRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [id]);
     const report = reportRows[0];
 
-    await logAudit({ user: req.role, action: 'create', reportId: id, snapshot: report });
+    await logAudit({ user: req.username || req.role, action: 'create', reportId: id, snapshot: report });
 
     res.status(201).json(report);
   } catch (e) {
@@ -476,7 +476,7 @@ router.put('/:id', uploadFiles, async (req, res) => {
 
     const changes = diffFields(existing, updated, AUDIT_FIELDS);
     if (changes) {
-      await logAudit({ user: req.role, action: 'edit', reportId: updated.id, changes });
+      await logAudit({ user: req.username || req.role, action: 'edit', reportId: updated.id, changes });
     }
 
     res.json(updated);
@@ -554,7 +554,7 @@ router.patch('/:id', express.json(), async (req, res) => {
         changes.status?.to === 'flight_confirmed' ? 'confirm_flight' :
         changes.status?.to === 'closed'           ? 'close'          :
         changes.status?.to === 'under_process'    ? 'reopen'         : 'edit';
-      await logAudit({ user: req.role, action, reportId: updated.id, changes });
+      await logAudit({ user: req.username || req.role, action, reportId: updated.id, changes });
     }
 
     res.json(updated);
@@ -576,7 +576,7 @@ router.delete('/:id/files/:filename', requireRole('supervisor'), async (req, res
     if (newPaths.length === paths.length) return res.status(404).json({ error: 'File not in report' });
     await deleteFile(fname).catch(() => {});
     await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', [JSON.stringify(newPaths), req.params.id]);
-    await logAudit({ user: req.role, action: 'delete_attachment', reportId: Number(req.params.id), changes: { removed: fname } });
+    await logAudit({ user: req.username || req.role, action: 'delete_attachment', reportId: Number(req.params.id), changes: { removed: fname } });
     res.json({ success: true, file_paths: newPaths });
   } catch (e) {
     console.error('[DELETE /reports/:id/files/:filename]', e);
@@ -600,7 +600,7 @@ router.post('/:id/files', uploadFiles, async (req, res) => {
 
     await pool.query('UPDATE reports SET file_paths = $1 WHERE id = $2', [JSON.stringify(filePaths), req.params.id]);
     await logAudit({
-      user: req.role,
+      user: req.username || req.role,
       action: 'attach_files',
       reportId: rows[0].id,
       changes: { file_paths: { added: newPaths } },
@@ -626,7 +626,7 @@ router.delete('/:id', requireRole('supervisor'), async (req, res) => {
     } catch (_) {}
 
     await pool.query('DELETE FROM reports WHERE id = $1', [req.params.id]);
-    await logAudit({ user: req.role, action: 'delete', reportId: report.id, snapshot: report });
+    await logAudit({ user: req.username || req.role, action: 'delete', reportId: report.id, snapshot: report });
 
     res.json({ success: true });
   } catch (e) {
@@ -650,7 +650,7 @@ router.post('/:id/nusuk', express.json(), async (req, res) => {
 
     await pool.query('UPDATE reports SET nusuk_received = $1, nusuk_by = $2 WHERE id = $3', [ts, by, req.params.id]);
     await logAudit({
-      user: req.role,
+      user: req.username || req.role,
       action: received ? 'nusuk_confirm' : 'nusuk_unconfirm',
       reportId: report.id,
       changes: { nusuk_received: { from: report.nusuk_received, to: ts } },

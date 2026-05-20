@@ -86,6 +86,31 @@ async function initDb() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_export_token ON export_tokens(token)`);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id         SERIAL PRIMARY KEY,
+      name       TEXT NOT NULL UNIQUE,
+      role       TEXT NOT NULL CHECK (role IN ('staff', 'supervisor')),
+      pin_hash   TEXT NOT NULL,
+      active     BOOLEAN NOT NULL DEFAULT true,
+      created_at TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_name ON users(LOWER(name))`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invite_tokens (
+      id         SERIAL PRIMARY KEY,
+      token      TEXT NOT NULL UNIQUE,
+      role       TEXT NOT NULL CHECK (role IN ('staff', 'supervisor')),
+      created_by TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL,
+      used       BOOLEAN NOT NULL DEFAULT false,
+      created_at TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_invite_token ON invite_tokens(token)`);
+
   // Fix column defaults on existing tables (safe, idempotent)
   await pool.query(`ALTER TABLE reports ALTER COLUMN created_at SET DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')`);
   await pool.query(`ALTER TABLE export_tokens ALTER COLUMN created_at SET DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')`);

@@ -20,6 +20,7 @@ const flightRoutes    = require('./routes/flights');
 const reportRoutes    = require('./routes/reports');
 const analyticsRoutes = require('./routes/analytics');
 const exportRoutes    = require('./routes/export');
+const usersRoutes     = require('./routes/users');
 const { requireAuth } = require('./middleware/auth');
 const { streamFile, USE_R2, LOCAL_DIR } = require('./storage');
 
@@ -82,6 +83,7 @@ app.use('/api/analytics', requireAuth, analyticsRoutes);
 // Export router: token-management routes use per-route requireAuth+requireRole('supervisor');
 // external read endpoints (/live-state, /audit-log) use their own requireToken (export tokens).
 app.use('/api/export',    exportRoutes);
+app.use('/api/users',     requireAuth, usersRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 

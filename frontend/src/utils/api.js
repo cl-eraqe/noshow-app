@@ -1,16 +1,28 @@
-import { getToken } from './auth';
+import { clearRole, clearToken, clearUsername, getToken } from './auth';
 
 // Base URL: empty string uses Vite proxy in dev; set VITE_API_URL for production
 const BASE = import.meta.env.VITE_API_URL || '';
 
 function authHeaders(extra = {}) {
   const token = getToken();
-  return token ? { Authorization: `Bearer ${token}`, ...extra } : { ...extra };
+  return token
+    ? { Authorization: `Bearer ${token}`, ...extra }
+    : { ...extra };
 }
 
 async function request(path, options = {}) {
-  const opts = { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } };
+  const opts = {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) },
+  };
   const res = await fetch(`${BASE}${path}`, opts);
+  if (res.status === 401) {
+    clearRole();
+    clearToken();
+    clearUsername();
+    window.location.replace('/login');
+    throw new Error('Session expired');
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `HTTP ${res.status}`);
@@ -18,7 +30,7 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// Download a protected file by fetching with auth header, then triggering a browser download
+// Download a protected file by fetching with auth token, then triggering a browser download
 export async function downloadFile(filePath, saveName) {
   const filename = filePath.split('/').pop();
   const res = await fetch(`${BASE}/api/files/${encodeURIComponent(filename)}`, {
@@ -46,12 +58,39 @@ export async function getFileObjectUrl(filePath) {
 }
 
 // ── Auth
-export async function login(pin) {
-  return request('/api/auth/login', {
-    method: 'POST',
+export async function login(name, pin) {
+  const body = name ? { name, pin } : { pin };
+  return fetch(`${BASE}/api/auth/login`, {
+    method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pin }),
+    body:    JSON.stringify(body),
+  }).then(async res => {
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
   });
+}
+
+export async function registerUser(inviteToken, name, pin) {
+  const res = await fetch(`${BASE}/api/auth/register`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ token: inviteToken, name, pin }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+export async function checkInvite(token) {
+  const res = await fetch(`${BASE}/api/auth/invite/${encodeURIComponent(token)}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+export function apiLogout() {
+  // Bearer token — just clear client-side state (no server call needed)
 }
 
 // ── Flights
@@ -71,7 +110,7 @@ export async function getReport(id) {
 export async function createReport(formData) {
   const res = await fetch(`${BASE}/api/reports`, {
     method: 'POST',
-    headers: authHeaders(),
+    credentials: 'include',
     body: formData, // do NOT set Content-Type; browser sets multipart boundary
   });
   if (!res.ok) {
@@ -96,7 +135,7 @@ export async function updateReport(id, data) {
 export async function updateReportFull(id, formData) {
   const res = await fetch(`${BASE}/api/reports/${id}`, {
     method: 'PUT',
-    headers: authHeaders(),
+    credentials: 'include',
     body: formData,
   });
   if (!res.ok) {
@@ -126,7 +165,7 @@ export async function attachFilesToReport(id, fileList, user) {
   if (user) fd.append('user', user);
   const res = await fetch(`${BASE}/api/reports/${id}/files`, {
     method: 'POST',
-    headers: authHeaders(),
+    credentials: 'include',
     body: fd,
   });
   if (!res.ok) {
@@ -208,6 +247,38 @@ export async function rotateExportToken(id) {
 }
 export async function deleteExportToken(id) {
   return request(`/api/export/tokens/${id}`, { method: 'DELETE' });
+}
+
+// ── User management (supervisor)
+export async function getUsers() {
+  return request('/api/users');
+}
+export async function setUserActive(id, active) {
+  return request(`/api/users/${id}/active`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ active }),
+  });
+}
+export async function resetUserPin(id, pin) {
+  return request(`/api/users/${id}/pin`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin }),
+  });
+}
+export async function createInvite(role) {
+  return request('/api/users/invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+}
+export async function getInvites() {
+  return request('/api/users/invites');
+}
+export async function deleteInvite(id) {
+  return request(`/api/users/invites/${id}`, { method: 'DELETE' });
 }
 
 // ── Shift Summary
