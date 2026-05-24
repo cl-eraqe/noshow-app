@@ -4,7 +4,7 @@ import imageCompression from 'browser-image-compression';
 import { jsPDF } from 'jspdf';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
-import { getRole } from '../utils/auth';
+import { getRole, getUsername } from '../utils/auth';
 
 const IMG_TYPES = /^image\/(jpeg|jpg|png|gif|webp|bmp)$/i;
 const A4 = { w: 210, h: 297 }; // mm
@@ -447,7 +447,7 @@ export default function NewReport({ editMode }) {
       fd.append('status', reportStatus);
 
       if (!isEdit) {
-        fd.append('submitted_by', getRole());
+        fd.append('submitted_by', getUsername() || getRole());
       }
 
       // Include new flight fields if status is flight_confirmed
