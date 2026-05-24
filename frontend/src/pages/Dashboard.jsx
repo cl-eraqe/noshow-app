@@ -12,6 +12,18 @@ function fmt(dt) {
   catch { return dt; }
 }
 
+function fmtInline(dt) {
+  if (!dt) return '';
+  try {
+    const d = new Date(dt);
+    const day  = String(d.getDate()).padStart(2, '0');
+    const mon  = String(d.getMonth() + 1).padStart(2, '0');
+    const h    = String(d.getHours()).padStart(2, '0');
+    const m    = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${mon}, ${h}:${m}`;
+  } catch { return ''; }
+}
+
 function stdToDatetime(std) {
   if (!std) return '';
   const today = new Date().toISOString().slice(0, 10);
@@ -98,6 +110,7 @@ export default function Dashboard() {
   const [search, setSearch]       = useState('');
   const [activeTab, setActiveTab] = useState('under_process');
   const [airlineFilter, setAirlineFilter] = useState('');
+  const [whoPopup, setWhoPopup]           = useState(null); // report id
 
   // Bulk select
   const [selected, setSelected] = useState(new Set());
@@ -856,7 +869,6 @@ export default function Dashboard() {
                     <th>Pax</th>
                     <th>Days</th>
                     {activeTab !== 'under_process' && <th>New Flight</th>}
-                    {activeTab !== 'under_process' && <th>New Flight Date</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -870,7 +882,7 @@ export default function Dashboard() {
                     return (
                       <tr key={r.id}
                         className={`clickable-row ${urgent && activeTab === 'under_process' ? 'row-urgent' : ''} ${bus && activeTab === 'flight_confirmed' ? 'row-bus' : ''}`}
-                        onClick={e => handleRowClick(r, e)}
+                        onClick={e => { if (whoPopup) { setWhoPopup(null); return; } handleRowClick(r, e); }}
                         onTouchStart={e => handleTouchStart(r, e)}
                         onTouchEnd={e => handleTouchEnd(r, e)}
                       >
@@ -880,19 +892,36 @@ export default function Dashboard() {
                               onChange={e => toggleSelect(r.id, e)} />
                           </td>
                         )}
-                        <td data-label="#" className="col-id">
+                        <td data-label="#" className="col-id" style={{ position: 'relative' }}>
                           #{r.id}
-                          {r.comment && (
-                            <span className="comment-indicator" title="View comment" style={{ cursor: 'pointer' }}
-                              onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'comment' }); }}>💬</span>
-                          )}
-                          {(() => { try { return JSON.parse(r.file_paths || '[]').length > 0; } catch { return false; } })() && (
-                            <span className="comment-indicator" title="View attachments" style={{ cursor: 'pointer' }}
-                              onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'attachments' }); }}>📎</span>
+                          <span style={{ display: 'inline-flex', gap: 2, marginLeft: 4 }}>
+                            {r.comment && (
+                              <span className="comment-indicator" title="View comment" style={{ cursor: 'pointer' }}
+                                onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'comment' }); }}>💬</span>
+                            )}
+                            {(() => { try { return JSON.parse(r.file_paths || '[]').length > 0; } catch { return false; } })() && (
+                              <span className="comment-indicator" title="View attachments" style={{ cursor: 'pointer' }}
+                                onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'attachments' }); }}>📎</span>
+                            )}
+                            {r.submitted_by && (
+                              <span className="comment-indicator" title="Who submitted" style={{ cursor: 'pointer' }}
+                                onClick={e => { e.stopPropagation(); setWhoPopup(whoPopup === r.id ? null : r.id); }}>👤</span>
+                            )}
+                          </span>
+                          {whoPopup === r.id && (
+                            <div onClick={e => e.stopPropagation()} style={{
+                              position: 'absolute', zIndex: 100, top: '100%', left: 0,
+                              background: '#fff', border: '1px solid #ddd', borderRadius: 8,
+                              padding: '0.5rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 160,
+                            }}>
+                              <div>👤 <strong>{r.submitted_by}</strong></div>
+                            </div>
                           )}
                         </td>
                         <td data-label="Prev Flight" className="col-flight">
                           <span className="flight-badge">{r.prev_flight || '—'}</span>
+                          {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 4 }}>{fmtInline(r.prev_datetime)}</span>}
                         </td>
                         <td data-label="Destination">{r.prev_destination || '—'}</td>
                         <td data-label="Nationality">{r.nationality || '—'}</td>
@@ -930,9 +959,9 @@ export default function Dashboard() {
                           <td data-label="New Flight" className="col-flight">
                             <span className="flight-badge">{r.new_flight || '—'}</span>
                             {bus && <span className="bus-badge" title={`Bus to ${getTerminal(r.new_flight)} Terminal`}>🚌 {getTerminal(r.new_flight)}</span>}
+                            {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 4 }}>{fmtInline(r.new_datetime)}</span>}
                           </td>
                         )}
-                        {activeTab !== 'under_process' && <td data-label="New Flight Date">{fmt(r.new_datetime)}</td>}
                         <td data-label="" className="col-actions">
                           {showNusuk && (
                             <button
