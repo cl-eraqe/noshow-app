@@ -902,7 +902,7 @@ export default function Dashboard() {
                               )}
                               <span>#{r.id}</span>
                             </span>
-                            <span style={{ display: 'inline-flex', gap: 2 }}>
+                            <span style={{ display: 'inline-flex', gap: 8 }}>
                               {r.comment && (
                                 <span className="comment-indicator" title="View comment" style={{ cursor: 'pointer' }}
                                   onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'comment' }); }}>💬</span>

@@ -1079,8 +1079,9 @@ html, body, #root {
   }
 
   /* Merge the select checkbox into the #id line on mobile */
-  .mobile-checkbox { display: none; }
+  .report-table td.mobile-checkbox { display: none; }
   .inline-checkbox { display: inline-block; }
+  .col-id { width: auto; white-space: normal; }
   td.col-actions::before { display: none; }
   td.col-actions {
     display: flex;
