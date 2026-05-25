@@ -288,6 +288,7 @@ html, body, #root {
 .report-table tbody tr:hover { background: #f5f9ff; }
 
 .col-id      { font-weight: 700; color: var(--navy); white-space: nowrap; width: 1%; }
+.inline-checkbox { display: none; }
 .col-center  { text-align: center; }
 .col-flight  { white-space: nowrap; }
 .col-actions { white-space: nowrap; display: flex; gap: 4px; align-items: center; }
@@ -1077,9 +1078,9 @@ html, body, #root {
     margin-right: 12px;
   }
 
-  /* Hide label for checkbox & actions rows */
-  .mobile-checkbox { justify-content: flex-start; }
-  .mobile-checkbox::before { display: none; }
+  /* Merge the select checkbox into the #id line on mobile */
+  .mobile-checkbox { display: none; }
+  .inline-checkbox { display: inline-block; }
   td.col-actions::before { display: none; }
   td.col-actions {
     display: flex;

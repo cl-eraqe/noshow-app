@@ -893,8 +893,15 @@ export default function Dashboard() {
                           </td>
                         )}
                         <td data-label="" className="col-id" style={{ position: 'relative' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-                            <span>#{r.id}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4, width: '100%' }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              {activeTab !== 'closed' && (
+                                <input type="checkbox" className="inline-checkbox" checked={selected.has(r.id)}
+                                  onClick={e => e.stopPropagation()}
+                                  onChange={e => toggleSelect(r.id, e)} />
+                              )}
+                              <span>#{r.id}</span>
+                            </span>
                             <span style={{ display: 'inline-flex', gap: 2 }}>
                               {r.comment && (
                                 <span className="comment-indicator" title="View comment" style={{ cursor: 'pointer' }}
