@@ -287,7 +287,7 @@ html, body, #root {
 .report-table tbody tr:last-child td { border-bottom: none; }
 .report-table tbody tr:hover { background: #f5f9ff; }
 
-.col-id      { font-weight: 700; color: var(--navy); white-space: nowrap; }
+.col-id      { font-weight: 700; color: var(--navy); white-space: nowrap; width: 1%; }
 .col-center  { text-align: center; }
 .col-flight  { white-space: nowrap; }
 .col-actions { white-space: nowrap; display: flex; gap: 4px; align-items: center; }

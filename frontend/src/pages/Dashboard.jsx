@@ -861,7 +861,7 @@ export default function Dashboard() {
                           onChange={toggleSelectAll} />
                       </th>
                     )}
-                    <th>#</th>
+                    <th style={{ width: '1%', whiteSpace: 'nowrap' }}>#</th>
                     <th>Prev Flight</th>
                     <th>Destination</th>
                     <th>Nationality</th>
