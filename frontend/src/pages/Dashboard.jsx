@@ -16,11 +16,11 @@ function fmtInline(dt) {
   if (!dt) return '';
   try {
     const d = new Date(dt);
-    const day  = String(d.getDate()).padStart(2, '0');
-    const mon  = String(d.getMonth() + 1).padStart(2, '0');
-    const h    = String(d.getHours()).padStart(2, '0');
-    const m    = String(d.getMinutes()).padStart(2, '0');
-    return `${day}/${mon}, ${h}:${m}`;
+    const day = d.getDate();
+    const mon = d.toLocaleString('en-GB', { month: 'short' });
+    const h   = String(d.getHours()).padStart(2, '0');
+    const m   = String(d.getMinutes()).padStart(2, '0');
+    return `${day} ${mon}, ${h}:${m}`;
   } catch { return ''; }
 }
 
@@ -922,7 +922,7 @@ export default function Dashboard() {
                         </td>
                         <td data-label="Prev Flight" className="col-flight">
                           <span className="flight-badge">{r.prev_flight || '—'}</span>
-                          {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 4 }}>{fmtInline(r.prev_datetime)}</span>}
+                          {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 2 }}>{fmtInline(r.prev_datetime)}</span>}
                         </td>
                         <td data-label="Destination">{r.prev_destination || '—'}</td>
                         <td data-label="Nationality">{r.nationality || '—'}</td>
@@ -960,7 +960,7 @@ export default function Dashboard() {
                           <td data-label="New Flight" className="col-flight">
                             <span className="flight-badge">{r.new_flight || '—'}</span>
                             {bus && <span className="bus-badge" title={`Bus to ${getTerminal(r.new_flight)} Terminal`}>🚌 {getTerminal(r.new_flight)}</span>}
-                            {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 4 }}>{fmtInline(r.new_datetime)}</span>}
+                            {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 2 }}>{fmtInline(r.new_datetime)}</span>}
                           </td>
                         )}
                         <td data-label="" className="col-actions">
