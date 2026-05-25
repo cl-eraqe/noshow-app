@@ -892,22 +892,24 @@ export default function Dashboard() {
                               onChange={e => toggleSelect(r.id, e)} />
                           </td>
                         )}
-                        <td data-label="#" className="col-id" style={{ position: 'relative' }}>
-                          #{r.id}
-                          <span style={{ display: 'inline-flex', gap: 2, marginLeft: 4 }}>
-                            {r.comment && (
-                              <span className="comment-indicator" title="View comment" style={{ cursor: 'pointer' }}
-                                onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'comment' }); }}>💬</span>
-                            )}
-                            {(() => { try { return JSON.parse(r.file_paths || '[]').length > 0; } catch { return false; } })() && (
-                              <span className="comment-indicator" title="View attachments" style={{ cursor: 'pointer' }}
-                                onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'attachments' }); }}>📎</span>
-                            )}
-                            {r.submitted_by && (
-                              <span className="comment-indicator" title="Who submitted" style={{ cursor: 'pointer' }}
-                                onClick={e => { e.stopPropagation(); setWhoPopup(whoPopup === r.id ? null : r.id); }}>👤</span>
-                            )}
-                          </span>
+                        <td data-label="" className="col-id" style={{ position: 'relative' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                            <span>#{r.id}</span>
+                            <span style={{ display: 'inline-flex', gap: 2 }}>
+                              {r.comment && (
+                                <span className="comment-indicator" title="View comment" style={{ cursor: 'pointer' }}
+                                  onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'comment' }); }}>💬</span>
+                              )}
+                              {(() => { try { return JSON.parse(r.file_paths || '[]').length > 0; } catch { return false; } })() && (
+                                <span className="comment-indicator" title="View attachments" style={{ cursor: 'pointer' }}
+                                  onClick={e => { e.stopPropagation(); setQuickView({ report: r, tab: 'attachments' }); }}>📎</span>
+                              )}
+                              {r.submitted_by && (
+                                <span className="comment-indicator" title="Who submitted" style={{ cursor: 'pointer' }}
+                                  onClick={e => { e.stopPropagation(); setWhoPopup(whoPopup === r.id ? null : r.id); }}>👤</span>
+                              )}
+                            </span>
+                          </div>
                           {whoPopup === r.id && (
                             <div onClick={e => e.stopPropagation()} style={{
                               position: 'absolute', zIndex: 100, top: '100%', left: 0,
@@ -921,8 +923,10 @@ export default function Dashboard() {
                           )}
                         </td>
                         <td data-label="Prev Flight" className="col-flight">
-                          <span className="flight-badge">{r.prev_flight || '—'}</span>
-                          {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 2 }}>{fmtInline(r.prev_datetime)}</span>}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <span className="flight-badge">{r.prev_flight || '—'}</span>
+                            {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtInline(r.prev_datetime)}</span>}
+                          </span>
                         </td>
                         <td data-label="Destination">{r.prev_destination || '—'}</td>
                         <td data-label="Nationality">{r.nationality || '—'}</td>
@@ -958,9 +962,11 @@ export default function Dashboard() {
                         </td>
                         {activeTab !== 'under_process' && (
                           <td data-label="New Flight" className="col-flight">
-                            <span className="flight-badge">{r.new_flight || '—'}</span>
-                            {bus && <span className="bus-badge" title={`Bus to ${getTerminal(r.new_flight)} Terminal`}>🚌 {getTerminal(r.new_flight)}</span>}
-                            {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666', marginLeft: 2 }}>{fmtInline(r.new_datetime)}</span>}
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <span className="flight-badge">{r.new_flight || '—'}</span>
+                              {bus && <span className="bus-badge" title={`Bus to ${getTerminal(r.new_flight)} Terminal`}>🚌 {getTerminal(r.new_flight)}</span>}
+                              {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtInline(r.new_datetime)}</span>}
+                            </span>
                           </td>
                         )}
                         <td data-label="" className="col-actions">
