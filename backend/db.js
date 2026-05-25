@@ -111,6 +111,9 @@ async function initDb() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_invite_token ON invite_tokens(token)`);
 
+  // Add confirmed_by column if not exists (idempotent migration)
+  await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS confirmed_by TEXT`);
+
   // Fix column defaults on existing tables (safe, idempotent)
   await pool.query(`ALTER TABLE reports ALTER COLUMN created_at SET DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')`);
   await pool.query(`ALTER TABLE export_tokens ALTER COLUMN created_at SET DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')`);

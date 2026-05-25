@@ -915,7 +915,8 @@ export default function Dashboard() {
                               padding: '0.5rem 0.75rem', fontSize: '0.8rem', whiteSpace: 'nowrap',
                               boxShadow: '0 4px 12px rgba(0,0,0,0.12)', minWidth: 160,
                             }}>
-                              <div>👤 <strong>{r.submitted_by}</strong></div>
+                              <div style={{ marginBottom: r.confirmed_by ? 4 : 0 }}>📝 <strong>{r.submitted_by}</strong></div>
+                              {r.confirmed_by && <div>✈️ <strong>{r.confirmed_by}</strong></div>}
                             </div>
                           )}
                         </td>

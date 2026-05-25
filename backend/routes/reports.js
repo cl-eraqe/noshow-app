@@ -387,7 +387,7 @@ router.post('/', uploadFiles, async (req, res) => {
     await pool.query('UPDATE reports SET whatsapp_text = $1 WHERE id = $2', [whatsapp_text, id]);
 
     if (reportStatus === 'flight_confirmed') {
-      await pool.query('UPDATE reports SET confirmed_at = $1 WHERE id = $2', [jeddahNowStr(), id]);
+      await pool.query('UPDATE reports SET confirmed_at = $1, confirmed_by = $2 WHERE id = $3', [jeddahNowStr(), req.username || req.role, id]);
     }
 
     const { rows: reportRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [id]);
@@ -464,7 +464,7 @@ router.put('/:id', uploadFiles, async (req, res) => {
     );
 
     if (existing.status !== 'flight_confirmed' && reportStatus === 'flight_confirmed' && !existing.confirmed_at) {
-      await pool.query('UPDATE reports SET confirmed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+      await pool.query('UPDATE reports SET confirmed_at = $1, confirmed_by = $2 WHERE id = $3', [jeddahNowStr(), req.username || req.role, req.params.id]);
     }
     if (existing.status !== 'closed' && reportStatus === 'closed' && !existing.closed_at) {
       await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
@@ -538,7 +538,7 @@ router.patch('/:id', express.json(), async (req, res) => {
     await pool.query(`UPDATE reports SET ${updates.join(', ')} WHERE id = $${idx}`, values);
 
     if (status && report.status !== 'flight_confirmed' && status === 'flight_confirmed' && !report.confirmed_at) {
-      await pool.query('UPDATE reports SET confirmed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
+      await pool.query('UPDATE reports SET confirmed_at = $1, confirmed_by = $2 WHERE id = $3', [jeddahNowStr(), req.username || req.role, req.params.id]);
     }
     if (status && report.status !== 'closed' && status === 'closed' && !report.closed_at) {
       await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
