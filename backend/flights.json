@@ -57,7 +57,7 @@
   },
   "MS644": {
     "destination": "CAI",
-    "std": "00:30",
+    "std": "00:40",
     "city": "Cairo",
     "country": "Egypt",
     "nationality": "Egyptian",
@@ -145,7 +145,7 @@
   },
   "SV882": {
     "destination": "CAN",
-    "std": "01:05",
+    "std": "01:10",
     "city": "Guangzhou",
     "country": "China",
     "nationality": "Chinese",
@@ -553,7 +553,7 @@
   },
   "VF190": {
     "destination": "SAW",
-    "std": "03:05",
+    "std": "03:10",
     "city": "Istanbul (Sabiha Gökçen)",
     "country": "Turkey",
     "nationality": "Turkish",
@@ -825,7 +825,7 @@
   },
   "FZ920": {
     "destination": "DXB",
-    "std": "04:40",
+    "std": "05:00",
     "city": "Dubai",
     "country": "United Arab Emirates",
     "nationality": "Emirati",
@@ -1129,7 +1129,7 @@
   },
   "XY627": {
     "destination": "GYD",
-    "std": "06:10",
+    "std": "06:30",
     "city": "Baku",
     "country": "Azerbaijan",
     "nationality": "Azerbaijani",
@@ -1201,7 +1201,7 @@
   },
   "TK97": {
     "destination": "IST",
-    "std": "06:25",
+    "std": "06:10",
     "city": "Istanbul",
     "country": "Turkey",
     "nationality": "Turkish",
@@ -1592,9 +1592,9 @@
     "terminal": "Hajj"
   },
   "E5328": {
-    "destination": "HBE",
-    "std": "08:05",
-    "city": "Alexandria (Borg El Arab)",
+    "destination": "CAI",
+    "std": "09:00",
+    "city": "Cairo",
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "North"
@@ -1617,7 +1617,7 @@
   },
   "SM452": {
     "destination": "HBE",
-    "std": "08:10",
+    "std": "14:35",
     "city": "Alexandria (Borg El Arab)",
     "country": "Egypt",
     "nationality": "Egyptian",
@@ -1849,7 +1849,7 @@
   },
   "NP228": {
     "destination": "CAI",
-    "std": "09:20",
+    "std": "10:15",
     "city": "Cairo",
     "country": "Egypt",
     "nationality": "Egyptian",
@@ -2377,7 +2377,7 @@
   },
   "SV588": {
     "destination": "DXB",
-    "std": "12:05",
+    "std": "12:10",
     "city": "Dubai",
     "country": "United Arab Emirates",
     "nationality": "Emirati",
@@ -2713,7 +2713,7 @@
   },
   "SM476": {
     "destination": "CAI",
-    "std": "13:40",
+    "std": "10:10",
     "city": "Cairo",
     "country": "Egypt",
     "nationality": "Egyptian",
@@ -3073,7 +3073,7 @@
   },
   "NP128": {
     "destination": "CAI",
-    "std": "16:15",
+    "std": "15:55",
     "city": "Cairo",
     "country": "Egypt",
     "nationality": "Egyptian",
@@ -3113,7 +3113,7 @@
   },
   "SD215": {
     "destination": "PZU",
-    "std": "16:25",
+    "std": "16:20",
     "city": "Port Sudan",
     "country": "Sudan",
     "nationality": "Sudanese",
@@ -3225,7 +3225,7 @@
   },
   "OV286": {
     "destination": "MCT",
-    "std": "17:00",
+    "std": "16:40",
     "city": "Muscat",
     "country": "Oman",
     "nationality": "Omani",
@@ -3505,7 +3505,7 @@
   },
   "SM454": {
     "destination": "HMB",
-    "std": "18:50",
+    "std": "14:00",
     "city": "Sohag",
     "country": "Egypt",
     "nationality": "Egyptian",
@@ -3569,7 +3569,7 @@
   },
   "SV704": {
     "destination": "KHI",
-    "std": "19:20",
+    "std": "19:15",
     "city": "Karachi",
     "country": "Pakistan",
     "nationality": "Pakistani",
@@ -3672,9 +3672,9 @@
     "terminal": "Hajj"
   },
   "RB382": {
-    "destination": "DAM",
-    "std": "20:00",
-    "city": "Damascus",
+    "destination": "ALP",
+    "std": "03:25",
+    "city": "Aleppo",
     "country": "Syria",
     "nationality": "Syrian",
     "terminal": "North"
@@ -3729,7 +3729,7 @@
   },
   "IY515": {
     "destination": "ADE",
-    "std": "20:25",
+    "std": "08:15",
     "city": "Aden",
     "country": "Yemen",
     "nationality": "Yemeni",
@@ -3841,7 +3841,7 @@
   },
   "SM456": {
     "destination": "ATZ",
-    "std": "21:15",
+    "std": "07:40",
     "city": "Assiut",
     "country": "Egypt",
     "nationality": "Egyptian",
@@ -4409,10 +4409,26 @@
   },
   "SV421": {
     "destination": "ADD",
-    "std": "0.996527778",
+    "std": "23:30",
     "city": "Addis Ababa",
     "country": "Ethiopia",
     "nationality": "Ethiopian",
+    "terminal": "T1"
+  },
+  "ET2": {
+    "destination": "ADD",
+    "std": "03:30",
+    "city": "Addis Ababa",
+    "country": "Ethiopia",
+    "nationality": "Ethiopian",
+    "terminal": "Hajj"
+  },
+  "XY579": {
+    "destination": "SSH",
+    "std": "10:15",
+    "city": "Sharm El Sheikh",
+    "country": "Egypt",
+    "nationality": "Egyptian",
     "terminal": "T1"
   }
 }
