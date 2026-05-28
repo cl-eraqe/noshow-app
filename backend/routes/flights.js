@@ -59,7 +59,16 @@ router.get('/:flightNumber', async (req, res) => {
     const custom = rows[0];
     if (custom) {
       if (custom.deleted) return res.status(404).json({ error: `Flight ${key} not found` });
-      return res.json({ destination: custom.destination, std: custom.std, city: custom.city, country: custom.country, nationality: custom.nationality });
+      // Terminal always comes from flights.json (custom rows don't store it)
+      const base = flights[key];
+      return res.json({
+        destination: custom.destination,
+        std: custom.std,
+        city: custom.city,
+        country: custom.country,
+        nationality: custom.nationality,
+        terminal: base ? base.terminal : '',
+      });
     }
     const base = flights[key];
     if (!base) return res.status(404).json({ error: `Flight ${key} not found` });
