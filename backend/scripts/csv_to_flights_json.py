@@ -86,6 +86,7 @@ TERMINAL_MAP = {
     "XY": "T1",
     "J9": "North",
     "ER": "Hajj",
+    "DH": "Hajj",
 }
 
 

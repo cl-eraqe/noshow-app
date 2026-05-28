@@ -94,7 +94,18 @@ export function apiLogout() {
 
 // ── Flights
 export async function lookupFlight(flightNumber) {
-  return request(`/api/flights/${encodeURIComponent(flightNumber.toUpperCase().trim())}`);
+  const key = flightNumber.toUpperCase().trim();
+  const data = await request(`/api/flights/${encodeURIComponent(key)}`);
+  // flights.json is the source of truth for terminal — override whatever the backend returned
+  await loadTerminalsCache().catch(() => {});
+  const cached = _terminalCache?.[key];
+  if (cached === 'T1' || cached === 'Hajj' || cached === 'North') {
+    data.terminal = cached;
+  } else if (data.terminal !== 'T1' && data.terminal !== 'Hajj' && data.terminal !== 'North') {
+    // Last-resort: airline-code map (only if json had no entry and backend gave no valid value)
+    data.terminal = TERMINAL_MAP[key.slice(0, 2)] || 'T1';
+  }
+  return data;
 }
 
 // ── Reports
@@ -390,12 +401,12 @@ const TERMINAL_MAP = {
   NP: 'North', HY: 'North', SZ: 'North', RB: 'North', D3: 'North',
   SD: 'North', DV: 'North', OV: 'North', IX: 'North', TU: 'North',
   W9: 'North', E5: 'North', J9: 'North',
-  // Hajj Terminal — bus needed 🚌 (22 airlines)
+  // Hajj Terminal — bus needed 🚌
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
   GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '9P': 'Hajj', QP: 'Hajj',
   JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', TK: 'T1', D7: 'Hajj',
   '2S': 'Hajj', '7Q': 'Hajj', BJ: 'Hajj', BM: 'Hajj', FH: 'Hajj',
-  UZ: 'Hajj', XC: 'Hajj', ER: 'Hajj',
+  UZ: 'Hajj', XC: 'Hajj', ER: 'Hajj', DH: 'Hajj',
 };
 
 // Cache of per-flight terminals from flights.json (loaded once after login)
