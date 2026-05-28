@@ -398,9 +398,29 @@ const TERMINAL_MAP = {
   UZ: 'Hajj', XC: 'Hajj', ER: 'Hajj',
 };
 
+// Cache of per-flight terminals from flights.json (loaded once after login)
+let _terminalCache = null;
+let _terminalCachePromise = null;
+const VALID_TERMINALS = new Set(['T1', 'Hajj', 'North']);
+
+export async function loadTerminalsCache(force = false) {
+  if (_terminalCache && !force) return _terminalCache;
+  if (_terminalCachePromise) return _terminalCachePromise;
+  _terminalCachePromise = fetch(`${BASE}/api/flights/terminals`, { credentials: 'include' })
+    .then(r => r.ok ? r.json() : {})
+    .then(map => { _terminalCache = map; _terminalCachePromise = null; return map; })
+    .catch(() => { _terminalCachePromise = null; return {}; });
+  return _terminalCachePromise;
+}
+
 export function getTerminal(flightNumber) {
   if (!flightNumber) return 'T1';
-  const code = getAirlineCode(flightNumber);
+  const upper = String(flightNumber).toUpperCase().trim();
+  // Primary source: per-flight terminal from flights.json (cached)
+  const cached = _terminalCache?.[upper];
+  if (cached && VALID_TERMINALS.has(cached)) return cached;
+  // Fallback: airline-code mapping (used when cache miss or not yet loaded)
+  const code = getAirlineCode(upper);
   return TERMINAL_MAP[code] || 'T1';
 }
 

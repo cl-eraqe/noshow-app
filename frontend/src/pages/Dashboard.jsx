@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExcelJS from 'exceljs';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile, apiLogout } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile, apiLogout, loadTerminalsCache } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 import { getRole, isSupervisor, logout as clearLocalAuth } from '../utils/auth';
@@ -169,6 +169,7 @@ export default function Dashboard() {
   useEffect(() => { load(); }, []);
   useEffect(() => {
     getFilterOptions().then(o => setKnownDestinations(o.destinationsFull || [])).catch(() => {});
+    loadTerminalsCache().catch(() => {});
   }, []);
   useEffect(() => {
     function onDown(e) { if (excelMenuRef.current && !excelMenuRef.current.contains(e.target)) setExcelMenu(false); }

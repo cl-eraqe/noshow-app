@@ -4,6 +4,23 @@ const flights = require('../flights.json');
 const { getDb, jeddahNowStr } = require('../db');
 const { requireRole } = require('../middleware/auth');
 
+// GET /api/flights/terminals — { flightNumber: terminal } map sourced from flights.json
+router.get('/terminals', async (_req, res) => {
+  try {
+    const pool = getDb();
+    const { rows: customs } = await pool.query('SELECT flight_number, deleted FROM flights_custom');
+    const deletedSet = new Set(customs.filter(c => c.deleted).map(c => c.flight_number));
+    const map = {};
+    for (const k of Object.keys(flights)) {
+      if (!deletedSet.has(k)) map[k] = flights[k].terminal;
+    }
+    res.json(map);
+  } catch (e) {
+    console.error('[GET /flights/terminals]', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/flights/custom/list — must be before /:flightNumber
 router.get('/custom/list', async (_req, res) => {
   try {
