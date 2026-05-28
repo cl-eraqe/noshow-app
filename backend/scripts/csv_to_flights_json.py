@@ -4,7 +4,10 @@ Usage: python csv_to_flights_json.py <input.csv> [output.json]
 Default output: ../flights.json  (overwrites the existing file)
 
 Terminal assignment rules:
-  - Taken from the CSV data — each airline maps to a single terminal.
+  - If the CSV has a "Terminal" column with a recognized value (H/N/T1 or
+    Hajj/North/T1), that wins per-flight.
+  - Otherwise fall back to airline-code mapping; each airline maps to a
+    single terminal.
   - Conflict cases use flight-number patterns derived from the actual data:
       SV: SV2xxx -> H  (Royal Air Maroc-codeshare North Africa routes), rest -> T1
       TK: TK5xxx -> H  (regional codeshares operated by other carriers), rest -> T1
@@ -147,6 +150,23 @@ def format_std(raw):
     return raw
 
 
+TERMINAL_ALIASES = {
+    "H": "Hajj", "HAJJ": "Hajj",
+    "N": "North", "NORTH": "North",
+    "T1": "T1", "T": "T1", "1": "T1",
+}
+
+
+def normalize_terminal(raw):
+    """Map a CSV terminal value to Hajj/North/T1, or None if unrecognized."""
+    if raw is None:
+        return None
+    val = raw.strip().upper()
+    if not val:
+        return None
+    return TERMINAL_ALIASES.get(val)
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python csv_to_flights_json.py <input.csv> [output.json]")
@@ -165,12 +185,16 @@ def main():
         reader = csv.DictReader(f)
         # Strip whitespace from header names (e.g. 'Country  ')
         reader.fieldnames = [h.strip() for h in reader.fieldnames]
+        # Detect Terminal column (case-insensitive). CSV is source of truth when present.
+        terminal_col = next((h for h in reader.fieldnames if h.lower() == "terminal"), None)
         for row in reader:
             fn = fix_excel_scientific(row["Flight Number"].strip())
             if not fn:
                 continue
 
-            terminal = assign_terminal(fn)
+            terminal = normalize_terminal(row.get(terminal_col)) if terminal_col else None
+            if terminal is None:
+                terminal = assign_terminal(fn)
             if terminal == "UNKNOWN":
                 unknown.append(fn)
 
