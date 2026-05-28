@@ -16,7 +16,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const trimmedName = name.trim();
-      const data = await login(trimmedName || null, pin);
+      const data = await login(trimmedName, pin);
       saveRole(data.role);
       saveToken(data.token);
       if (data.username) saveUsername(data.username);
@@ -47,6 +47,7 @@ export default function LoginPage() {
             value={name}
             onChange={e => setName(e.target.value)}
             maxLength={60}
+            required
             autoFocus
           />
           <label className="field-label" style={{ marginTop: '0.75rem' }}>PIN</label>
@@ -63,7 +64,7 @@ export default function LoginPage() {
             required
           />
           {error && <p className="login-error">{error}</p>}
-          <button type="submit" className="btn btn-primary btn-full" disabled={loading || !pin} style={{ marginTop: '1rem' }}>
+          <button type="submit" className="btn btn-primary btn-full" disabled={loading || !pin || !name.trim()} style={{ marginTop: '1rem' }}>
             {loading ? 'Verifying…' : 'Sign In'}
           </button>
         </form>

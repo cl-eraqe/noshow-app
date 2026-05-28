@@ -59,11 +59,10 @@ export async function getFileObjectUrl(filePath) {
 
 // ── Auth
 export async function login(name, pin) {
-  const body = name ? { name, pin } : { pin };
   return fetch(`${BASE}/api/auth/login`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
+    body:    JSON.stringify({ name, pin }),
   }).then(async res => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
