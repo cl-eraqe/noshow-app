@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -158,7 +158,78 @@ function KpiCard({ label, value, sub, cases, pax, color, accent, spark, status, 
   );
 }
 
-// ── Custom horizontal bar list (for Nationality with flags & Airline with logos)
+// ── Circular avatar (flag for nationality, logo for airline, initial fallback)
+function BarAvatar({ name, mode }) {
+  const [broken, setBroken] = useState(false);
+  const flag = mode === 'nationality' ? flagUrl(name) : null;
+  const brand = mode === 'airline' ? AIRLINE_BRAND[name] : null;
+  const src = flag || brand?.logo || null;
+
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt=""
+        className={`xbar-avatar ${flag ? '' : 'xbar-avatar-logo'}`}
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  // Fallback: initial-letter placeholder circle
+  const initial = (name || '?').trim().charAt(0).toUpperCase();
+  return <span className="xbar-avatar xbar-avatar-ph">{initial}</span>;
+}
+
+// ── Single bar row: measures whether the value label fits inside the fill;
+//    if not, it is pushed outside to the right so it is never clipped.
+function BarRow({ d, pct, mode, onClick }) {
+  const fillRef  = useRef(null);
+  const labelRef = useRef(null);
+  const [outside, setOutside] = useState(false);
+  const brand = mode === 'airline' ? AIRLINE_BRAND[d.name] : null;
+
+  useLayoutEffect(() => {
+    const fillEl = fillRef.current;
+    const labelEl = labelRef.current;
+    if (!fillEl || !labelEl) return;
+    const measure = () => {
+      // 16px breathing room (padding) — label width is stable wherever it sits
+      const fits = labelEl.scrollWidth + 16 <= fillEl.offsetWidth;
+      setOutside(prev => (prev === !fits ? prev : !fits));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(fillEl);
+    return () => ro.disconnect();
+  }, [pct, d.value, d.pax]);
+
+  const label = (
+    <span ref={labelRef} className={`xbarlist-val ${outside ? 'xbarlist-val-out' : ''}`}>
+      <b>{d.value}</b>{d.pax != null && <span className="pax"> · {d.pax} pax</span>}
+    </span>
+  );
+
+  return (
+    <div className="xbarlist-row" onClick={() => onClick && onClick(d.name)}>
+      <div className="xbarlist-name">
+        <BarAvatar name={d.name} mode={mode} />
+        <span className="xbarlist-name-text">{d.name}</span>
+      </div>
+      <div className="xbarlist-track">
+        <div
+          ref={fillRef}
+          className={`xbarlist-fill xbarlist-fill-${mode}`}
+          style={{ width: `${pct}%`, background: brand?.color || undefined }}
+        >
+          {!outside && label}
+        </div>
+        {outside && label}
+      </div>
+    </div>
+  );
+}
+
+// ── Custom horizontal bar list (Nationality with flags & Airline with logos)
 function BrandedBarList({ data, mode, onClick }) {
   if (!data || data.length === 0) {
     return <div className="xchart-empty">No data</div>;
@@ -166,36 +237,10 @@ function BrandedBarList({ data, mode, onClick }) {
   const max = Math.max(...data.map(d => d.value), 1);
   return (
     <div className="xbarlist">
-      {data.map((d, i) => {
-        const pct = Math.max(4, (d.value / max) * 100);
-        const brand = mode === 'airline' ? AIRLINE_BRAND[d.name] : null;
-        const flag = mode === 'nationality' ? flagUrl(d.name) : null;
-        const bg =
-          flag ? `linear-gradient(90deg, rgba(12,22,40,0.10), rgba(12,22,40,0.25)), url(${flag}) center/cover no-repeat` :
-          brand ? brand.color :
-          'linear-gradient(90deg, #2563eb, #38bdf8)';
-        return (
-          <div key={i} className="xbarlist-row" onClick={() => onClick && onClick(d.name)}>
-            <div className="xbarlist-name">
-              {brand && <img src={brand.logo} alt="" className="xbarlist-logo"
-                             onError={e => { e.target.style.display='none'; }} />}
-              <span>{d.name}</span>
-            </div>
-            <div className="xbarlist-track">
-              <div className="xbarlist-fill"
-                   style={{
-                     width: `${pct}%`,
-                     background: bg,
-                     borderColor: brand ? brand.accent : 'transparent',
-                   }}>
-                <span className="xbarlist-val">
-                  <b>{d.value}</b>{d.pax != null && <span className="pax"> · {d.pax} pax</span>}
-                </span>
-              </div>
-            </div>
-          </div>
-        );
-      })}
+      {data.map((d, i) => (
+        <BarRow key={i} d={d} mode={mode} onClick={onClick}
+                pct={Math.max(4, (d.value / max) * 100)} />
+      ))}
     </div>
   );
 }
