@@ -196,6 +196,7 @@ function BarRow({ d, pct, mode, onClick }) {
   const labelRef = useRef(null);
   const [outside, setOutside] = useState(false);
   const brand = mode === 'airline' ? AIRLINE_BRAND[d.name] : null;
+  const flag  = mode === 'nationality' ? flagUrl(d.name) : null;
 
   useLayoutEffect(() => {
     const fillEl = fillRef.current;
@@ -211,6 +212,19 @@ function BarRow({ d, pct, mode, onClick }) {
     ro.observe(fillEl);
     return () => ro.disconnect();
   }, [pct, d.value, d.pax]);
+
+  // Bar background:
+  // - Nationality: stretched flag with a soft dark overlay for text legibility.
+  // - Airline:     solid brand color with the airline logo centered on top.
+  // - Fallback (no flag / no brand): CSS class gradient takes over.
+  let fillBg;
+  if (flag) {
+    fillBg = `linear-gradient(rgba(10,18,36,0.38), rgba(10,18,36,0.55)), url(${flag}) center/cover no-repeat`;
+  } else if (brand) {
+    fillBg = brand.logo
+      ? `${brand.color} url(${brand.logo}) center / auto 65% no-repeat`
+      : brand.color;
+  }
 
   const label = (
     <span ref={labelRef} className={`xbarlist-val ${outside ? 'xbarlist-val-out' : ''}`}>
@@ -228,7 +242,7 @@ function BarRow({ d, pct, mode, onClick }) {
         <div
           ref={fillRef}
           className={`xbarlist-fill xbarlist-fill-${mode}`}
-          style={{ width: `${pct}%`, background: brand?.color || undefined }}
+          style={{ width: `${pct}%`, background: fillBg }}
         >
           {!outside && label}
         </div>
