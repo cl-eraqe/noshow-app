@@ -1891,10 +1891,13 @@ html, body, #root {
   justify-content: flex-end;
   padding-right: 10px;
   box-sizing: border-box;
+  overflow: hidden;
   transition: width 0.6s cubic-bezier(0.2,0.8,0.2,1), filter 0.15s;
   min-width: 8px;
 }
-/* Clean dark-theme fills — no stretched flag backgrounds */
+/* Fallback fills when no flag / no brand entry is registered for the row.
+   When a flag URL or brand color exists, the JS sets an inline `background`
+   that overrides these. */
 .xbarlist-fill-nationality {
   background: linear-gradient(90deg, #1f8a91, var(--xaccent));
 }
@@ -1905,7 +1908,8 @@ html, body, #root {
   font-size: 0.75rem;
   color: #fff;
   font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.55);
+  /* Stronger shadow keeps the label readable over flag images and bright brand colors */
+  text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55);
   white-space: nowrap;
 }
 /* Label pushed outside the bar — sits to the right, fully legible on dark bg */
