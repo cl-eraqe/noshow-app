@@ -65,11 +65,20 @@ const flagUrl = (nat) => {
   return code ? `https://flagcdn.com/w640/${code}.png` : null;
 };
 
-// ── Airline brand colors + logos (place logos at /public/airlines/{IATA}.png)
+// ── Airline brand colors + logos (place logos at /public/airlines/{IATA}.{ext})
+// Use scripts/import-airline-logos.mjs to copy & rename from a source folder.
+// Keys MUST match the airline name returned by airlineFromFlightNumber() in api.js.
 const AIRLINE_BRAND = {
-  Saudia:   { color: '#00623B', accent: '#b99657', logo: '/airlines/SV.png' },
-  flynas:   { color: '#00B2A9', accent: '#004F4B', logo: '/airlines/XY.png' },
-  Flyadeal: { color: '#5B2A86', accent: '#C4D600', logo: '/airlines/F3.png' },
+  Saudia:             { color: '#00623B', accent: '#b99657', logo: '/airlines/SV.png' },
+  flynas:             { color: '#00B2A9', accent: '#004F4B', logo: '/airlines/XY.svg' },
+  Flyadeal:           { color: '#5B2A86', accent: '#C4D600', logo: '/airlines/F3.svg' },
+  EgyptAir:           { color: '#002663', accent: '#A6A8AB', logo: '/airlines/MS.png' },
+  'Etihad Airways':   { color: '#BD8B13', accent: '#5B0A23', logo: '/airlines/EY.svg' },
+  flydubai:           { color: '#1E2A5E', accent: '#FF7E00', logo: '/airlines/FZ.svg' },
+  'Kuwait Airways':   { color: '#0070BA', accent: '#003B7A', logo: '/airlines/KU.png' },
+  'Oman Air':         { color: '#A88B41', accent: '#7D7D7D', logo: '/airlines/WY.png' },
+  'Qatar Airways':    { color: '#5C0F2E', accent: '#8E8B8C', logo: '/airlines/QR.png' },
+  'Turkish Airlines': { color: '#E81932', accent: '#FFFFFF', logo: '/airlines/TK.png' },
 };
 
 const RANGE_LABELS = {
