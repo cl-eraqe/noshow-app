@@ -195,8 +195,10 @@ function BarRow({ d, pct, mode, onClick }) {
   const fillRef  = useRef(null);
   const labelRef = useRef(null);
   const [outside, setOutside] = useState(false);
-  const brand = mode === 'airline' ? AIRLINE_BRAND[d.name] : null;
-  const flag  = mode === 'nationality' ? flagUrl(d.name) : null;
+  const isAirline     = mode === 'airline';
+  const isNationality = mode === 'nationality';
+  const brand = isAirline     ? AIRLINE_BRAND[d.name] : null;
+  const flag  = isNationality ? flagUrl(d.name)       : null;
 
   useLayoutEffect(() => {
     const fillEl = fillRef.current;
@@ -215,15 +217,14 @@ function BarRow({ d, pct, mode, onClick }) {
 
   // Bar background:
   // - Nationality: stretched flag with a soft dark overlay for text legibility.
-  // - Airline:     solid brand color with the airline logo centered on top.
+  // - Airline:     solid brand color only (the logo is rendered as an absolute
+  //                overlay centered on the full track, not on the fill).
   // - Fallback (no flag / no brand): CSS class gradient takes over.
   let fillBg;
   if (flag) {
     fillBg = `linear-gradient(rgba(10,18,36,0.38), rgba(10,18,36,0.55)), url(${flag}) center/cover no-repeat`;
   } else if (brand) {
-    fillBg = brand.logo
-      ? `${brand.color} url(${brand.logo}) center / auto 65% no-repeat`
-      : brand.color;
+    fillBg = brand.color;
   }
 
   const label = (
@@ -244,9 +245,28 @@ function BarRow({ d, pct, mode, onClick }) {
           className={`xbarlist-fill xbarlist-fill-${mode}`}
           style={{ width: `${pct}%`, background: fillBg }}
         >
-          {!outside && label}
+          {/* Nationality: value label inside the fill if it fits */}
+          {!isAirline && !outside && label}
         </div>
-        {outside && label}
+        {/* Nationality: value label outside the fill if it doesn't fit */}
+        {!isAirline && outside && label}
+        {/* Airline: logo + value pinned to the middle of the FULL track so they
+            stay visible regardless of how small the airline's bar is. */}
+        {isAirline && (
+          <div className="xbarlist-center">
+            {brand?.logo && (
+              <img
+                src={brand.logo}
+                alt=""
+                className="xbarlist-center-logo"
+                onError={e => { e.target.style.display = 'none'; }}
+              />
+            )}
+            <span className="xbarlist-center-val">
+              <b>{d.value}</b>{d.pax != null && <span className="pax"> · {d.pax} pax</span>}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
