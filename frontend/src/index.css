@@ -1843,48 +1843,84 @@ html, body, #root {
   font-size: 0.78rem;
   color: var(--xtext);
   font-weight: 600;
+  min-width: 0;
+}
+.xbarlist-name-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.xbarlist-logo {
-  width: 26px;
-  height: 20px;
-  object-fit: contain;
+/* Circular avatar — flag / logo / initial fallback */
+.xbar-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
   flex-shrink: 0;
+  object-fit: cover;
+  background: var(--xpanel-2);
+  border: 1px solid var(--xborder-2);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+.xbar-avatar-logo {
+  object-fit: contain;
+  background: #fff;
+  padding: 2px;
+}
+.xbar-avatar-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--xmuted);
+  background: linear-gradient(135deg, #16243f, #1e2d4f);
 }
 .xbarlist-track {
   position: relative;
+  display: flex;
+  align-items: center;
   background: rgba(255,255,255,0.04);
   border-radius: 6px;
   height: 28px;
-  overflow: hidden;
 }
 .xbarlist-fill {
   height: 100%;
   border-radius: 6px;
-  border: 1px solid transparent;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding-right: 10px;
+  box-sizing: border-box;
   transition: width 0.6s cubic-bezier(0.2,0.8,0.2,1), filter 0.15s;
-  background-size: cover !important;
-  background-position: center !important;
-  min-width: 36px;
+  min-width: 8px;
+}
+/* Clean dark-theme fills — no stretched flag backgrounds */
+.xbarlist-fill-nationality {
+  background: linear-gradient(90deg, #1f8a91, var(--xaccent));
+}
+.xbarlist-fill-airline {
+  background: linear-gradient(90deg, #2563eb, #38bdf8);
 }
 .xbarlist-val {
   font-size: 0.75rem;
   color: #fff;
   font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.55);
   white-space: nowrap;
+}
+/* Label pushed outside the bar — sits to the right, fully legible on dark bg */
+.xbarlist-val-out {
+  color: var(--xtext);
+  text-shadow: none;
+  padding-left: 8px;
+  flex-shrink: 0;
 }
 .xbarlist-val .pax {
   opacity: 0.85;
   font-weight: 500;
   font-size: 0.7rem;
 }
+.xbarlist-val-out .pax { opacity: 0.7; }
 
 /* ── Heatmap */
 .xheatmap { display: flex; flex-direction: column; gap: 2px; }
