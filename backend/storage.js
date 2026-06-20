@@ -48,6 +48,11 @@ async function uploadAirlineFile(filename, buffer, mimetype) {
 }
 
 async function streamAirlineFile(filename, res) {
+  // The dashboard runs on a different origin from the API in production
+  // (Vercel ↔ Railway). Helmet sets a default Cross-Origin-Resource-Policy:
+  // same-origin header that would otherwise make the browser block these
+  // images when loaded directly via <img src="https://railway/...">.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   if (USE_R2) {
     const response = await s3.send(new presigner.GetObjectCommand({ Bucket: BUCKET, Key: `airlines/${filename}` }));
     if (response.ContentType) res.setHeader('Content-Type', response.ContentType);
