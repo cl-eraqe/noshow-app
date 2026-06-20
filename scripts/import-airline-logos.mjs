@@ -8,7 +8,7 @@
 // Example:
 //   node scripts/import-airline-logos.mjs ~/Downloads/logos
 
-import { readdirSync, copyFileSync, mkdirSync, existsSync } from 'node:fs';
+import { readdirSync, copyFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { join, extname, basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -93,6 +93,14 @@ function main() {
   const matched = [];
   const skipped = [];
 
+  // Existing files in the destination, indexed by IATA code (stem in upper case).
+  // We use this to remove stale extensions (e.g. F3.svg when F3.jpg comes in).
+  const existingByIata = {};
+  for (const f of readdirSync(destDir)) {
+    const stem = basename(f, extname(f)).toUpperCase();
+    (existingByIata[stem] ||= []).push(f);
+  }
+
   for (const f of files) {
     const iata = detectIata(f);
     const ext = extname(f).toLowerCase();
@@ -101,6 +109,13 @@ function main() {
       continue;
     }
     const destName = `${iata}${ext}`;
+    // Remove any older logo for this airline that uses a different extension.
+    for (const old of (existingByIata[iata] || [])) {
+      if (old !== destName) {
+        unlinkSync(join(destDir, old));
+        matched.push({ from: '(removed stale)', to: old });
+      }
+    }
     copyFileSync(join(srcAbs, f), join(destDir, destName));
     matched.push({ from: f, to: destName });
   }

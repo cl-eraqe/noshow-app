@@ -70,8 +70,8 @@ const flagUrl = (nat) => {
 // Keys MUST match the airline name returned by airlineFromFlightNumber() in api.js.
 const AIRLINE_BRAND = {
   Saudia:             { color: '#00623B', accent: '#b99657', logo: '/airlines/SV.png' },
-  flynas:             { color: '#00B2A9', accent: '#004F4B', logo: '/airlines/XY.svg' },
-  Flyadeal:           { color: '#5B2A86', accent: '#C4D600', logo: '/airlines/F3.svg' },
+  flynas:             { color: '#00B2A9', accent: '#004F4B', logo: '/airlines/XY.jpg' },
+  Flyadeal:           { color: '#5B2A86', accent: '#C4D600', logo: '/airlines/F3.jpg' },
   EgyptAir:           { color: '#002663', accent: '#A6A8AB', logo: '/airlines/MS.png' },
   'Etihad Airways':   { color: '#BD8B13', accent: '#5B0A23', logo: '/airlines/EY.svg' },
   flydubai:           { color: '#1E2A5E', accent: '#FF7E00', logo: '/airlines/FZ.svg' },
