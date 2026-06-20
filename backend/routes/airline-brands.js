@@ -1,51 +1,21 @@
 const express = require('express');
 const multer  = require('multer');
 const path    = require('path');
-const sharp   = require('sharp');
 const router  = express.Router();
 const { getDb, jeddahNowStr, logAudit } = require('../db');
 const { uploadAirlineFile, streamAirlineFile, deleteAirlineFile } = require('../storage');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
 // This route only stores and serves *overrides*. The bundled defaults
-// (brand names, colors, paths to the bundled logos) live in the frontend
-// at frontend/src/data/airline-brands.json and the dashboard merges them
+// (brand names, paths to the bundled logos) live in the frontend at
+// frontend/src/data/airline-brands.json and the dashboard merges them
 // with whatever this endpoint returns. Keeping the backend ignorant of
 // the brand list means it doesn't need to reach across folders that
 // Railway doesn't include in the deploy.
-
-// ── Avatar generation (matches scripts/generate-airline-avatars.mjs) ─────────
-const AVATAR_SIZE = 64;
-const LOGO_PADDING_PCT = 0.18; // logo fills ~64% of the avatar
-
-function hexToRgb(hex) {
-  const m = String(hex || '').replace('#', '').padEnd(6, '0');
-  return {
-    r: parseInt(m.slice(0, 2), 16) || 0,
-    g: parseInt(m.slice(2, 4), 16) || 0,
-    b: parseInt(m.slice(4, 6), 16) || 0,
-    alpha: 1,
-  };
-}
-
-async function buildAvatar(logoBuffer, hexColor) {
-  const inner = Math.round(AVATAR_SIZE * (1 - 2 * LOGO_PADDING_PCT));
-  const logoFit = await sharp(logoBuffer, { density: 300 })
-    .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .png()
-    .toBuffer();
-  return sharp({
-    create: {
-      width: AVATAR_SIZE,
-      height: AVATAR_SIZE,
-      channels: 4,
-      background: hexToRgb(hexColor),
-    },
-  })
-    .composite([{ input: logoFit, gravity: 'center' }])
-    .png()
-    .toBuffer();
-}
+//
+// Note: we deliberately do NOT composite the uploaded image onto a
+// brand-color square. The frontend renders the raw upload in a circular
+// <img> with object-fit:cover — what you upload is what you see.
 
 // ── File serving — public, cached briefly. Hashed filenames give us cache-busting. ─
 router.get('/file/:filename', async (req, res) => {
@@ -70,6 +40,7 @@ router.get('/overrides', requireAuth, async (_req, res) => {
     for (const r of rows) {
       const iata = (r.iata || '').toUpperCase();
       const bust = encodeURIComponent(r.updated_at || '');
+      // logo_file and avatar_file can point at the same file — that's fine.
       out[iata] = {
         iata,
         logo:       `/api/airline-brands/file/${r.logo_file}?v=${bust}`,
@@ -108,8 +79,6 @@ function uploadLogoMw(req, res, next) {
   });
 }
 
-const HEX = /^#[0-9A-Fa-f]{6}$/;
-
 router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw, async (req, res) => {
   try {
     const iata = String(req.params.iata || '').toUpperCase();
@@ -118,32 +87,18 @@ router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw,
     }
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
-    const color = String(req.body.color || '');
-    if (!HEX.test(color)) {
-      return res.status(400).json({ error: 'Missing or invalid brand color. Send "color" as #RRGGBB.' });
-    }
-    const avatarBgRaw = String(req.body.avatarBg || '');
-    const avatarColor = HEX.test(avatarBgRaw) ? avatarBgRaw : color;
-
-    let avatarBuf;
-    try {
-      avatarBuf = await buildAvatar(req.file.buffer, avatarColor);
-    } catch (e) {
-      console.error('[avatar build]', e?.message || e);
-      return res.status(400).json({ error: 'Could not process the image. Try a different file.' });
-    }
-
+    // Store the file exactly as uploaded. Same file is used for both the
+    // avatar (clipped to a circle on the frontend) and the bar logo.
     const ts = Date.now();
     const origExt = (path.extname(req.file.originalname || '').toLowerCase() || '.png').replace(/^\.+/, '.');
-    const logoFile   = `${iata}-logo-${ts}${origExt}`;
-    const avatarFile = `${iata}-avatar-${ts}.png`;
+    const filename = `${iata}-${ts}${origExt}`;
 
-    await uploadAirlineFile(logoFile, req.file.buffer, req.file.mimetype);
-    await uploadAirlineFile(avatarFile, avatarBuf, 'image/png');
+    await uploadAirlineFile(filename, req.file.buffer, req.file.mimetype);
 
     const pool = getDb();
     const now  = jeddahNowStr();
 
+    // Read previous row so we can delete the stale files after the row is replaced.
     const { rows: prev } = await pool.query(
       'SELECT logo_file, avatar_file FROM airline_brand_overrides WHERE iata = $1',
       [iata]
@@ -157,27 +112,27 @@ router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw,
          avatar_file = EXCLUDED.avatar_file,
          updated_at  = EXCLUDED.updated_at,
          updated_by  = EXCLUDED.updated_by`,
-      [iata, logoFile, avatarFile, now, req.username || null]
+      [iata, filename, filename, now, req.username || null]
     );
 
     if (prev[0]) {
-      Promise.all([
-        deleteAirlineFile(prev[0].logo_file),
-        deleteAirlineFile(prev[0].avatar_file),
-      ]).catch(() => {});
+      const stale = new Set([prev[0].logo_file, prev[0].avatar_file].filter(Boolean));
+      stale.delete(filename); // never delete the file we just uploaded
+      Promise.all([...stale].map(f => deleteAirlineFile(f).catch(() => {}))).catch(() => {});
     }
 
     await logAudit({
       user:   req.username || req.role,
       action: 'airline_logo_upload',
-      changes: { iata, logo_file: logoFile, avatar_file: avatarFile },
+      changes: { iata, file: filename },
     });
 
     const bust = encodeURIComponent(now);
+    const url  = `/api/airline-brands/file/${filename}?v=${bust}`;
     res.json({
       iata,
-      logo:       `/api/airline-brands/file/${logoFile}?v=${bust}`,
-      avatar:     `/api/airline-brands/file/${avatarFile}?v=${bust}`,
+      logo:       url,
+      avatar:     url,
       updated_at: now,
     });
   } catch (e) {
@@ -186,7 +141,7 @@ router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw,
   }
 });
 
-// ── DELETE override — supervisor only (reverts to bundled default) ───────────
+// ── DELETE override — supervisor only (reverts to bundled default if any) ────
 router.delete('/:iata/logo', requireAuth, requireRole('supervisor'), async (req, res) => {
   try {
     const iata = String(req.params.iata || '').toUpperCase();
@@ -202,10 +157,8 @@ router.delete('/:iata/logo', requireAuth, requireRole('supervisor'), async (req,
     if (!rows[0]) return res.json({ success: true, reverted: false });
 
     await pool.query('DELETE FROM airline_brand_overrides WHERE iata = $1', [iata]);
-    Promise.all([
-      deleteAirlineFile(rows[0].logo_file),
-      deleteAirlineFile(rows[0].avatar_file),
-    ]).catch(() => {});
+    const stale = new Set([rows[0].logo_file, rows[0].avatar_file].filter(Boolean));
+    Promise.all([...stale].map(f => deleteAirlineFile(f).catch(() => {}))).catch(() => {});
 
     await logAudit({
       user: req.username || req.role,

@@ -4,9 +4,13 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area,
 } from 'recharts';
-import { getDashboardData, getFilterOptions, getAirlineBrandOverrides, uploadAirlineLogo, revertAirlineLogo } from '../utils/api';
+import { getDashboardData, getFilterOptions, getAirlineBrandOverrides, uploadAirlineLogo, revertAirlineLogo, iataForAirlineName, AIRLINE_CODES } from '../utils/api';
 import AIRLINE_BRAND_DEFAULTS from '../data/airline-brands.json';
 import { isSupervisor } from '../utils/auth';
+
+// IATA → display name (just AIRLINE_CODES — used to merge overrides for
+// airlines that aren't in our bundled-defaults JSON).
+const AIRLINE_NAMES_BY_IATA = AIRLINE_CODES;
 
 // ── Nationality → ISO country code for flagcdn.com
 // Each entry maps BOTH the adjective form ("Ethiopian") and the country name
@@ -166,12 +170,18 @@ function BarAvatar({ name, mode }) {
   const [broken, setBroken] = useState(false);
   const { brands, onEdit } = useContext(AirlineBrandContext);
   const flag = mode === 'nationality' ? flagUrl(name) : null;
-  const brand = mode === 'airline' ? brands[name] : null;
-  // For airlines, prefer the pre-baked brand-colored avatar (full-fill circle,
-  // like an Instagram avatar). Fall back to the raw logo if avatar is missing.
+  // For airlines we accept ANY name in the chart — even ones without a
+  // bundled-defaults entry. We try the brands map first, then fall back
+  // to a synthetic brand built from the IATA reverse lookup so the upload
+  // modal can still target the right airline.
+  let brand = mode === 'airline' ? brands[name] : null;
+  if (mode === 'airline' && !brand) {
+    const iata = iataForAirlineName(name);
+    if (iata) brand = { iata, name };
+  }
   const src = flag || brand?.avatar || brand?.logo || null;
-  // Supervisor click-to-edit for airline avatars
-  const editable = mode === 'airline' && !!brand && typeof onEdit === 'function';
+  // Supervisor click-to-edit: enabled whenever we have an IATA we can upload to.
+  const editable = mode === 'airline' && !!brand?.iata && typeof onEdit === 'function';
   const onClick  = editable ? (e) => { e.stopPropagation(); onEdit(name, brand); } : undefined;
 
   if (src && !broken) {
@@ -186,9 +196,17 @@ function BarAvatar({ name, mode }) {
       />
     );
   }
-  // Fallback: initial-letter placeholder circle
+  // Fallback: initial-letter placeholder circle (still clickable for supervisors)
   const initial = (name || '?').trim().charAt(0).toUpperCase();
-  return <span className="xbar-avatar xbar-avatar-ph">{initial}</span>;
+  return (
+    <span
+      className={`xbar-avatar xbar-avatar-ph ${editable ? 'xbar-avatar-editable' : ''}`}
+      onClick={onClick}
+      title={editable ? `Click to upload ${name}'s logo` : undefined}
+    >
+      {initial}
+    </span>
+  );
 }
 
 // ── Single bar row: measures whether the value label fits inside the fill;
@@ -370,12 +388,28 @@ export default function Analytics() {
   function mergeOverrides(overrides) {
     setAirlineBrands(() => {
       const merged = {};
+      const usedIatas = new Set();
+      // Start with bundled defaults — apply override URLs where present.
       for (const [name, brand] of Object.entries(AIRLINE_BRAND_DEFAULTS)) {
         const iata = (brand.iata || '').toUpperCase();
         const ov = overrides[iata];
         merged[name] = ov
           ? { ...brand, logo: ov.logo, avatar: ov.avatar, overridden: true, updated_at: ov.updated_at }
           : brand;
+        if (iata) usedIatas.add(iata);
+      }
+      // Add overrides for airlines NOT in defaults — look up the display name
+      // from the IATA code so the chart row can match up by name.
+      for (const [iata, ov] of Object.entries(overrides)) {
+        if (usedIatas.has(iata)) continue;
+        const name = AIRLINE_NAMES_BY_IATA[iata] || iata;
+        merged[name] = {
+          iata,
+          logo:       ov.logo,
+          avatar:     ov.avatar,
+          overridden: true,
+          updated_at: ov.updated_at,
+        };
       }
       return merged;
     });
@@ -1026,7 +1060,7 @@ function AirlineLogoModal({ name, brand, onClose, onSaved, onReverted }) {
     if (!file) return;
     setBusy(true); setErr('');
     try {
-      const payload = await uploadAirlineLogo(brand.iata, file, brand.color, brand.avatarBg);
+      const payload = await uploadAirlineLogo(brand.iata, file);
       onSaved(payload);
     } catch (e) {
       setErr(e.message || 'Upload failed.');
@@ -1068,19 +1102,33 @@ function AirlineLogoModal({ name, brand, onClose, onSaved, onReverted }) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1rem' }}>
-          <img
-            src={previewUrl || brand.avatar}
-            alt=""
-            style={{
-              width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
-              background: brand.avatarBg || brand.color,
-              border: '1px solid rgba(255,255,255,0.15)',
-            }}
-          />
+          {(previewUrl || brand.avatar) ? (
+            <img
+              src={previewUrl || brand.avatar}
+              alt=""
+              style={{
+                width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
+                background: 'transparent',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+            />
+          ) : (
+            <span
+              style={{
+                width: 56, height: 56, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'linear-gradient(135deg, #16243f, #1e2d4f)',
+                color: '#8ba3b8', fontWeight: 700, fontSize: '1.4rem',
+                border: '1px solid rgba(255,255,255,0.15)',
+              }}
+            >
+              {(name || '?').trim().charAt(0).toUpperCase()}
+            </span>
+          )}
           <div>
             <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{name}</div>
             <div style={{ fontSize: '0.78rem', color: '#8ba3b8' }}>
-              IATA <b>{brand.iata}</b> · {brand.color}
+              IATA <b>{brand.iata}</b>
               {brand.overridden && <span style={{ marginLeft: 6, color: '#39d0d8' }}>(custom)</span>}
             </div>
           </div>
