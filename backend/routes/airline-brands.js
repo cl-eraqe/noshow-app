@@ -7,21 +7,19 @@ const { getDb, jeddahNowStr, logAudit } = require('../db');
 const { uploadAirlineFile, streamAirlineFile, deleteAirlineFile } = require('../storage');
 const { requireAuth, requireRole } = require('../middleware/auth');
 
-// Static defaults (shape: { [airlineName]: { iata, color, accent, avatarBg?, logo, avatar } })
-const DEFAULTS = require('../../frontend/src/data/airline-brands.json');
-
-// Quick IATA → brand-name lookup
-const NAME_BY_IATA = {};
-for (const [name, brand] of Object.entries(DEFAULTS)) {
-  if (brand.iata) NAME_BY_IATA[brand.iata.toUpperCase()] = name;
-}
+// This route only stores and serves *overrides*. The bundled defaults
+// (brand names, colors, paths to the bundled logos) live in the frontend
+// at frontend/src/data/airline-brands.json and the dashboard merges them
+// with whatever this endpoint returns. Keeping the backend ignorant of
+// the brand list means it doesn't need to reach across folders that
+// Railway doesn't include in the deploy.
 
 // ── Avatar generation (matches scripts/generate-airline-avatars.mjs) ─────────
 const AVATAR_SIZE = 64;
 const LOGO_PADDING_PCT = 0.18; // logo fills ~64% of the avatar
 
 function hexToRgb(hex) {
-  const m = String(hex || '#000000').replace('#', '');
+  const m = String(hex || '').replace('#', '').padEnd(6, '0');
   return {
     r: parseInt(m.slice(0, 2), 16) || 0,
     g: parseInt(m.slice(2, 4), 16) || 0,
@@ -30,7 +28,7 @@ function hexToRgb(hex) {
   };
 }
 
-async function buildAvatar(logoBuffer, brand) {
+async function buildAvatar(logoBuffer, hexColor) {
   const inner = Math.round(AVATAR_SIZE * (1 - 2 * LOGO_PADDING_PCT));
   const logoFit = await sharp(logoBuffer, { density: 300 })
     .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
@@ -41,7 +39,7 @@ async function buildAvatar(logoBuffer, brand) {
       width: AVATAR_SIZE,
       height: AVATAR_SIZE,
       channels: 4,
-      background: hexToRgb(brand.avatarBg || brand.color),
+      background: hexToRgb(hexColor),
     },
   })
     .composite([{ input: logoFit, gravity: 'center' }])
@@ -61,35 +59,27 @@ router.get('/file/:filename', async (req, res) => {
   }
 });
 
-// ── GET /api/airline-brands — merged defaults + DB overrides ────────────────
-router.get('/', requireAuth, async (_req, res) => {
+// ── GET overrides — keyed by IATA. Empty object if no airline has been overridden. ─
+router.get('/overrides', requireAuth, async (_req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query(
       'SELECT iata, logo_file, avatar_file, updated_at FROM airline_brand_overrides'
     );
-    const overrides = {};
-    for (const r of rows) overrides[r.iata.toUpperCase()] = r;
-
-    const merged = {};
-    for (const [name, brand] of Object.entries(DEFAULTS)) {
-      const iata = (brand.iata || '').toUpperCase();
-      const ov = overrides[iata];
-      if (ov) {
-        const bust = encodeURIComponent(ov.updated_at || '');
-        merged[name] = {
-          ...brand,
-          logo:   `/api/airline-brands/file/${ov.logo_file}?v=${bust}`,
-          avatar: `/api/airline-brands/file/${ov.avatar_file}?v=${bust}`,
-          overridden: true,
-        };
-      } else {
-        merged[name] = brand;
-      }
+    const out = {};
+    for (const r of rows) {
+      const iata = (r.iata || '').toUpperCase();
+      const bust = encodeURIComponent(r.updated_at || '');
+      out[iata] = {
+        iata,
+        logo:       `/api/airline-brands/file/${r.logo_file}?v=${bust}`,
+        avatar:     `/api/airline-brands/file/${r.avatar_file}?v=${bust}`,
+        updated_at: r.updated_at,
+      };
     }
-    res.json(merged);
+    res.json(out);
   } catch (e) {
-    console.error('[GET /airline-brands]', e?.message || e);
+    console.error('[GET /airline-brands/overrides]', e?.message || e);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -118,19 +108,26 @@ function uploadLogoMw(req, res, next) {
   });
 }
 
+const HEX = /^#[0-9A-Fa-f]{6}$/;
+
 router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw, async (req, res) => {
   try {
     const iata = String(req.params.iata || '').toUpperCase();
-    const name = NAME_BY_IATA[iata];
-    if (!name) return res.status(404).json({ error: `Unknown airline IATA: ${iata}` });
+    if (!/^[A-Z0-9]{2,3}$/.test(iata)) {
+      return res.status(400).json({ error: 'Invalid IATA code.' });
+    }
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
-    const brand = DEFAULTS[name];
+    const color = String(req.body.color || '');
+    if (!HEX.test(color)) {
+      return res.status(400).json({ error: 'Missing or invalid brand color. Send "color" as #RRGGBB.' });
+    }
+    const avatarBgRaw = String(req.body.avatarBg || '');
+    const avatarColor = HEX.test(avatarBgRaw) ? avatarBgRaw : color;
 
-    // Build the avatar from the uploaded buffer using the brand's color.
     let avatarBuf;
     try {
-      avatarBuf = await buildAvatar(req.file.buffer, brand);
+      avatarBuf = await buildAvatar(req.file.buffer, avatarColor);
     } catch (e) {
       console.error('[avatar build]', e?.message || e);
       return res.status(400).json({ error: 'Could not process the image. Try a different file.' });
@@ -147,7 +144,6 @@ router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw,
     const pool = getDb();
     const now  = jeddahNowStr();
 
-    // Read previous row so we can delete the old files after the row is replaced.
     const { rows: prev } = await pool.query(
       'SELECT logo_file, avatar_file FROM airline_brand_overrides WHERE iata = $1',
       [iata]
@@ -164,7 +160,6 @@ router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw,
       [iata, logoFile, avatarFile, now, req.username || null]
     );
 
-    // Clean up the previous files (best effort).
     if (prev[0]) {
       Promise.all([
         deleteAirlineFile(prev[0].logo_file),
@@ -175,16 +170,15 @@ router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw,
     await logAudit({
       user:   req.username || req.role,
       action: 'airline_logo_upload',
-      changes: { iata, name, logo_file: logoFile, avatar_file: avatarFile },
+      changes: { iata, logo_file: logoFile, avatar_file: avatarFile },
     });
 
     const bust = encodeURIComponent(now);
     res.json({
-      iata, name,
+      iata,
       logo:       `/api/airline-brands/file/${logoFile}?v=${bust}`,
       avatar:     `/api/airline-brands/file/${avatarFile}?v=${bust}`,
       updated_at: now,
-      overridden: true,
     });
   } catch (e) {
     console.error('[POST /airline-brands/:iata/logo]', e?.message || e);
@@ -196,8 +190,9 @@ router.post('/:iata/logo', requireAuth, requireRole('supervisor'), uploadLogoMw,
 router.delete('/:iata/logo', requireAuth, requireRole('supervisor'), async (req, res) => {
   try {
     const iata = String(req.params.iata || '').toUpperCase();
-    const name = NAME_BY_IATA[iata];
-    if (!name) return res.status(404).json({ error: `Unknown airline IATA: ${iata}` });
+    if (!/^[A-Z0-9]{2,3}$/.test(iata)) {
+      return res.status(400).json({ error: 'Invalid IATA code.' });
+    }
 
     const pool = getDb();
     const { rows } = await pool.query(
@@ -215,7 +210,7 @@ router.delete('/:iata/logo', requireAuth, requireRole('supervisor'), async (req,
     await logAudit({
       user: req.username || req.role,
       action: 'airline_logo_revert',
-      changes: { iata, name },
+      changes: { iata },
     });
 
     res.json({ success: true, reverted: true });

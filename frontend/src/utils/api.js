@@ -292,13 +292,17 @@ export async function deleteInvite(id) {
 }
 
 // ── Airline brand management (supervisor)
-export async function getAirlineBrands() {
-  return request('/api/airline-brands');
+// Returns just the overrides (keyed by IATA). The frontend merges them with
+// its bundled defaults in airline-brands.json.
+export async function getAirlineBrandOverrides() {
+  return request('/api/airline-brands/overrides');
 }
 
-export async function uploadAirlineLogo(iata, file) {
+export async function uploadAirlineLogo(iata, file, color, avatarBg) {
   const fd = new FormData();
   fd.append('logo', file, file.name);
+  fd.append('color', color);
+  if (avatarBg && avatarBg !== color) fd.append('avatarBg', avatarBg);
   const res = await fetch(`${BASE}/api/airline-brands/${encodeURIComponent(iata)}/logo`, {
     method: 'POST',
     headers: authHeaders(),

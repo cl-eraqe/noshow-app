@@ -8,7 +8,6 @@ import AccessManagement from './pages/AccessManagement';
 import FlightManager from './pages/FlightManager';
 import SharePicker from './pages/SharePicker';
 import UsersPage   from './pages/UsersPage';
-import AirlineLogosPage from './pages/AirlineLogosPage';
 import PrivateRoute from './components/PrivateRoute';
 
 export default function App() {
@@ -44,10 +43,6 @@ export default function App() {
 
         <Route path="/users" element={
           <PrivateRoute supervisorOnly><UsersPage /></PrivateRoute>
-        } />
-
-        <Route path="/airline-logos" element={
-          <PrivateRoute supervisorOnly><AirlineLogosPage /></PrivateRoute>
         } />
 
         <Route path="/share-pick" element={

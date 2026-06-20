@@ -4,8 +4,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area,
 } from 'recharts';
-import { getDashboardData, getFilterOptions, getAirlineBrands } from '../utils/api';
+import { getDashboardData, getFilterOptions, getAirlineBrandOverrides, uploadAirlineLogo, revertAirlineLogo } from '../utils/api';
 import AIRLINE_BRAND_DEFAULTS from '../data/airline-brands.json';
+import { isSupervisor } from '../utils/auth';
 
 // ── Nationality → ISO country code for flagcdn.com
 // Each entry maps BOTH the adjective form ("Ethiopian") and the country name
@@ -67,9 +68,11 @@ const flagUrl = (nat) => {
 };
 
 // Live airline brand map: starts as the bundled defaults, then the main
-// Analytics component fetches /api/airline-brands and replaces it via context
-// so supervisor-uploaded logos appear without a rebuild.
-const AirlineBrandContext = createContext(AIRLINE_BRAND_DEFAULTS);
+// Analytics component fetches /api/airline-brands/overrides and merges them
+// in so supervisor-uploaded logos appear without a rebuild.
+// onEdit is only set for supervisors — when set, BarAvatar becomes clickable
+// to open the upload modal.
+const AirlineBrandContext = createContext({ brands: AIRLINE_BRAND_DEFAULTS, onEdit: null });
 
 
 const RANGE_LABELS = {
@@ -161,20 +164,25 @@ function KpiCard({ label, value, sub, cases, pax, color, accent, spark, status, 
 // ── Circular avatar (flag for nationality, logo for airline, initial fallback)
 function BarAvatar({ name, mode }) {
   const [broken, setBroken] = useState(false);
-  const brands = useContext(AirlineBrandContext);
+  const { brands, onEdit } = useContext(AirlineBrandContext);
   const flag = mode === 'nationality' ? flagUrl(name) : null;
   const brand = mode === 'airline' ? brands[name] : null;
   // For airlines, prefer the pre-baked brand-colored avatar (full-fill circle,
   // like an Instagram avatar). Fall back to the raw logo if avatar is missing.
   const src = flag || brand?.avatar || brand?.logo || null;
+  // Supervisor click-to-edit for airline avatars
+  const editable = mode === 'airline' && !!brand && typeof onEdit === 'function';
+  const onClick  = editable ? (e) => { e.stopPropagation(); onEdit(name, brand); } : undefined;
 
   if (src && !broken) {
     return (
       <img
         src={src}
         alt=""
-        className="xbar-avatar"
+        className={`xbar-avatar ${editable ? 'xbar-avatar-editable' : ''}`}
         onError={() => setBroken(true)}
+        onClick={onClick}
+        title={editable ? `Click to change ${name}'s logo` : undefined}
       />
     );
   }
@@ -189,7 +197,7 @@ function BarRow({ d, pct, mode, onClick }) {
   const fillRef  = useRef(null);
   const labelRef = useRef(null);
   const [outside, setOutside] = useState(false);
-  const brands = useContext(AirlineBrandContext);
+  const { brands } = useContext(AirlineBrandContext);
   const isAirline     = mode === 'airline';
   const isNationality = mode === 'nationality';
   const brand = isAirline     ? brands[d.name]   : null;
@@ -356,10 +364,27 @@ export default function Analytics() {
 
   // Airline brand map — supervisor-uploaded logos replace the bundled defaults.
   const [airlineBrands, setAirlineBrands] = useState(AIRLINE_BRAND_DEFAULTS);
+  const [editingAirline, setEditingAirline] = useState(null); // { name, brand } | null
+  const supervisor = isSupervisor();
+
+  function mergeOverrides(overrides) {
+    setAirlineBrands(() => {
+      const merged = {};
+      for (const [name, brand] of Object.entries(AIRLINE_BRAND_DEFAULTS)) {
+        const iata = (brand.iata || '').toUpperCase();
+        const ov = overrides[iata];
+        merged[name] = ov
+          ? { ...brand, logo: ov.logo, avatar: ov.avatar, overridden: true, updated_at: ov.updated_at }
+          : brand;
+      }
+      return merged;
+    });
+  }
+
   useEffect(() => {
     let cancelled = false;
-    getAirlineBrands()
-      .then(b => { if (!cancelled && b && Object.keys(b).length) setAirlineBrands(b); })
+    getAirlineBrandOverrides()
+      .then(ov => { if (!cancelled) mergeOverrides(ov || {}); })
       .catch(() => {}); // keep bundled defaults on failure
     return () => { cancelled = true; };
   }, []);
@@ -472,7 +497,10 @@ export default function Analytics() {
   const on = (id) => widgets[id];
 
   return (
-   <AirlineBrandContext.Provider value={airlineBrands}>
+   <AirlineBrandContext.Provider value={{
+     brands: airlineBrands,
+     onEdit: supervisor ? (name, brand) => setEditingAirline({ name, brand }) : null,
+   }}>
     <div className="exec-dashboard">
       {/* ── Header Bar ── */}
       <header className="xheader">
@@ -939,7 +967,198 @@ export default function Analytics() {
           </section>
         </>
       )}
+      {editingAirline && (
+        <AirlineLogoModal
+          name={editingAirline.name}
+          brand={editingAirline.brand}
+          onClose={() => setEditingAirline(null)}
+          onSaved={payload => {
+            // Patch the live brands so the dashboard updates instantly
+            setAirlineBrands(prev => ({
+              ...prev,
+              [editingAirline.name]: {
+                ...prev[editingAirline.name],
+                logo:       payload.logo,
+                avatar:     payload.avatar,
+                overridden: true,
+                updated_at: payload.updated_at,
+              },
+            }));
+            setEditingAirline(null);
+          }}
+          onReverted={() => {
+            const fallback = AIRLINE_BRAND_DEFAULTS[editingAirline.name];
+            if (fallback) {
+              setAirlineBrands(prev => ({ ...prev, [editingAirline.name]: fallback }));
+            }
+            setEditingAirline(null);
+          }}
+        />
+      )}
     </div>
    </AirlineBrandContext.Provider>
+  );
+}
+
+// ── Supervisor-only modal: click an airline avatar in BY AIRLINE to open this.
+function AirlineLogoModal({ name, brand, onClose, onSaved, onReverted }) {
+  const fileRef = useRef(null);
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState('');
+
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  function pick() { fileRef.current?.click(); }
+  function onPick(e) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (f) { setFile(f); setErr(''); }
+  }
+
+  async function save() {
+    if (!file) return;
+    setBusy(true); setErr('');
+    try {
+      const payload = await uploadAirlineLogo(brand.iata, file, brand.color, brand.avatarBg);
+      onSaved(payload);
+    } catch (e) {
+      setErr(e.message || 'Upload failed.');
+      setBusy(false);
+    }
+  }
+
+  async function revert() {
+    if (!confirm(`Revert ${name} to the default logo?`)) return;
+    setBusy(true); setErr('');
+    try {
+      await revertAirlineLogo(brand.iata);
+      onReverted();
+    } catch (e) {
+      setErr(e.message || 'Revert failed.');
+      setBusy(false);
+    }
+  }
+
+  function onBackdrop(e) { if (e.target === e.currentTarget) onClose(); }
+
+  return (
+    <div
+      onClick={onBackdrop}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(5,10,22,0.7)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1rem',
+      }}
+    >
+      <div
+        style={{
+          background: '#0f1a2e', color: '#e6eefb',
+          border: '1px solid #2b3f68', borderRadius: 12,
+          padding: '1.25rem 1.25rem 1rem',
+          width: '100%', maxWidth: 420,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1rem' }}>
+          <img
+            src={previewUrl || brand.avatar}
+            alt=""
+            style={{
+              width: 56, height: 56, borderRadius: '50%', objectFit: 'cover',
+              background: brand.avatarBg || brand.color,
+              border: '1px solid rgba(255,255,255,0.15)',
+            }}
+          />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1.05rem' }}>{name}</div>
+            <div style={{ fontSize: '0.78rem', color: '#8ba3b8' }}>
+              IATA <b>{brand.iata}</b> · {brand.color}
+              {brand.overridden && <span style={{ marginLeft: 6, color: '#39d0d8' }}>(custom)</span>}
+            </div>
+          </div>
+        </div>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/svg+xml,image/webp"
+          style={{ display: 'none' }}
+          onChange={onPick}
+        />
+
+        <button
+          type="button"
+          onClick={pick}
+          disabled={busy}
+          style={{
+            width: '100%', padding: '0.6rem',
+            background: '#16243f', color: '#e6eefb',
+            border: '1px dashed #2b3f68', borderRadius: 8,
+            cursor: busy ? 'default' : 'pointer',
+            fontSize: '0.88rem',
+            marginBottom: '0.6rem',
+          }}
+        >
+          {file ? file.name : 'Choose a logo (PNG / JPEG / SVG / WebP, ≤ 5 MB)'}
+        </button>
+
+        {err && (
+          <p style={{ color: '#ff8c8c', fontSize: '0.82rem', margin: '0 0 0.6rem' }}>{err}</p>
+        )}
+
+        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+          {brand.overridden && (
+            <button
+              type="button"
+              onClick={revert}
+              disabled={busy}
+              style={{
+                background: 'transparent', color: '#ff8c8c',
+                border: '1px solid #4a2828', borderRadius: 6,
+                padding: '0.4rem 0.8rem', fontSize: '0.82rem',
+                cursor: busy ? 'default' : 'pointer',
+              }}
+            >
+              Revert to default
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            style={{
+              background: 'transparent', color: '#8ba3b8',
+              border: '1px solid #2b3f68', borderRadius: 6,
+              padding: '0.4rem 0.8rem', fontSize: '0.82rem',
+              cursor: busy ? 'default' : 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={busy || !file}
+            style={{
+              background: file ? '#39d0d8' : '#1f3a52',
+              color: '#0b1220', fontWeight: 700,
+              border: 'none', borderRadius: 6,
+              padding: '0.4rem 0.9rem', fontSize: '0.82rem',
+              cursor: (busy || !file) ? 'default' : 'pointer',
+            }}
+          >
+            {busy ? 'Working…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
