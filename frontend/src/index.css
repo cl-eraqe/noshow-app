@@ -1873,6 +1873,15 @@ html, body, #root {
   color: var(--xmuted);
   background: linear-gradient(135deg, #16243f, #1e2d4f);
 }
+/* Supervisor click-to-edit affordance on airline avatars */
+.xbar-avatar-editable {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.xbar-avatar-editable:hover {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 2px var(--xaccent), 0 2px 8px rgba(0,0,0,0.45);
+}
 .xbarlist-track {
   position: relative;
   display: flex;
