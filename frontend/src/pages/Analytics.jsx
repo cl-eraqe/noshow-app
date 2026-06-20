@@ -5,6 +5,7 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area,
 } from 'recharts';
 import { getDashboardData, getFilterOptions } from '../utils/api';
+import AIRLINE_BRAND from '../data/airline-brands.json';
 
 // ── Nationality → ISO country code for flagcdn.com
 // Each entry maps BOTH the adjective form ("Ethiopian") and the country name
@@ -65,21 +66,10 @@ const flagUrl = (nat) => {
   return code ? `https://flagcdn.com/w640/${code}.png` : null;
 };
 
-// ── Airline brand colors + logos (place logos at /public/airlines/{IATA}.{ext})
-// Use scripts/import-airline-logos.mjs to copy & rename from a source folder.
-// Keys MUST match the airline name returned by airlineFromFlightNumber() in api.js.
-const AIRLINE_BRAND = {
-  Saudia:             { color: '#00623B', accent: '#b99657', logo: '/airlines/SV.png' },
-  flynas:             { color: '#00B2A9', accent: '#004F4B', logo: '/airlines/XY.jpg' },
-  Flyadeal:           { color: '#5B2A86', accent: '#C4D600', logo: '/airlines/F3.jpg' },
-  EgyptAir:           { color: '#002663', accent: '#A6A8AB', logo: '/airlines/MS.png' },
-  'Etihad Airways':   { color: '#BD8B13', accent: '#5B0A23', logo: '/airlines/EY.svg' },
-  flydubai:           { color: '#1E2A5E', accent: '#FF7E00', logo: '/airlines/FZ.svg' },
-  'Kuwait Airways':   { color: '#0070BA', accent: '#003B7A', logo: '/airlines/KU.png' },
-  'Oman Air':         { color: '#A88B41', accent: '#7D7D7D', logo: '/airlines/WY.png' },
-  'Qatar Airways':    { color: '#5C0F2E', accent: '#8E8B8C', logo: '/airlines/QR.png' },
-  'Turkish Airlines': { color: '#E81932', accent: '#FFFFFF', logo: '/airlines/TK.png' },
-};
+// AIRLINE_BRAND is imported from ../data/airline-brands.json — single source
+// of truth shared with scripts/generate-airline-avatars.mjs which renders
+// the circular avatars at /public/airlines/{IATA}_avatar.png.
+
 
 const RANGE_LABELS = {
   today: 'Today',
@@ -172,14 +162,16 @@ function BarAvatar({ name, mode }) {
   const [broken, setBroken] = useState(false);
   const flag = mode === 'nationality' ? flagUrl(name) : null;
   const brand = mode === 'airline' ? AIRLINE_BRAND[name] : null;
-  const src = flag || brand?.logo || null;
+  // For airlines, prefer the pre-baked brand-colored avatar (full-fill circle,
+  // like an Instagram avatar). Fall back to the raw logo if avatar is missing.
+  const src = flag || brand?.avatar || brand?.logo || null;
 
   if (src && !broken) {
     return (
       <img
         src={src}
         alt=""
-        className={`xbar-avatar ${flag ? '' : 'xbar-avatar-logo'}`}
+        className="xbar-avatar"
         onError={() => setBroken(true)}
       />
     );
