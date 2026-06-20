@@ -291,6 +291,28 @@ export async function deleteInvite(id) {
   return request(`/api/users/invites/${id}`, { method: 'DELETE' });
 }
 
+// ── Airline brand management (supervisor)
+export async function getAirlineBrands() {
+  return request('/api/airline-brands');
+}
+
+export async function uploadAirlineLogo(iata, file) {
+  const fd = new FormData();
+  fd.append('logo', file, file.name);
+  const res = await fetch(`${BASE}/api/airline-brands/${encodeURIComponent(iata)}/logo`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+export async function revertAirlineLogo(iata) {
+  return request(`/api/airline-brands/${encodeURIComponent(iata)}/logo`, { method: 'DELETE' });
+}
+
 // ── Shift Summary
 export async function getShiftSummary(date) {
   const params = date ? `?date=${date}` : '';

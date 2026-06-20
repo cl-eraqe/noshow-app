@@ -17,6 +17,7 @@ if (USE_R2) {
 
 const BUCKET = process.env.R2_BUCKET;
 const LOCAL_DIR = path.join(__dirname, 'uploads');
+const AIRLINE_LOCAL_DIR = path.join(__dirname, 'airline-uploads');
 
 async function uploadFile(filename, buffer, mimetype) {
   if (USE_R2) {
@@ -28,6 +29,47 @@ async function uploadFile(filename, buffer, mimetype) {
     fs.writeFileSync(path.join(LOCAL_DIR, filename), buffer);
   }
   return `/uploads/${filename}`;
+}
+
+// ── Airline brand assets (logos + generated avatars) ─────────────────────────
+// Stored under a separate R2 prefix / local folder so they're not mixed with
+// passenger report attachments.
+
+async function uploadAirlineFile(filename, buffer, mimetype) {
+  if (USE_R2) {
+    await s3.send(new presigner.PutObjectCommand({
+      Bucket: BUCKET, Key: `airlines/${filename}`, Body: buffer, ContentType: mimetype,
+    }));
+  } else {
+    if (!fs.existsSync(AIRLINE_LOCAL_DIR)) fs.mkdirSync(AIRLINE_LOCAL_DIR, { recursive: true });
+    fs.writeFileSync(path.join(AIRLINE_LOCAL_DIR, filename), buffer);
+  }
+  return filename;
+}
+
+async function streamAirlineFile(filename, res) {
+  if (USE_R2) {
+    const response = await s3.send(new presigner.GetObjectCommand({ Bucket: BUCKET, Key: `airlines/${filename}` }));
+    if (response.ContentType) res.setHeader('Content-Type', response.ContentType);
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    const bytes = await response.Body.transformToByteArray();
+    res.send(Buffer.from(bytes));
+    return true;
+  }
+  const fp = path.join(AIRLINE_LOCAL_DIR, filename);
+  if (!fs.existsSync(fp)) return false;
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.sendFile(fp);
+  return true;
+}
+
+async function deleteAirlineFile(filename) {
+  if (USE_R2) {
+    await s3.send(new presigner.DeleteObjectCommand({ Bucket: BUCKET, Key: `airlines/${filename}` })).catch(() => {});
+  } else {
+    const fp = path.join(AIRLINE_LOCAL_DIR, filename);
+    if (fs.existsSync(fp)) fs.unlinkSync(fp);
+  }
 }
 
 // Serve a file from R2 directly through the Express response
@@ -59,4 +101,7 @@ async function deleteFile(filename) {
   }
 }
 
-module.exports = { uploadFile, getFileUrl, streamFile, deleteFile, USE_R2, LOCAL_DIR };
+module.exports = {
+  uploadFile, getFileUrl, streamFile, deleteFile, USE_R2, LOCAL_DIR,
+  uploadAirlineFile, streamAirlineFile, deleteAirlineFile, AIRLINE_LOCAL_DIR,
+};

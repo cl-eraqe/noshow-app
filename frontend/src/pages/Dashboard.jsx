@@ -780,6 +780,9 @@ export default function Dashboard() {
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/users')} title="Manage users">
                 Users
               </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate('/airline-logos')} title="Upload airline logos">
+                Airline Logos
+              </button>
             </>
           )}
           <button className="btn btn-primary btn-sm" onClick={() => navigate('/new-report')}>

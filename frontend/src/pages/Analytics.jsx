@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import { useState, useEffect, useMemo, useRef, useLayoutEffect, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area,
 } from 'recharts';
-import { getDashboardData, getFilterOptions } from '../utils/api';
-import AIRLINE_BRAND from '../data/airline-brands.json';
+import { getDashboardData, getFilterOptions, getAirlineBrands } from '../utils/api';
+import AIRLINE_BRAND_DEFAULTS from '../data/airline-brands.json';
 
 // ── Nationality → ISO country code for flagcdn.com
 // Each entry maps BOTH the adjective form ("Ethiopian") and the country name
@@ -66,9 +66,10 @@ const flagUrl = (nat) => {
   return code ? `https://flagcdn.com/w640/${code}.png` : null;
 };
 
-// AIRLINE_BRAND is imported from ../data/airline-brands.json — single source
-// of truth shared with scripts/generate-airline-avatars.mjs which renders
-// the circular avatars at /public/airlines/{IATA}_avatar.png.
+// Live airline brand map: starts as the bundled defaults, then the main
+// Analytics component fetches /api/airline-brands and replaces it via context
+// so supervisor-uploaded logos appear without a rebuild.
+const AirlineBrandContext = createContext(AIRLINE_BRAND_DEFAULTS);
 
 
 const RANGE_LABELS = {
@@ -160,8 +161,9 @@ function KpiCard({ label, value, sub, cases, pax, color, accent, spark, status, 
 // ── Circular avatar (flag for nationality, logo for airline, initial fallback)
 function BarAvatar({ name, mode }) {
   const [broken, setBroken] = useState(false);
+  const brands = useContext(AirlineBrandContext);
   const flag = mode === 'nationality' ? flagUrl(name) : null;
-  const brand = mode === 'airline' ? AIRLINE_BRAND[name] : null;
+  const brand = mode === 'airline' ? brands[name] : null;
   // For airlines, prefer the pre-baked brand-colored avatar (full-fill circle,
   // like an Instagram avatar). Fall back to the raw logo if avatar is missing.
   const src = flag || brand?.avatar || brand?.logo || null;
@@ -187,10 +189,11 @@ function BarRow({ d, pct, mode, onClick }) {
   const fillRef  = useRef(null);
   const labelRef = useRef(null);
   const [outside, setOutside] = useState(false);
+  const brands = useContext(AirlineBrandContext);
   const isAirline     = mode === 'airline';
   const isNationality = mode === 'nationality';
-  const brand = isAirline     ? AIRLINE_BRAND[d.name] : null;
-  const flag  = isNationality ? flagUrl(d.name)       : null;
+  const brand = isAirline     ? brands[d.name]   : null;
+  const flag  = isNationality ? flagUrl(d.name)  : null;
 
   useLayoutEffect(() => {
     const fillEl = fillRef.current;
@@ -351,6 +354,16 @@ export default function Analytics() {
   const [clock, setClock] = useState(new Date());
   const [kpiFilter, setKpiFilter] = useState(null); // { id, label, predicate }
 
+  // Airline brand map — supervisor-uploaded logos replace the bundled defaults.
+  const [airlineBrands, setAirlineBrands] = useState(AIRLINE_BRAND_DEFAULTS);
+  useEffect(() => {
+    let cancelled = false;
+    getAirlineBrands()
+      .then(b => { if (!cancelled && b && Object.keys(b).length) setAirlineBrands(b); })
+      .catch(() => {}); // keep bundled defaults on failure
+    return () => { cancelled = true; };
+  }, []);
+
   // persist widget toggles
   useEffect(() => {
     localStorage.setItem('exec_widgets', JSON.stringify(widgets));
@@ -459,6 +472,7 @@ export default function Analytics() {
   const on = (id) => widgets[id];
 
   return (
+   <AirlineBrandContext.Provider value={airlineBrands}>
     <div className="exec-dashboard">
       {/* ── Header Bar ── */}
       <header className="xheader">
@@ -926,5 +940,6 @@ export default function Analytics() {
         </>
       )}
     </div>
+   </AirlineBrandContext.Provider>
   );
 }
