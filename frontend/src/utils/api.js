@@ -291,11 +291,27 @@ export async function deleteInvite(id) {
   return request(`/api/users/invites/${id}`, { method: 'DELETE' });
 }
 
+// Convert a server-relative path (e.g. "/api/airline-brands/file/SV.png")
+// into an absolute URL pointing at the backend. The dashboard renders these
+// directly in <img src>, and without this they'd hit Vercel's origin (where
+// /api/* doesn't exist) instead of Railway.
+export function absoluteApiUrl(path) {
+  if (!path) return path;
+  if (/^https?:\/\//i.test(path)) return path;          // already absolute
+  if (!path.startsWith('/api/')) return path;            // /airlines/SV.png stays on Vercel
+  return `${BASE}${path}`;
+}
+
 // ── Airline brand management (supervisor)
 // Returns just the overrides (keyed by IATA). The frontend merges them with
 // its bundled defaults in airline-brands.json.
 export async function getAirlineBrandOverrides() {
-  return request('/api/airline-brands/overrides');
+  const out = await request('/api/airline-brands/overrides');
+  for (const ov of Object.values(out || {})) {
+    if (ov.logo)   ov.logo   = absoluteApiUrl(ov.logo);
+    if (ov.avatar) ov.avatar = absoluteApiUrl(ov.avatar);
+  }
+  return out;
 }
 
 export async function uploadAirlineLogo(iata, file, color, avatarBg) {
@@ -310,6 +326,8 @@ export async function uploadAirlineLogo(iata, file, color, avatarBg) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (data.logo)   data.logo   = absoluteApiUrl(data.logo);
+  if (data.avatar) data.avatar = absoluteApiUrl(data.avatar);
   return data;
 }
 
