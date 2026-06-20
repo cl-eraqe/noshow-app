@@ -1850,17 +1850,17 @@ html, body, #root {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* Circular avatar — flag / pre-baked brand-color logo / initial fallback.
-   Airline logos go through scripts/generate-airline-avatars.mjs which
-   composites them on a brand-color square, so cover-fit fills the circle
-   edge-to-edge with no white padding. */
+/* Circular avatar — flag for nationality, raw uploaded image for airline,
+   initial-letter placeholder if neither. We deliberately don't paint a
+   background behind the image — uploaded logos render exactly as supplied
+   (transparent areas show the dashboard background through). */
 .xbar-avatar {
   width: 24px;
   height: 24px;
   border-radius: 50%;
   flex-shrink: 0;
   object-fit: cover;
-  background: var(--xpanel-2);
+  background: transparent;
   border: 1px solid var(--xborder-2);
   box-shadow: 0 1px 3px rgba(0,0,0,0.35);
 }

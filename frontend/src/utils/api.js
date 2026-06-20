@@ -314,11 +314,9 @@ export async function getAirlineBrandOverrides() {
   return out;
 }
 
-export async function uploadAirlineLogo(iata, file, color, avatarBg) {
+export async function uploadAirlineLogo(iata, file) {
   const fd = new FormData();
   fd.append('logo', file, file.name);
-  fd.append('color', color);
-  if (avatarBg && avatarBg !== color) fd.append('avatarBg', avatarBg);
   const res = await fetch(`${BASE}/api/airline-brands/${encodeURIComponent(iata)}/logo`, {
     method: 'POST',
     headers: authHeaders(),
@@ -495,6 +493,17 @@ export function airlineLogo(flightNumber) {
   if (!code) return null;
   // Kiwi.com airline logo CDN – small PNGs, widely available
   return `https://images.kiwi.com/airlines/64/${code}.png`;
+}
+
+// Reverse lookup: airline display name → IATA code (the first match wins).
+// Used so the dashboard can upload a logo for any airline shown in the chart,
+// even ones that don't have a bundled-default entry in airline-brands.json.
+export function iataForAirlineName(name) {
+  if (!name) return null;
+  for (const [iata, n] of Object.entries(AIRLINE_CODES)) {
+    if (n === name) return iata;
+  }
+  return null;
 }
 
 export function airlineFromFlightNumber(flightNumber) {
