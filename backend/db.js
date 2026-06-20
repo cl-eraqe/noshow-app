@@ -111,6 +111,16 @@ async function initDb() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_invite_token ON invite_tokens(token)`);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS airline_brand_overrides (
+      iata         TEXT PRIMARY KEY,
+      logo_file    TEXT NOT NULL,
+      avatar_file  TEXT NOT NULL,
+      updated_at   TEXT NOT NULL,
+      updated_by   TEXT
+    )
+  `);
+
   // Add confirmed_by column if not exists (idempotent migration)
   await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS confirmed_by TEXT`);
 
