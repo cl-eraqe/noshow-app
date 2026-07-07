@@ -31,6 +31,14 @@
     "nationality": "Afghan",
     "terminal": "Hajj"
   },
+  "F3809": {
+    "destination": "SAW",
+    "std": "00:05",
+    "city": "Istanbul (Sabiha Gökçen)",
+    "country": "Turkey",
+    "nationality": "Turkish",
+    "terminal": "T1"
+  },
   "QP7634": {
     "destination": "AMD",
     "std": "00:05",
@@ -135,14 +143,6 @@
     "nationality": "Indian",
     "terminal": "Hajj"
   },
-  "NE501": {
-    "destination": "LXR",
-    "std": "00:10",
-    "city": "Luxor",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
-  },
   "IR1615": {
     "destination": "IKA",
     "std": "00:10",
@@ -231,20 +231,20 @@
     "nationality": "Iranian",
     "terminal": "Hajj"
   },
+  "SV590": {
+    "destination": "DXB",
+    "std": "00:15",
+    "city": "Dubai",
+    "country": "United Arab Emirates",
+    "nationality": "Emirati",
+    "terminal": "T1"
+  },
   "IR1607": {
     "destination": "MHD",
     "std": "00:15",
     "city": "Mashhad",
     "country": "Iran",
     "nationality": "Iranian",
-    "terminal": "Hajj"
-  },
-  "QP562": {
-    "destination": "BOM",
-    "std": "00:15",
-    "city": "Mumbai",
-    "country": "India",
-    "nationality": "Indian",
     "terminal": "Hajj"
   },
   "IR1557": {
@@ -319,6 +319,14 @@
     "nationality": "Iranian",
     "terminal": "Hajj"
   },
+  "MS644": {
+    "destination": "CAI",
+    "std": "00:30",
+    "city": "Cairo",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "T1"
+  },
   "IX942": {
     "destination": "BLR",
     "std": "00:30",
@@ -342,14 +350,6 @@
     "country": "Pakistan",
     "nationality": "Pakistani",
     "terminal": "T1"
-  },
-  "JT113": {
-    "destination": "CGK",
-    "std": "00:30",
-    "city": "Jakarta",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
-    "terminal": "Hajj"
   },
   "SM472": {
     "destination": "CAI",
@@ -383,14 +383,6 @@
     "nationality": "Iranian",
     "terminal": "Hajj"
   },
-  "JT77": {
-    "destination": "PLM",
-    "std": "00:30",
-    "city": "Palembang",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
-    "terminal": "Hajj"
-  },
   "SV5595": {
     "destination": "FEZ",
     "std": "00:35",
@@ -406,14 +398,6 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "Hajj"
-  },
-  "SV590": {
-    "destination": "DXB",
-    "std": "00:40",
-    "city": "Dubai",
-    "country": "United Arab Emirates",
-    "nationality": "Emirati",
-    "terminal": "T1"
   },
   "SV724": {
     "destination": "ISB",
@@ -431,13 +415,13 @@
     "nationality": "Turkish",
     "terminal": "Hajj"
   },
-  "MS644": {
-    "destination": "CAI",
+  "RB382": {
+    "destination": "ALP",
     "std": "00:45",
-    "city": "Cairo",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "T1"
+    "city": "Aleppo",
+    "country": "Syria",
+    "nationality": "Syrian",
+    "terminal": "North"
   },
   "F37382": {
     "destination": "GAU",
@@ -463,6 +447,14 @@
     "nationality": "Turkish",
     "terminal": "Hajj"
   },
+  "SV856": {
+    "destination": "DPS",
+    "std": "00:55",
+    "city": "Bali (Denpasar)",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "T1"
+  },
   "WY674": {
     "destination": "MCT",
     "std": "00:55",
@@ -486,6 +478,14 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "T1"
+  },
+  "OD706": {
+    "destination": "KUL",
+    "std": "01:00",
+    "city": "Kuala Lumpur",
+    "country": "Malaysia",
+    "nationality": "Malaysian",
+    "terminal": "Hajj"
   },
   "AH471": {
     "destination": "ALG",
@@ -566,14 +566,6 @@
     "country": "Morocco",
     "nationality": "Moroccan",
     "terminal": "Hajj"
-  },
-  "SV856": {
-    "destination": "DPS",
-    "std": "01:00",
-    "city": "Bali (Denpasar)",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
-    "terminal": "T1"
   },
   "F37426": {
     "destination": "YEI",
@@ -677,14 +669,6 @@
     "city": "Lucknow",
     "country": "India",
     "nationality": "Indian",
-    "terminal": "Hajj"
-  },
-  "PK732": {
-    "destination": "KHI",
-    "std": "01:20",
-    "city": "Karachi",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
     "terminal": "Hajj"
   },
   "C6328": {
@@ -839,6 +823,22 @@
     "nationality": "Pakistani",
     "terminal": "Hajj"
   },
+  "6E76": {
+    "destination": "AMD",
+    "std": "01:30",
+    "city": "Ahmedabad",
+    "country": "India",
+    "nationality": "Indian",
+    "terminal": "North"
+  },
+  "GA975": {
+    "destination": "SUB",
+    "std": "01:35",
+    "city": "Surabaya",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "Hajj"
+  },
   "SV754": {
     "destination": "HYD",
     "std": "01:35",
@@ -870,14 +870,6 @@
     "country": "Tunisia",
     "nationality": "Tunisian",
     "terminal": "Hajj"
-  },
-  "SV722": {
-    "destination": "ISB",
-    "std": "01:40",
-    "city": "Islamabad",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "T1"
   },
   "SV866": {
     "destination": "BLR",
@@ -958,6 +950,14 @@
     "country": "India",
     "nationality": "Indian",
     "terminal": "Hajj"
+  },
+  "SV722": {
+    "destination": "ISB",
+    "std": "01:50",
+    "city": "Islamabad",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "T1"
   },
   "SV3650": {
     "destination": "BKK",
@@ -1111,20 +1111,12 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
-  "PK740": {
-    "destination": "MUX",
+  "F39232": {
+    "destination": "TAS",
     "std": "02:00",
-    "city": "Multan",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
-  },
-  "OD706": {
-    "destination": "KUL",
-    "std": "02:00",
-    "city": "Kuala Lumpur",
-    "country": "Malaysia",
-    "nationality": "Malaysian",
+    "city": "Tashkent",
+    "country": "Uzbekistan",
+    "nationality": "Uzbek",
     "terminal": "Hajj"
   },
   "RQ2050": {
@@ -1271,6 +1263,14 @@
     "nationality": "Bangladeshi",
     "terminal": "T1"
   },
+  "F39234": {
+    "destination": "TAS",
+    "std": "02:10",
+    "city": "Tashkent",
+    "country": "Uzbekistan",
+    "nationality": "Uzbek",
+    "terminal": "Hajj"
+  },
   "FG2404": {
     "destination": "KBL",
     "std": "02:10",
@@ -1295,6 +1295,14 @@
     "nationality": "Egyptian",
     "terminal": "North"
   },
+  "VF610": {
+    "destination": "ESB",
+    "std": "02:15",
+    "city": "Ankara",
+    "country": "Turkey",
+    "nationality": "Turkish",
+    "terminal": "T1"
+  },
   "SV5154": {
     "destination": "BTH",
     "std": "02:15",
@@ -1310,22 +1318,6 @@
     "country": "Yemen",
     "nationality": "Yemeni",
     "terminal": "North"
-  },
-  "PK842": {
-    "destination": "ISB",
-    "std": "02:20",
-    "city": "Islamabad",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
-  },
-  "PK932": {
-    "destination": "ISB",
-    "std": "02:20",
-    "city": "Islamabad",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
   },
   "SV5605": {
     "destination": "KAN",
@@ -1471,14 +1463,6 @@
     "nationality": "Turkish",
     "terminal": "Hajj"
   },
-  "PF719": {
-    "destination": "ISB",
-    "std": "02:35",
-    "city": "Islamabad",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
-  },
   "TK5317": {
     "destination": "ERZ",
     "std": "02:35",
@@ -1486,6 +1470,14 @@
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
+  },
+  "SV872": {
+    "destination": "MLE",
+    "std": "02:40",
+    "city": "Malé",
+    "country": "Maldives",
+    "nationality": "Maldivian",
+    "terminal": "T1"
   },
   "SV3656": {
     "destination": "BKK",
@@ -1511,13 +1503,13 @@
     "nationality": "Cameroonian",
     "terminal": "Hajj"
   },
-  "VF610": {
-    "destination": "ESB",
+  "PF719": {
+    "destination": "ISB",
     "std": "02:50",
-    "city": "Ankara",
-    "country": "Turkey",
-    "nationality": "Turkish",
-    "terminal": "T1"
+    "city": "Islamabad",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
   },
   "PF717": {
     "destination": "LHE",
@@ -1550,6 +1542,14 @@
     "country": "Burkina Faso",
     "nationality": "Burkinabé",
     "terminal": "Hajj"
+  },
+  "F3821": {
+    "destination": "PRG",
+    "std": "02:55",
+    "city": "Prague",
+    "country": "Czech Republic",
+    "nationality": "Czech",
+    "terminal": "T1"
   },
   "E5322": {
     "destination": "HBE",
@@ -1623,14 +1623,6 @@
     "nationality": "Nigerian",
     "terminal": "Hajj"
   },
-  "VF190": {
-    "destination": "SAW",
-    "std": "03:05",
-    "city": "Istanbul (Sabiha Gökçen)",
-    "country": "Turkey",
-    "nationality": "Turkish",
-    "terminal": "T1"
-  },
   "QR3063": {
     "destination": "DOH",
     "std": "03:05",
@@ -1702,6 +1694,14 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "North"
+  },
+  "VF190": {
+    "destination": "SAW",
+    "std": "03:10",
+    "city": "Istanbul (Sabiha Gökçen)",
+    "country": "Turkey",
+    "nationality": "Turkish",
+    "terminal": "T1"
   },
   "ET8333": {
     "destination": "GOU",
@@ -1781,14 +1781,6 @@
     "city": "Monastir",
     "country": "Tunisia",
     "nationality": "Tunisian",
-    "terminal": "Hajj"
-  },
-  "PF721": {
-    "destination": "SKT",
-    "std": "03:25",
-    "city": "Sialkot",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
     "terminal": "Hajj"
   },
   "BG3106": {
@@ -1959,6 +1951,14 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
+  "PF721": {
+    "destination": "SKT",
+    "std": "03:35",
+    "city": "Sialkot",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
   "VF6342": {
     "destination": "DIY",
     "std": "03:40",
@@ -2055,14 +2055,6 @@
     "nationality": "Senegalese",
     "terminal": "Hajj"
   },
-  "PK760": {
-    "destination": "LHE",
-    "std": "03:50",
-    "city": "Lahore",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
-  },
   "PK736": {
     "destination": "PEW",
     "std": "03:50",
@@ -2085,6 +2077,14 @@
     "city": "Djibouti",
     "country": "Djibouti",
     "nationality": "Djiboutian",
+    "terminal": "T1"
+  },
+  "F3815": {
+    "destination": "TZX",
+    "std": "03:55",
+    "city": "Trabzon",
+    "country": "Turkey",
+    "nationality": "Turkish",
     "terminal": "T1"
   },
   "KC266": {
@@ -2263,20 +2263,20 @@
     "nationality": "Indian",
     "terminal": "Hajj"
   },
+  "PA873": {
+    "destination": "MUX",
+    "std": "04:10",
+    "city": "Multan",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
   "F37390": {
     "destination": "VGA",
     "std": "04:10",
     "city": "Vijayawada",
     "country": "India",
     "nationality": "Indian",
-    "terminal": "Hajj"
-  },
-  "PA871": {
-    "destination": "MUX",
-    "std": "04:10",
-    "city": "Multan",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
     "terminal": "Hajj"
   },
   "TU5002": {
@@ -2295,20 +2295,20 @@
     "nationality": "Indian",
     "terminal": "North"
   },
+  "AH487": {
+    "destination": "AAE",
+    "std": "04:15",
+    "city": "Annaba",
+    "country": "Algeria",
+    "nationality": "Algerian",
+    "terminal": "Hajj"
+  },
   "SV5796": {
     "destination": "DAC",
     "std": "04:15",
     "city": "Dhaka",
     "country": "Bangladesh",
     "nationality": "Bangladeshi",
-    "terminal": "Hajj"
-  },
-  "AH487": {
-    "destination": "BLJ",
-    "std": "04:15",
-    "city": "Batna",
-    "country": "Algeria",
-    "nationality": "Algerian",
     "terminal": "Hajj"
   },
   "F37394": {
@@ -2374,6 +2374,14 @@
     "country": "Jordan",
     "nationality": "Jordanian",
     "terminal": "T1"
+  },
+  "PA471": {
+    "destination": "LHE",
+    "std": "04:30",
+    "city": "Lahore",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
   },
   "IY507": {
     "destination": "ADE",
@@ -2503,13 +2511,21 @@
     "nationality": "Ethiopian",
     "terminal": "North"
   },
-  "VF568": {
-    "destination": "ESB",
-    "std": "04:40",
-    "city": "Ankara",
-    "country": "Turkey",
-    "nationality": "Turkish",
-    "terminal": "T1"
+  "PK832": {
+    "destination": "KHI",
+    "std": "04:45",
+    "city": "Karachi",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
+  "PA271": {
+    "destination": "ISB",
+    "std": "04:45",
+    "city": "Islamabad",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
   },
   "D31826": {
     "destination": "MGQ",
@@ -2517,14 +2533,6 @@
     "city": "Mogadishu",
     "country": "Somalia",
     "nationality": "Somali",
-    "terminal": "Hajj"
-  },
-  "C63320": {
-    "destination": "TAS",
-    "std": "04:45",
-    "city": "Tashkent",
-    "country": "Uzbekistan",
-    "nationality": "Uzbek",
     "terminal": "Hajj"
   },
   "PA273": {
@@ -2767,12 +2775,28 @@
     "nationality": "Nigerian",
     "terminal": "Hajj"
   },
-  "J4669": {
-    "destination": "KRT",
+  "VF568": {
+    "destination": "ESB",
     "std": "05:10",
-    "city": "Khartoum",
-    "country": "Sudan",
-    "nationality": "Sudanese",
+    "city": "Ankara",
+    "country": "Turkey",
+    "nationality": "Turkish",
+    "terminal": "T1"
+  },
+  "C6324": {
+    "destination": "FEG",
+    "std": "05:10",
+    "city": "Fergana",
+    "country": "Uzbekistan",
+    "nationality": "Uzbek",
+    "terminal": "Hajj"
+  },
+  "PC699": {
+    "destination": "SAW",
+    "std": "05:10",
+    "city": "Istanbul (Sabiha Gökçen)",
+    "country": "Turkey",
+    "nationality": "Turkish",
     "terminal": "North"
   },
   "J95320": {
@@ -2967,13 +2991,21 @@
     "nationality": "Nigerien",
     "terminal": "Hajj"
   },
-  "PC699": {
-    "destination": "SAW",
+  "PA871": {
+    "destination": "MUX",
     "std": "05:30",
-    "city": "Istanbul (Sabiha Gökçen)",
-    "country": "Turkey",
-    "nationality": "Turkish",
-    "terminal": "North"
+    "city": "Multan",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
+  "F39122": {
+    "destination": "TAS",
+    "std": "05:30",
+    "city": "Tashkent",
+    "country": "Uzbekistan",
+    "nationality": "Uzbek",
+    "terminal": "Hajj"
   },
   "NE177": {
     "destination": "CAI",
@@ -3014,14 +3046,6 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "North"
-  },
-  "PA873": {
-    "destination": "MUX",
-    "std": "05:30",
-    "city": "Multan",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
   },
   "XY9140": {
     "destination": "DAC",
@@ -3080,9 +3104,9 @@
     "terminal": "Hajj"
   },
   "PF723": {
-    "destination": "KHI",
+    "destination": "MUX",
     "std": "05:35",
-    "city": "Karachi",
+    "city": "Multan",
     "country": "Pakistan",
     "nationality": "Pakistani",
     "terminal": "Hajj"
@@ -3133,14 +3157,6 @@
     "city": "Alexandria (Borg El Arab)",
     "country": "Egypt",
     "nationality": "Egyptian",
-    "terminal": "T1"
-  },
-  "XY693": {
-    "destination": "ASM",
-    "std": "05:40",
-    "city": "Asmara",
-    "country": "Eritrea",
-    "nationality": "Eritrean",
     "terminal": "T1"
   },
   "D31830": {
@@ -3552,9 +3568,9 @@
     "terminal": "Hajj"
   },
   "AH465": {
-    "destination": "AZR",
+    "destination": "CZL",
     "std": "06:20",
-    "city": "Adrar",
+    "city": "Constantine",
     "country": "Algeria",
     "nationality": "Algerian",
     "terminal": "Hajj"
@@ -3574,6 +3590,14 @@
     "country": "Pakistan",
     "nationality": "Pakistani",
     "terminal": "Hajj"
+  },
+  "XY565": {
+    "destination": "CAI",
+    "std": "06:25",
+    "city": "Cairo",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "T1"
   },
   "HY5342": {
     "destination": "NMA",
@@ -3606,22 +3630,6 @@
     "country": "Jordan",
     "nationality": "Jordanian",
     "terminal": "T1"
-  },
-  "XY565": {
-    "destination": "CAI",
-    "std": "06:25",
-    "city": "Cairo",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "T1"
-  },
-  "SM454": {
-    "destination": "HMB",
-    "std": "06:30",
-    "city": "Sohag",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
   },
   "2S6939": {
     "destination": "ESB",
@@ -3751,6 +3759,14 @@
     "nationality": "Malaysian",
     "terminal": "Hajj"
   },
+  "SM492": {
+    "destination": "HRG",
+    "std": "06:45",
+    "city": "Hurghada",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
+  },
   "HY5344": {
     "destination": "AZN",
     "std": "06:45",
@@ -3782,6 +3798,14 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "T1"
+  },
+  "SM452": {
+    "destination": "HBE",
+    "std": "06:55",
+    "city": "Alexandria (Borg El Arab)",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
   },
   "J95644": {
     "destination": "MCX",
@@ -3959,6 +3983,14 @@
     "nationality": "Omani",
     "terminal": "T1"
   },
+  "SM478": {
+    "destination": "CAI",
+    "std": "07:05",
+    "city": "Cairo",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
+  },
   "2S6114": {
     "destination": "KYA",
     "std": "07:05",
@@ -3997,6 +4029,30 @@
     "city": "Makhachkala",
     "country": "Russia",
     "nationality": "Russian",
+    "terminal": "Hajj"
+  },
+  "NE501": {
+    "destination": "LXR",
+    "std": "07:15",
+    "city": "Luxor",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
+  },
+  "PK840": {
+    "destination": "MUX",
+    "std": "07:15",
+    "city": "Multan",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
+  "PA171": {
+    "destination": "KHI",
+    "std": "07:15",
+    "city": "Karachi",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
     "terminal": "Hajj"
   },
   "IX3402": {
@@ -4095,6 +4151,14 @@
     "nationality": "Pakistani",
     "terminal": "Hajj"
   },
+  "SM490": {
+    "destination": "HRG",
+    "std": "07:20",
+    "city": "Hurghada",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
+  },
   "ET8403": {
     "destination": "NDJ",
     "std": "07:20",
@@ -4145,7 +4209,7 @@
   },
   "XY623": {
     "destination": "TBS",
-    "std": "07:20",
+    "std": "07:25",
     "city": "Tbilisi",
     "country": "Georgia",
     "nationality": "Georgian",
@@ -4158,14 +4222,6 @@
     "country": "India",
     "nationality": "Indian",
     "terminal": "North"
-  },
-  "PK832": {
-    "destination": "KHI",
-    "std": "07:25",
-    "city": "Karachi",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
   },
   "SV3588": {
     "destination": "DXB",
@@ -4197,22 +4253,6 @@
     "city": "Kazan",
     "country": "Russia",
     "nationality": "Russian",
-    "terminal": "Hajj"
-  },
-  "VF192": {
-    "destination": "SAW",
-    "std": "07:30",
-    "city": "Istanbul (Sabiha Gökçen)",
-    "country": "Turkey",
-    "nationality": "Turkish",
-    "terminal": "T1"
-  },
-  "PK742": {
-    "destination": "ISB",
-    "std": "07:30",
-    "city": "Islamabad",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
     "terminal": "Hajj"
   },
   "P47937": {
@@ -4311,14 +4351,6 @@
     "nationality": "Egyptian",
     "terminal": "North"
   },
-  "SM478": {
-    "destination": "CAI",
-    "std": "07:40",
-    "city": "Cairo",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
-  },
   "MS4054": {
     "destination": "CAI",
     "std": "07:40",
@@ -4358,14 +4390,6 @@
     "country": "Indonesia",
     "nationality": "Indonesian",
     "terminal": "Hajj"
-  },
-  "SM456": {
-    "destination": "ATZ",
-    "std": "07:45",
-    "city": "Assiut",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
   },
   "ET8717": {
     "destination": "NIM",
@@ -4487,6 +4511,22 @@
     "nationality": "Ghanaian",
     "terminal": "Hajj"
   },
+  "F3819": {
+    "destination": "BGY",
+    "std": "08:00",
+    "city": "Bergamo (Milan)",
+    "country": "Italy",
+    "nationality": "Italian",
+    "terminal": "T1"
+  },
+  "F3823": {
+    "destination": "SJJ",
+    "std": "08:00",
+    "city": "Sarajevo",
+    "country": "Bosnia and Herzegovina",
+    "nationality": "Bosnian",
+    "terminal": "T1"
+  },
   "XY9676": {
     "destination": "ACC",
     "std": "08:00",
@@ -4575,14 +4615,6 @@
     "nationality": "Pakistani",
     "terminal": "Hajj"
   },
-  "SM452": {
-    "destination": "HBE",
-    "std": "08:10",
-    "city": "Alexandria (Borg El Arab)",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
-  },
   "E5324": {
     "destination": "HBE",
     "std": "08:10",
@@ -4639,6 +4671,22 @@
     "nationality": "Spanish",
     "terminal": "T1"
   },
+  "J4665": {
+    "destination": "PZU",
+    "std": "08:25",
+    "city": "Port Sudan",
+    "country": "Sudan",
+    "nationality": "Sudanese",
+    "terminal": "North"
+  },
+  "J4669": {
+    "destination": "PZU",
+    "std": "08:25",
+    "city": "Port Sudan",
+    "country": "Sudan",
+    "nationality": "Sudanese",
+    "terminal": "North"
+  },
   "HY5362": {
     "destination": "FEG",
     "std": "08:25",
@@ -4670,14 +4718,6 @@
     "country": "Maldives",
     "nationality": "Maldivian",
     "terminal": "T1"
-  },
-  "PK840": {
-    "destination": "MUX",
-    "std": "08:30",
-    "city": "Multan",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
   },
   "MS646": {
     "destination": "CAI",
@@ -4743,13 +4783,13 @@
     "nationality": "Indonesian",
     "terminal": "T1"
   },
-  "J4665": {
-    "destination": "PZU",
+  "VF192": {
+    "destination": "SAW",
     "std": "08:45",
-    "city": "Port Sudan",
-    "country": "Sudan",
-    "nationality": "Sudanese",
-    "terminal": "North"
+    "city": "Istanbul (Sabiha Gökçen)",
+    "country": "Turkey",
+    "nationality": "Turkish",
+    "terminal": "T1"
   },
   "NE171": {
     "destination": "CAI",
@@ -4895,6 +4935,14 @@
     "nationality": "Chadian",
     "terminal": "Hajj"
   },
+  "PK740": {
+    "destination": "MUX",
+    "std": "09:00",
+    "city": "Multan",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
   "J4667": {
     "destination": "PZU",
     "std": "09:00",
@@ -5007,6 +5055,14 @@
     "nationality": "Nigerian",
     "terminal": "Hajj"
   },
+  "QP595": {
+    "destination": "CCJ",
+    "std": "09:05",
+    "city": "Kozhikode (Calicut)",
+    "country": "India",
+    "nationality": "Indian",
+    "terminal": "Hajj"
+  },
   "2S6154": {
     "destination": "KYA",
     "std": "09:05",
@@ -5055,14 +5111,6 @@
     "nationality": "Russian",
     "terminal": "Hajj"
   },
-  "J9204": {
-    "destination": "KWI",
-    "std": "09:10",
-    "city": "Kuwait City",
-    "country": "Kuwait",
-    "nationality": "Kuwaiti",
-    "terminal": "North"
-  },
   "J95132": {
     "destination": "DME",
     "std": "09:10",
@@ -5103,14 +5151,6 @@
     "nationality": "Russian",
     "terminal": "Hajj"
   },
-  "QP595": {
-    "destination": "CCJ",
-    "std": "09:15",
-    "city": "Kozhikode (Calicut)",
-    "country": "India",
-    "nationality": "Indian",
-    "terminal": "Hajj"
-  },
   "SV61": {
     "destination": "YYZ",
     "std": "09:15",
@@ -5126,6 +5166,14 @@
     "country": "Algeria",
     "nationality": "Algerian",
     "terminal": "Hajj"
+  },
+  "XY655": {
+    "destination": "RZV",
+    "std": "09:20",
+    "city": "Rezvanshahr",
+    "country": "Iran",
+    "nationality": "Iranian",
+    "terminal": "T1"
   },
   "ER822": {
     "destination": "LHE",
@@ -5295,12 +5343,12 @@
     "nationality": "Senegalese",
     "terminal": "Hajj"
   },
-  "SV211": {
-    "destination": "MXP",
+  "SV233": {
+    "destination": "ZRH",
     "std": "09:35",
-    "city": "Milan (Malpensa)",
-    "country": "Italy",
-    "nationality": "Italian",
+    "city": "Zurich",
+    "country": "Switzerland",
+    "nationality": "Swiss",
     "terminal": "T1"
   },
   "SV5408": {
@@ -5310,6 +5358,30 @@
     "country": "Indonesia",
     "nationality": "Indonesian",
     "terminal": "Hajj"
+  },
+  "SV151": {
+    "destination": "VIE",
+    "std": "09:40",
+    "city": "Vienna",
+    "country": "Austria",
+    "nationality": "Austrian",
+    "terminal": "T1"
+  },
+  "SV211": {
+    "destination": "MXP",
+    "std": "09:40",
+    "city": "Milan (Malpensa)",
+    "country": "Italy",
+    "nationality": "Italian",
+    "terminal": "T1"
+  },
+  "SV279": {
+    "destination": "AYT",
+    "std": "09:40",
+    "city": "Antalya",
+    "country": "Turkey",
+    "nationality": "Turkish",
+    "terminal": "T1"
   },
   "SV237": {
     "destination": "GVA",
@@ -5399,13 +5471,13 @@
     "nationality": "Syrian",
     "terminal": "Hajj"
   },
-  "SV41": {
-    "destination": "LAX",
+  "IX940": {
+    "destination": "HYD",
     "std": "09:50",
-    "city": "Los Angeles",
-    "country": "USA",
-    "nationality": "American",
-    "terminal": "T1"
+    "city": "Hyderabad",
+    "country": "India",
+    "nationality": "Indian",
+    "terminal": "North"
   },
   "RB1914": {
     "destination": "DAM",
@@ -5414,6 +5486,22 @@
     "country": "Syria",
     "nationality": "Syrian",
     "terminal": "Hajj"
+  },
+  "SV175": {
+    "destination": "MUC",
+    "std": "09:55",
+    "city": "Munich",
+    "country": "Germany",
+    "nationality": "German",
+    "terminal": "T1"
+  },
+  "SV41": {
+    "destination": "LAX",
+    "std": "09:55",
+    "city": "Los Angeles",
+    "country": "USA",
+    "nationality": "American",
+    "terminal": "T1"
   },
   "F37502": {
     "destination": "CAI",
@@ -5462,14 +5550,6 @@
     "country": "Uzbekistan",
     "nationality": "Uzbek",
     "terminal": "Hajj"
-  },
-  "IX940": {
-    "destination": "HYD",
-    "std": "10:00",
-    "city": "Hyderabad",
-    "country": "India",
-    "nationality": "Indian",
-    "terminal": "North"
   },
   "RQ2046": {
     "destination": "HEA",
@@ -5542,14 +5622,6 @@
     "country": "Oman",
     "nationality": "Omani",
     "terminal": "Hajj"
-  },
-  "XY587": {
-    "destination": "SPX",
-    "std": "10:00",
-    "city": "Sphinx (Cairo)",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "T1"
   },
   "XY9478": {
     "destination": "DAC",
@@ -5631,6 +5703,14 @@
     "nationality": "Ivorian",
     "terminal": "Hajj"
   },
+  "XY639": {
+    "destination": "TZX",
+    "std": "10:05",
+    "city": "Trabzon",
+    "country": "Turkey",
+    "nationality": "Turkish",
+    "terminal": "T1"
+  },
   "ET8647": {
     "destination": "OUA",
     "std": "10:05",
@@ -5687,14 +5767,6 @@
     "nationality": "Egyptian",
     "terminal": "North"
   },
-  "SV151": {
-    "destination": "VIE",
-    "std": "10:10",
-    "city": "Vienna",
-    "country": "Austria",
-    "nationality": "Austrian",
-    "terminal": "T1"
-  },
   "SV341": {
     "destination": "ALG",
     "std": "10:10",
@@ -5743,14 +5815,6 @@
     "nationality": "Jordanian",
     "terminal": "T1"
   },
-  "NE173": {
-    "destination": "CAI",
-    "std": "10:15",
-    "city": "Cairo",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
-  },
   "SV568": {
     "destination": "DXB",
     "std": "10:15",
@@ -5774,14 +5838,6 @@
     "country": "Mali",
     "nationality": "Malian",
     "terminal": "Hajj"
-  },
-  "SV175": {
-    "destination": "MUC",
-    "std": "10:25",
-    "city": "Munich",
-    "country": "Germany",
-    "nationality": "German",
-    "terminal": "T1"
   },
   "D31746": {
     "destination": "HGA",
@@ -5871,6 +5927,14 @@
     "nationality": "Somali",
     "terminal": "Hajj"
   },
+  "OV288": {
+    "destination": "MCT",
+    "std": "10:35",
+    "city": "Muscat",
+    "country": "Oman",
+    "nationality": "Omani",
+    "terminal": "North"
+  },
   "SV5000": {
     "destination": "KUL",
     "std": "10:35",
@@ -5886,14 +5950,6 @@
     "country": "Malaysia",
     "nationality": "Malaysian",
     "terminal": "Hajj"
-  },
-  "OV288": {
-    "destination": "MCT",
-    "std": "10:35",
-    "city": "Muscat",
-    "country": "Oman",
-    "nationality": "Omani",
-    "terminal": "North"
   },
   "SV201": {
     "destination": "FCO",
@@ -6359,14 +6415,6 @@
     "nationality": "Russian",
     "terminal": "Hajj"
   },
-  "HU7914": {
-    "destination": "HAK",
-    "std": "11:15",
-    "city": "Haikou",
-    "country": "China",
-    "nationality": "Chinese",
-    "terminal": "T1"
-  },
   "F37314": {
     "destination": "CCU",
     "std": "11:15",
@@ -6390,6 +6438,14 @@
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
+  },
+  "XY587": {
+    "destination": "SPX",
+    "std": "11:20",
+    "city": "Sphinx (Cairo)",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "T1"
   },
   "SV5300": {
     "destination": "SUB",
@@ -6439,6 +6495,14 @@
     "nationality": "Egyptian",
     "terminal": "T1"
   },
+  "SD229": {
+    "destination": "PZU",
+    "std": "11:30",
+    "city": "Port Sudan",
+    "country": "Sudan",
+    "nationality": "Sudanese",
+    "terminal": "North"
+  },
   "AH4331": {
     "destination": "ORN",
     "std": "11:30",
@@ -6478,14 +6542,6 @@
     "country": "India",
     "nationality": "Indian",
     "terminal": "Hajj"
-  },
-  "SM490": {
-    "destination": "HRG",
-    "std": "11:30",
-    "city": "Hurghada",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
   },
   "XY581": {
     "destination": "HMB",
@@ -6527,12 +6583,12 @@
     "nationality": "Turkish",
     "terminal": "Hajj"
   },
-  "XY645": {
-    "destination": "HRG",
+  "HU7914": {
+    "destination": "HAK",
     "std": "11:45",
-    "city": "Hurghada",
-    "country": "Egypt",
-    "nationality": "Egyptian",
+    "city": "Haikou",
+    "country": "China",
+    "nationality": "Chinese",
     "terminal": "T1"
   },
   "FH9312": {
@@ -6630,14 +6686,6 @@
     "country": "India",
     "nationality": "Indian",
     "terminal": "Hajj"
-  },
-  "SD229": {
-    "destination": "PZU",
-    "std": "12:00",
-    "city": "Port Sudan",
-    "country": "Sudan",
-    "nationality": "Sudanese",
-    "terminal": "North"
   },
   "TK5299": {
     "destination": "OGU",
@@ -6839,13 +6887,13 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
-  "KU788": {
-    "destination": "KWI",
+  "PK760": {
+    "destination": "LHE",
     "std": "12:10",
-    "city": "Kuwait City",
-    "country": "Kuwait",
-    "nationality": "Kuwaiti",
-    "terminal": "T1"
+    "city": "Lahore",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
   },
   "PK960": {
     "destination": "UET",
@@ -6926,14 +6974,6 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "Hajj"
-  },
-  "IY515": {
-    "destination": "ADE",
-    "std": "12:15",
-    "city": "Aden",
-    "country": "Yemen",
-    "nationality": "Yemeni",
-    "terminal": "North"
   },
   "IR1631": {
     "destination": "SYZ",
@@ -7047,10 +7087,18 @@
     "nationality": "Iranian",
     "terminal": "Hajj"
   },
-  "J4663": {
-    "destination": "PZU",
+  "XY645": {
+    "destination": "HRG",
     "std": "12:30",
-    "city": "Port Sudan",
+    "city": "Hurghada",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "T1"
+  },
+  "J4663": {
+    "destination": "KRT",
+    "std": "12:30",
+    "city": "Khartoum",
     "country": "Sudan",
     "nationality": "Sudanese",
     "terminal": "North"
@@ -7182,6 +7230,22 @@
     "country": "Indonesia",
     "nationality": "Indonesian",
     "terminal": "Hajj"
+  },
+  "KU788": {
+    "destination": "KWI",
+    "std": "12:40",
+    "city": "Kuwait City",
+    "country": "Kuwait",
+    "nationality": "Kuwaiti",
+    "terminal": "T1"
+  },
+  "NE173": {
+    "destination": "CAI",
+    "std": "12:40",
+    "city": "Cairo",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
   },
   "MS3715": {
     "destination": "BKO",
@@ -7333,6 +7397,14 @@
     "city": "Kano",
     "country": "Nigeria",
     "nationality": "Nigerian",
+    "terminal": "Hajj"
+  },
+  "PK932": {
+    "destination": "KHI",
+    "std": "12:55",
+    "city": "Karachi",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
     "terminal": "Hajj"
   },
   "DH201": {
@@ -7839,13 +7911,13 @@
     "nationality": "Ghanaian",
     "terminal": "Hajj"
   },
-  "F39232": {
-    "destination": "TAS",
+  "XY571": {
+    "destination": "CAI",
     "std": "13:30",
-    "city": "Tashkent",
-    "country": "Uzbekistan",
-    "nationality": "Uzbek",
-    "terminal": "Hajj"
+    "city": "Cairo",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "T1"
   },
   "P47919": {
     "destination": "LOS",
@@ -7975,13 +8047,13 @@
     "nationality": "Ethiopian",
     "terminal": "Hajj"
   },
-  "SM476": {
-    "destination": "CAI",
+  "XY663": {
+    "destination": "CMN",
     "std": "13:40",
-    "city": "Cairo",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
+    "city": "Casablanca",
+    "country": "Morocco",
+    "nationality": "Moroccan",
+    "terminal": "T1"
   },
   "XY9544": {
     "destination": "ACC",
@@ -8015,14 +8087,6 @@
     "nationality": "Indian",
     "terminal": "Hajj"
   },
-  "F39234": {
-    "destination": "TAS",
-    "std": "13:45",
-    "city": "Tashkent",
-    "country": "Uzbekistan",
-    "nationality": "Uzbek",
-    "terminal": "Hajj"
-  },
   "AT2105": {
     "destination": "AGA",
     "std": "13:50",
@@ -8039,6 +8103,14 @@
     "nationality": "Moroccan",
     "terminal": "Hajj"
   },
+  "SM476": {
+    "destination": "CAI",
+    "std": "13:55",
+    "city": "Cairo",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
+  },
   "RJ703": {
     "destination": "AMM",
     "std": "13:55",
@@ -8054,6 +8126,14 @@
     "country": "Kuwait",
     "nationality": "Kuwaiti",
     "terminal": "T1"
+  },
+  "SM454": {
+    "destination": "HMB",
+    "std": "14:00",
+    "city": "Sohag",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
   },
   "D31828": {
     "destination": "MGQ",
@@ -8239,6 +8319,14 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
+  "J9212": {
+    "destination": "KWI",
+    "std": "14:20",
+    "city": "Kuwait City",
+    "country": "Kuwait",
+    "nationality": "Kuwaiti",
+    "terminal": "North"
+  },
   "SV5306": {
     "destination": "SUB",
     "std": "14:20",
@@ -8246,14 +8334,6 @@
     "country": "Indonesia",
     "nationality": "Indonesian",
     "terminal": "T1"
-  },
-  "J9212": {
-    "destination": "DME",
-    "std": "14:20",
-    "city": "Moscow",
-    "country": "Russia",
-    "nationality": "Russian",
-    "terminal": "North"
   },
   "AT2025": {
     "destination": "CMN",
@@ -8270,6 +8350,14 @@
     "country": "Nigeria",
     "nationality": "Nigerian",
     "terminal": "Hajj"
+  },
+  "J4605": {
+    "destination": "PZU",
+    "std": "14:25",
+    "city": "Port Sudan",
+    "country": "Sudan",
+    "nationality": "Sudanese",
+    "terminal": "North"
   },
   "BG3114": {
     "destination": "DAC",
@@ -8423,10 +8511,18 @@
     "nationality": "Egyptian",
     "terminal": "T1"
   },
-  "SM492": {
-    "destination": "HRG",
+  "J9204": {
+    "destination": "KWI",
     "std": "14:40",
-    "city": "Hurghada",
+    "city": "Kuwait City",
+    "country": "Kuwait",
+    "nationality": "Kuwaiti",
+    "terminal": "North"
+  },
+  "SM456": {
+    "destination": "ATZ",
+    "std": "14:40",
+    "city": "Assiut",
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "North"
@@ -8526,14 +8622,6 @@
     "country": "India",
     "nationality": "Indian",
     "terminal": "Hajj"
-  },
-  "3T205": {
-    "destination": "KRT",
-    "std": "15:00",
-    "city": "Khartoum",
-    "country": "Sudan",
-    "nationality": "Sudanese",
-    "terminal": "North"
   },
   "GA1409": {
     "destination": "UPG",
@@ -8719,6 +8807,14 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
+  "PK842": {
+    "destination": "ISB",
+    "std": "15:20",
+    "city": "Islamabad",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
   "MS656": {
     "destination": "HBE",
     "std": "15:20",
@@ -8815,6 +8911,14 @@
     "nationality": "Turkish",
     "terminal": "Hajj"
   },
+  "J9214": {
+    "destination": "KWI",
+    "std": "15:30",
+    "city": "Kuwait City",
+    "country": "Kuwait",
+    "nationality": "Kuwaiti",
+    "terminal": "North"
+  },
   "HY5350": {
     "destination": "TAS",
     "std": "15:30",
@@ -8846,14 +8950,6 @@
     "country": "Germany",
     "nationality": "German",
     "terminal": "T1"
-  },
-  "GA991": {
-    "destination": "CGK",
-    "std": "15:30",
-    "city": "Jakarta",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
-    "terminal": "Hajj"
   },
   "F37408": {
     "destination": "YEI",
@@ -8910,14 +9006,6 @@
     "country": "United Arab Emirates",
     "nationality": "Emirati",
     "terminal": "T1"
-  },
-  "J9214": {
-    "destination": "KWI",
-    "std": "15:40",
-    "city": "Kuwait City",
-    "country": "Kuwait",
-    "nationality": "Kuwaiti",
-    "terminal": "North"
   },
   "SV5954": {
     "destination": "BOM",
@@ -8983,6 +9071,22 @@
     "nationality": "Malian",
     "terminal": "Hajj"
   },
+  "XY693": {
+    "destination": "ASM",
+    "std": "15:50",
+    "city": "Asmara",
+    "country": "Eritrea",
+    "nationality": "Eritrean",
+    "terminal": "T1"
+  },
+  "F3781": {
+    "destination": "SSH",
+    "std": "15:50",
+    "city": "Sharm El Sheikh",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "T1"
+  },
   "AH4325": {
     "destination": "CZL",
     "std": "15:50",
@@ -8999,26 +9103,18 @@
     "nationality": "Malaysian",
     "terminal": "Hajj"
   },
-  "XY663": {
-    "destination": "CMN",
-    "std": "15:50",
-    "city": "Casablanca",
-    "country": "Morocco",
-    "nationality": "Moroccan",
-    "terminal": "T1"
-  },
   "AH467": {
-    "destination": "AZR",
+    "destination": "ALG",
     "std": "15:55",
-    "city": "Adrar",
+    "city": "Algiers",
     "country": "Algeria",
     "nationality": "Algerian",
     "terminal": "Hajj"
   },
   "AH483": {
-    "destination": "ORN",
+    "destination": "OGX",
     "std": "15:55",
-    "city": "Oran",
+    "city": "Ouargla",
     "country": "Algeria",
     "nationality": "Algerian",
     "terminal": "Hajj"
@@ -9191,6 +9287,14 @@
     "nationality": "Georgian",
     "terminal": "Hajj"
   },
+  "J9210": {
+    "destination": "KWI",
+    "std": "16:15",
+    "city": "Kuwait City",
+    "country": "Kuwait",
+    "nationality": "Kuwaiti",
+    "terminal": "North"
+  },
   "ET8749": {
     "destination": "NIM",
     "std": "16:15",
@@ -9200,12 +9304,20 @@
     "terminal": "Hajj"
   },
   "AH469": {
-    "destination": "AZR",
+    "destination": "CZL",
     "std": "16:20",
-    "city": "Adrar",
+    "city": "Constantine",
     "country": "Algeria",
     "nationality": "Algerian",
     "terminal": "Hajj"
+  },
+  "SD215": {
+    "destination": "PZU",
+    "std": "16:20",
+    "city": "Port Sudan",
+    "country": "Sudan",
+    "nationality": "Sudanese",
+    "terminal": "North"
   },
   "SV5254": {
     "destination": "CGK",
@@ -9277,6 +9389,14 @@
     "city": "Lagos",
     "country": "Nigeria",
     "nationality": "Nigerian",
+    "terminal": "Hajj"
+  },
+  "GA991": {
+    "destination": "CGK",
+    "std": "16:35",
+    "city": "Jakarta",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
     "terminal": "Hajj"
   },
   "GA947": {
@@ -9487,14 +9607,6 @@
     "nationality": "Indian",
     "terminal": "Hajj"
   },
-  "VF1568": {
-    "destination": "ESB",
-    "std": "17:00",
-    "city": "Ankara",
-    "country": "Turkey",
-    "nationality": "Turkish",
-    "terminal": "T1"
-  },
   "RQ2048": {
     "destination": "HEA",
     "std": "17:00",
@@ -9575,14 +9687,6 @@
     "nationality": "Turkish",
     "terminal": "T1"
   },
-  "C6322": {
-    "destination": "TAS",
-    "std": "17:05",
-    "city": "Tashkent",
-    "country": "Uzbekistan",
-    "nationality": "Uzbek",
-    "terminal": "Hajj"
-  },
   "SV526": {
     "destination": "BAH",
     "std": "17:05",
@@ -9590,14 +9694,6 @@
     "country": "Bahrain",
     "nationality": "Bahraini",
     "terminal": "T1"
-  },
-  "GA993": {
-    "destination": "CGK",
-    "std": "17:10",
-    "city": "Jakarta",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
-    "terminal": "Hajj"
   },
   "SV411": {
     "destination": "HBE",
@@ -9615,6 +9711,14 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
+  "SM496": {
+    "destination": "HRG",
+    "std": "17:15",
+    "city": "Hurghada",
+    "country": "Egypt",
+    "nationality": "Egyptian",
+    "terminal": "North"
+  },
   "SV5136": {
     "destination": "PLM",
     "std": "17:15",
@@ -9630,6 +9734,14 @@
     "country": "Iraq",
     "nationality": "Iraqi",
     "terminal": "Hajj"
+  },
+  "SV772": {
+    "destination": "BOM",
+    "std": "17:20",
+    "city": "Mumbai",
+    "country": "India",
+    "nationality": "Indian",
+    "terminal": "T1"
   },
   "SV303": {
     "destination": "CAI",
@@ -9685,6 +9797,14 @@
     "city": "Kuwait City",
     "country": "Kuwait",
     "nationality": "Kuwaiti",
+    "terminal": "T1"
+  },
+  "SV814": {
+    "destination": "BLR",
+    "std": "17:30",
+    "city": "Bengaluru",
+    "country": "India",
+    "nationality": "Indian",
     "terminal": "T1"
   },
   "UY3560": {
@@ -9807,14 +9927,6 @@
     "nationality": "Bahraini",
     "terminal": "T1"
   },
-  "SV594": {
-    "destination": "DXB",
-    "std": "17:40",
-    "city": "Dubai",
-    "country": "United Arab Emirates",
-    "nationality": "Emirati",
-    "terminal": "T1"
-  },
   "RB1912": {
     "destination": "DAM",
     "std": "17:40",
@@ -9886,6 +9998,14 @@
     "country": "Benin",
     "nationality": "Beninese",
     "terminal": "Hajj"
+  },
+  "IY515": {
+    "destination": "ADE",
+    "std": "17:55",
+    "city": "Aden",
+    "country": "Yemen",
+    "nationality": "Yemeni",
+    "terminal": "North"
   },
   "SV5748": {
     "destination": "LHE",
@@ -10063,6 +10183,14 @@
     "nationality": "Pakistani",
     "terminal": "T1"
   },
+  "SV594": {
+    "destination": "DXB",
+    "std": "18:10",
+    "city": "Dubai",
+    "country": "United Arab Emirates",
+    "nationality": "Emirati",
+    "terminal": "T1"
+  },
   "SV5726": {
     "destination": "ISB",
     "std": "18:10",
@@ -10125,6 +10253,22 @@
     "city": "Bandar Seri Begawan",
     "country": "Brunei",
     "nationality": "Bruneian",
+    "terminal": "T1"
+  },
+  "JT77": {
+    "destination": "PLM",
+    "std": "18:20",
+    "city": "Palembang",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "Hajj"
+  },
+  "VF1568": {
+    "destination": "ESB",
+    "std": "18:20",
+    "city": "Ankara",
+    "country": "Turkey",
+    "nationality": "Turkish",
     "terminal": "T1"
   },
   "F3761": {
@@ -10198,6 +10342,14 @@
     "country": "India",
     "nationality": "Indian",
     "terminal": "Hajj"
+  },
+  "XY625": {
+    "destination": "BUS",
+    "std": "18:30",
+    "city": "Batumi",
+    "country": "Georgia",
+    "nationality": "Georgian",
+    "terminal": "T1"
   },
   "MS3814": {
     "destination": "CKY",
@@ -10359,22 +10511,6 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
-  "J4605": {
-    "destination": "PZU",
-    "std": "18:45",
-    "city": "Port Sudan",
-    "country": "Sudan",
-    "nationality": "Sudanese",
-    "terminal": "North"
-  },
-  "J9210": {
-    "destination": "MCX",
-    "std": "18:45",
-    "city": "Makhachkala",
-    "country": "Russia",
-    "nationality": "Russian",
-    "terminal": "North"
-  },
   "ET8627": {
     "destination": "BOY",
     "std": "18:45",
@@ -10406,6 +10542,14 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "North"
+  },
+  "PK860": {
+    "destination": "LHE",
+    "std": "18:55",
+    "city": "Lahore",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
   },
   "XY9558": {
     "destination": "TML",
@@ -10439,13 +10583,13 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
-  "XY571": {
-    "destination": "CAI",
+  "3T205": {
+    "destination": "KRT",
     "std": "19:00",
-    "city": "Cairo",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "T1"
+    "city": "Khartoum",
+    "country": "Sudan",
+    "nationality": "Sudanese",
+    "terminal": "North"
   },
   "ET8619": {
     "destination": "BOY",
@@ -10566,6 +10710,22 @@
     "country": "Nigeria",
     "nationality": "Nigerian",
     "terminal": "Hajj"
+  },
+  "GA993": {
+    "destination": "CGK",
+    "std": "19:05",
+    "city": "Jakarta",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "Hajj"
+  },
+  "SD227": {
+    "destination": "PZU",
+    "std": "19:05",
+    "city": "Port Sudan",
+    "country": "Sudan",
+    "nationality": "Sudanese",
+    "terminal": "North"
   },
   "SV2724": {
     "destination": "RBA",
@@ -10807,6 +10967,14 @@
     "nationality": "Russian",
     "terminal": "Hajj"
   },
+  "GA955": {
+    "destination": "PLM",
+    "std": "19:40",
+    "city": "Palembang",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "Hajj"
+  },
   "SV5728": {
     "destination": "DEL",
     "std": "19:40",
@@ -10981,14 +11149,6 @@
     "city": "Mersin",
     "country": "Turkey",
     "nationality": "Turkish",
-    "terminal": "Hajj"
-  },
-  "JT111": {
-    "destination": "CGK",
-    "std": "20:00",
-    "city": "Jakarta",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
     "terminal": "Hajj"
   },
   "RB384": {
@@ -11207,21 +11367,13 @@
     "nationality": "Egyptian",
     "terminal": "T1"
   },
-  "SD227": {
-    "destination": "PZU",
+  "C63320": {
+    "destination": "UGC",
     "std": "20:30",
-    "city": "Port Sudan",
-    "country": "Sudan",
-    "nationality": "Sudanese",
-    "terminal": "North"
-  },
-  "SD215": {
-    "destination": "PZU",
-    "std": "20:30",
-    "city": "Port Sudan",
-    "country": "Sudan",
-    "nationality": "Sudanese",
-    "terminal": "North"
+    "city": "Urgench",
+    "country": "Uzbekistan",
+    "nationality": "Uzbek",
+    "terminal": "Hajj"
   },
   "P47939": {
     "destination": "LOS",
@@ -11383,14 +11535,6 @@
     "nationality": "Kenyan",
     "terminal": "T1"
   },
-  "PK860": {
-    "destination": "LHE",
-    "std": "20:50",
-    "city": "Lahore",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
-  },
   "PK864": {
     "destination": "ISB",
     "std": "20:50",
@@ -11453,6 +11597,14 @@
     "city": "Algiers",
     "country": "Algeria",
     "nationality": "Algerian",
+    "terminal": "Hajj"
+  },
+  "JT105": {
+    "destination": "SUB",
+    "std": "21:00",
+    "city": "Surabaya",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
     "terminal": "Hajj"
   },
   "P47931": {
@@ -11663,6 +11815,14 @@
     "nationality": "Indonesian",
     "terminal": "Hajj"
   },
+  "JT111": {
+    "destination": "CGK",
+    "std": "21:20",
+    "city": "Jakarta",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "Hajj"
+  },
   "AH4329": {
     "destination": "AZR",
     "std": "21:20",
@@ -11791,6 +11951,14 @@
     "nationality": "Nigerian",
     "terminal": "Hajj"
   },
+  "QP553": {
+    "destination": "BOM",
+    "std": "21:40",
+    "city": "Mumbai",
+    "country": "India",
+    "nationality": "Indian",
+    "terminal": "Hajj"
+  },
   "HY5370": {
     "destination": "TAS",
     "std": "21:40",
@@ -11863,14 +12031,6 @@
     "nationality": "Turkish",
     "terminal": "Hajj"
   },
-  "QP553": {
-    "destination": "BOM",
-    "std": "21:45",
-    "city": "Mumbai",
-    "country": "India",
-    "nationality": "Indian",
-    "terminal": "Hajj"
-  },
   "QP701": {
     "destination": "BOM",
     "std": "21:45",
@@ -11895,14 +12055,6 @@
     "nationality": "Turkish",
     "terminal": "Hajj"
   },
-  "TR797": {
-    "destination": "SIN",
-    "std": "21:45",
-    "city": "Singapore",
-    "country": "Singapore",
-    "nationality": "Singaporean",
-    "terminal": "T1"
-  },
   "SV5230": {
     "destination": "SUB",
     "std": "21:45",
@@ -11910,14 +12062,6 @@
     "country": "Indonesia",
     "nationality": "Indonesian",
     "terminal": "T1"
-  },
-  "PK762": {
-    "destination": "KHI",
-    "std": "21:50",
-    "city": "Karachi",
-    "country": "Pakistan",
-    "nationality": "Pakistani",
-    "terminal": "Hajj"
   },
   "SV5318": {
     "destination": "CGK",
@@ -11974,6 +12118,14 @@
     "country": "Niger",
     "nationality": "Nigerien",
     "terminal": "Hajj"
+  },
+  "TR797": {
+    "destination": "SIN",
+    "std": "21:55",
+    "city": "Singapore",
+    "country": "Singapore",
+    "nationality": "Singaporean",
+    "terminal": "T1"
   },
   "QP7618": {
     "destination": "NAG",
@@ -12032,9 +12184,9 @@
     "terminal": "Hajj"
   },
   "JT85": {
-    "destination": "KNO",
+    "destination": "BTH",
     "std": "22:00",
-    "city": "Medan",
+    "city": "Batam",
     "country": "Indonesia",
     "nationality": "Indonesian",
     "terminal": "Hajj"
@@ -12247,6 +12399,14 @@
     "nationality": "Indian",
     "terminal": "Hajj"
   },
+  "PK732": {
+    "destination": "KHI",
+    "std": "22:20",
+    "city": "Karachi",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
   "PC6155": {
     "destination": "KYA",
     "std": "22:20",
@@ -12301,6 +12461,14 @@
     "city": "Konya",
     "country": "Turkey",
     "nationality": "Turkish",
+    "terminal": "Hajj"
+  },
+  "C6322": {
+    "destination": "TAS",
+    "std": "22:30",
+    "city": "Tashkent",
+    "country": "Uzbekistan",
+    "nationality": "Uzbek",
     "terminal": "Hajj"
   },
   "IA8204": {
@@ -12359,14 +12527,6 @@
     "nationality": "Egyptian",
     "terminal": "North"
   },
-  "SM496": {
-    "destination": "HRG",
-    "std": "22:30",
-    "city": "Hurghada",
-    "country": "Egypt",
-    "nationality": "Egyptian",
-    "terminal": "North"
-  },
   "IR1599": {
     "destination": "IFN",
     "std": "22:35",
@@ -12406,6 +12566,14 @@
     "country": "Indonesia",
     "nationality": "Indonesian",
     "terminal": "T1"
+  },
+  "JT113": {
+    "destination": "CGK",
+    "std": "22:40",
+    "city": "Jakarta",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "Hajj"
   },
   "HY5368": {
     "destination": "UGC",
@@ -12583,13 +12751,21 @@
     "nationality": "Indian",
     "terminal": "North"
   },
-  "RB382": {
-    "destination": "DAM",
+  "PK742": {
+    "destination": "ISB",
     "std": "23:00",
-    "city": "Damascus",
-    "country": "Syria",
-    "nationality": "Syrian",
-    "terminal": "North"
+    "city": "Islamabad",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
+    "terminal": "Hajj"
+  },
+  "JT81": {
+    "destination": "PDG",
+    "std": "23:00",
+    "city": "Padang",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
+    "terminal": "Hajj"
   },
   "SV3838": {
     "destination": "KUL",
@@ -12613,14 +12789,6 @@
     "city": "Kabul",
     "country": "Afghanistan",
     "nationality": "Afghan",
-    "terminal": "Hajj"
-  },
-  "JT107": {
-    "destination": "SUB",
-    "std": "23:00",
-    "city": "Surabaya",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
     "terminal": "Hajj"
   },
   "MS670": {
@@ -12718,14 +12886,6 @@
     "country": "Iran",
     "nationality": "Iranian",
     "terminal": "Hajj"
-  },
-  "SV772": {
-    "destination": "BOM",
-    "std": "23:10",
-    "city": "Mumbai",
-    "country": "India",
-    "nationality": "Indian",
-    "terminal": "T1"
   },
   "ET8825": {
     "destination": "BKO",
@@ -12831,14 +12991,6 @@
     "nationality": "Iranian",
     "terminal": "Hajj"
   },
-  "QP564": {
-    "destination": "AMD",
-    "std": "23:25",
-    "city": "Ahmedabad",
-    "country": "India",
-    "nationality": "Indian",
-    "terminal": "Hajj"
-  },
   "QP709": {
     "destination": "AMD",
     "std": "23:25",
@@ -12861,6 +13013,14 @@
     "city": "Tehran",
     "country": "Iran",
     "nationality": "Iranian",
+    "terminal": "Hajj"
+  },
+  "PK762": {
+    "destination": "KHI",
+    "std": "23:30",
+    "city": "Karachi",
+    "country": "Pakistan",
+    "nationality": "Pakistani",
     "terminal": "Hajj"
   },
   "IA8150": {
@@ -12918,6 +13078,14 @@
     "country": "Egypt",
     "nationality": "Egyptian",
     "terminal": "T1"
+  },
+  "QP564": {
+    "destination": "AMD",
+    "std": "23:40",
+    "city": "Ahmedabad",
+    "country": "India",
+    "nationality": "Indian",
+    "terminal": "Hajj"
   },
   "IR1565": {
     "destination": "IFN",
@@ -12989,6 +13157,14 @@
     "city": "Tehran",
     "country": "Iran",
     "nationality": "Iranian",
+    "terminal": "Hajj"
+  },
+  "JT107": {
+    "destination": "SUB",
+    "std": "23:45",
+    "city": "Surabaya",
+    "country": "Indonesia",
+    "nationality": "Indonesian",
     "terminal": "Hajj"
   },
   "GA945": {
@@ -13063,14 +13239,6 @@
     "nationality": "Malian",
     "terminal": "Hajj"
   },
-  "GA975": {
-    "destination": "BDJ",
-    "std": "23:45",
-    "city": "Banjarmasin",
-    "country": "Indonesia",
-    "nationality": "Indonesian",
-    "terminal": "Hajj"
-  },
   "QP575": {
     "destination": "BLR",
     "std": "23:50",
@@ -13085,6 +13253,14 @@
     "city": "Conakry",
     "country": "Guinea",
     "nationality": "Guinean",
+    "terminal": "Hajj"
+  },
+  "QP562": {
+    "destination": "BOM",
+    "std": "23:55",
+    "city": "Mumbai",
+    "country": "India",
+    "nationality": "Indian",
     "terminal": "Hajj"
   },
   "QP7616": {
