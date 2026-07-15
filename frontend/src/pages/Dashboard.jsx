@@ -165,6 +165,10 @@ export default function Dashboard() {
   const [qvDeleting, setQvDeleting] = useState(null); // filename being deleted
   const [excelMenu, setExcelMenu] = useState(false);
   const excelMenuRef = useRef(null);
+  const [customExport, setCustomExport] = useState(false); // custom-range modal open
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [exportFrom, setExportFrom] = useState(todayStr);
+  const [exportTo, setExportTo]     = useState(todayStr);
 
   useEffect(() => { load(); }, []);
   useEffect(() => {
@@ -519,21 +523,49 @@ export default function Dashboard() {
     await loadHandover(shift);
   }
 
-  // ── Export cases to Excel (supervisor only) — range: '24h' | 'week'
-  async function exportExcel(range) {
+  // ── Export cases to Excel (supervisor only)
+  // sel can be: '24h' | 'week' | 'all' | { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+  async function exportExcel(sel) {
     setExcelMenu(false);
     try {
       const all = await getReports();
-      const ms = range === 'week' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-      const cutoff = Date.now() - ms;
-      const recent = all.filter(r => {
-        if (!r.created_at) return false;
-        const t = new Date(r.created_at.replace(' ', 'T')).getTime();
-        return !isNaN(t) && t >= cutoff;
-      });
+
+      // Resolve the selection into a filter + human labels used for the
+      // sheet name, the "no results" message and the download filename.
+      let filterFn, emptyLabel, sheetName, fileTag;
+      if (sel === 'all') {
+        filterFn  = () => true;
+        emptyLabel = 'the system';
+        sheetName  = 'All Cases';
+        fileTag    = 'all';
+      } else if (sel && typeof sel === 'object') {
+        const fromMs = sel.from ? new Date(`${sel.from}T00:00:00`).getTime() : -Infinity;
+        const toMs   = sel.to   ? new Date(`${sel.to}T23:59:59`).getTime()   :  Infinity;
+        filterFn = r => {
+          if (!r.created_at) return false;
+          const t = new Date(r.created_at.replace(' ', 'T')).getTime();
+          return !isNaN(t) && t >= fromMs && t <= toMs;
+        };
+        emptyLabel = `${sel.from || '…'} → ${sel.to || '…'}`;
+        sheetName  = 'Custom Range';
+        fileTag    = `${sel.from || 'start'}_to_${sel.to || 'end'}`;
+      } else {
+        const ms = sel === 'week' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+        const cutoff = Date.now() - ms;
+        filterFn = r => {
+          if (!r.created_at) return false;
+          const t = new Date(r.created_at.replace(' ', 'T')).getTime();
+          return !isNaN(t) && t >= cutoff;
+        };
+        emptyLabel = sel === 'week' ? 'the last 7 days' : 'the last 24 hours';
+        sheetName  = sel === 'week' ? 'Last 7 Days' : 'Last 24h';
+        fileTag    = sel;
+      }
+
+      const recent = all.filter(filterFn);
 
       if (recent.length === 0) {
-        alert(`No reports were recorded in the last ${range === 'week' ? '7 days' : '24 hours'}.`);
+        alert(`No reports were recorded in ${emptyLabel}.`);
         return;
       }
 
@@ -550,7 +582,7 @@ export default function Dashboard() {
       const NEW_HEADERS = new Set(['New Departure Time', 'New Departure Date', 'New Flight Number']);
 
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet(range === 'week' ? 'Last 7 Days' : 'Last 24h');
+      const ws = wb.addWorksheet(sheetName);
 
       ws.addRow(headers);
 
@@ -623,7 +655,7 @@ export default function Dashboard() {
       const today = fmtDayMonth(new Date()).toLowerCase();
       const a = document.createElement('a');
       a.href = url;
-      a.download = `no-show-last-${range}-${today}.xlsx`;
+      a.download = `no-show-${fileTag}-${today}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -762,14 +794,19 @@ export default function Dashboard() {
                     background: '#0f1a2e', border: '1px solid #2b3a5a',
                     borderRadius: 8, minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                   }}>
-                    {[{ label: 'Last 24 hours', range: '24h' }, { label: 'Last 7 days', range: 'week' }].map(({ label, range }) => (
-                      <button key={range}
+                    {[
+                      { label: 'Last 24 hours', action: () => exportExcel('24h') },
+                      { label: 'Last 7 days',   action: () => exportExcel('week') },
+                      { label: 'All cases (ever)', action: () => exportExcel('all') },
+                      { label: 'Custom range…', action: () => { setExcelMenu(false); setCustomExport(true); } },
+                    ].map(({ label, action }) => (
+                      <button key={label}
                         style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px',
                           background: 'none', border: 'none', color: '#e6eefb',
                           cursor: 'pointer', fontSize: '0.92rem', fontWeight: 500 }}
                         onMouseEnter={e => e.currentTarget.style.background = '#1a2a45'}
                         onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                        onClick={() => exportExcel(range)}
+                        onClick={action}
                       >
                         {label}
                       </button>
@@ -1214,6 +1251,35 @@ export default function Dashboard() {
       )}
 
       {/* ── Shift Summary Modal */}
+      {customExport && (
+        <div className="modal-overlay" onClick={() => setCustomExport(false)}>
+          <div className="modal-content" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
+            <h2 className="modal-title">Export Custom Range</h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #8ba3b8)', marginTop: 0 }}>
+              Exports every case recorded between the two dates (inclusive), by recorded date.
+            </p>
+            <div className="field" style={{ marginBottom: 12 }}>
+              <label className="field-label">From</label>
+              <input type="date" className="field-input" value={exportFrom} max={exportTo || todayStr}
+                onChange={e => setExportFrom(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 16 }}>
+              <label className="field-label">To</label>
+              <input type="date" className="field-input" value={exportTo} min={exportFrom} max={todayStr}
+                onChange={e => setExportTo(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => setCustomExport(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm"
+                disabled={!exportFrom || !exportTo || exportFrom > exportTo}
+                onClick={() => { setCustomExport(false); exportExcel({ from: exportFrom, to: exportTo }); }}>
+                📊 Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {shiftModal && (
         <div className="modal-overlay" onClick={() => setShiftModal(false)}>
           <div className="modal-content shift-modal" onClick={e => e.stopPropagation()}>
