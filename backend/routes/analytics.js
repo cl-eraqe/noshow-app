@@ -50,12 +50,12 @@ function computeRange({ range, from, to }) {
   return { fromDate, toDate };
 }
 
-function highlights(arr) {
+function highlights(arr, metric = 'value') {
   if (!arr || arr.length === 0) return { most: null, least: null };
   let most = arr[0], least = arr[0];
   arr.forEach(r => {
-    if (r.value > most.value) most = r;
-    if (r.value < least.value) least = r;
+    if (r[metric] > most[metric]) most = r;
+    if (r[metric] < least[metric]) least = r;
   });
   return { most, least };
 }
@@ -195,7 +195,7 @@ router.get('/dashboard', async (req, res) => {
     }).length;
     const busPct = totalCases > 0 ? (busCount / totalCases) * 100 : 0;
 
-    function groupCount(key, extractor) {
+    function groupCount(key, extractor, sortBy = 'value') {
       const map = {};
       filtered.forEach(r => {
         const k = extractor ? extractor(r) : r[key];
@@ -204,11 +204,15 @@ router.get('/dashboard', async (req, res) => {
         map[k].value += 1;
         map[k].pax += (r.pax_count || 0);
       });
-      return Object.values(map).sort((a,b) => b.value - a.value);
+      return Object.values(map).sort((a,b) => b[sortBy] - a[sortBy]);
     }
 
-    const byNationality = groupCount('nationality').slice(0, 10);
-    const byAirline = groupCount('prev_airline').slice(0, 10);
+    // Nationality, airline and flight lists are ranked by total pax (a single
+    // 40-pax case matters more than ten 1-pax cases), not by case count.
+    const byNationality = groupCount('nationality', null, 'pax').slice(0, 10);
+    const byAirline = groupCount('prev_airline', null, 'pax').slice(0, 10);
+    // Top no-show flights, aggregated by flight number across all dates.
+    const byFlight = groupCount('prev_flight', null, 'pax').slice(0, 15);
     const byDestination = groupCount(null, r => {
       const m = (r.prev_destination || '').match(/\(([A-Z]{3})\)/);
       return m ? m[1] : r.prev_destination;
@@ -296,8 +300,9 @@ router.get('/dashboard', async (req, res) => {
     res.json({
       meta: { range: { from: fromDate, to: toDate }, filters: { shift, status, airline, nationality, destination, terminal, pax_type }, totalMatched: filtered.length },
       kpi: { totalCases, totalPax, active, activePax, underProcessCases, underProcessPax, confirmedCases, confirmedPax, closedCases, closedPax, needsNusukCases, needsNusukPax, needsNusukList, departedRecentCases, departedRecentPax, atAirportSoonCases, atAirportSoonPax, atAirportLaterCases, atAirportLaterPax, stuck24Cases, stuck24Pax, avgRebookHrs, avgCloseHrs, avgDaysAtAirport, busPct, sparkCases, sparkPax, sparkDays },
-      byNationality: { data: byNationality, ...highlights(byNationality) },
-      byAirline: { data: byAirline, ...highlights(byAirline) },
+      byNationality: { data: byNationality, ...highlights(byNationality, 'pax') },
+      byAirline: { data: byAirline, ...highlights(byAirline, 'pax') },
+      byFlight: { data: byFlight, ...highlights(byFlight, 'pax') },
       byDestination: { data: byDestination, ...highlights(byDestination) },
       byPaxType: { data: byPaxType },
       byShift: { data: byShift, ...highlights(byShift) },

@@ -905,7 +905,7 @@ export default function Dashboard() {
                     <th>Nationality</th>
                     <th>Pax Type</th>
                     <th>Pax</th>
-                    <th>Days</th>
+                    {activeTab !== 'closed' && <th>Days</th>}
                     {activeTab !== 'under_process' && <th>New Flight</th>}
                     <th>Actions</th>
                   </tr>
@@ -998,13 +998,15 @@ export default function Dashboard() {
                             </span>
                           )}
                         </td>
-                        <td data-label="Days" className="col-center">
-                          {days !== null ? (
-                            <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>
-                              {days}d
-                            </span>
-                          ) : '—'}
-                        </td>
+                        {activeTab !== 'closed' && (
+                          <td data-label="Days" className="col-center">
+                            {days !== null ? (
+                              <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>
+                                {days}d
+                              </span>
+                            ) : '—'}
+                          </td>
+                        )}
                         {activeTab !== 'under_process' && (
                           <td data-label="New Flight" className="col-flight">
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>

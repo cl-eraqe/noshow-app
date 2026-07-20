@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area,
 } from 'recharts';
-import { getDashboardData, getFilterOptions, getAirlineBrandOverrides, uploadAirlineLogo, revertAirlineLogo, iataForAirlineName, AIRLINE_CODES } from '../utils/api';
+import { getDashboardData, getFilterOptions, getAirlineBrandOverrides, uploadAirlineLogo, revertAirlineLogo, iataForAirlineName, airlineFromFlightNumber, AIRLINE_CODES } from '../utils/api';
 import AIRLINE_BRAND_DEFAULTS from '../data/airline-brands.json';
 import { isSupervisor } from '../utils/auth';
 
@@ -105,6 +105,7 @@ const WIDGETS = [
   { id: 'kpi_days',          label: 'KPI · Avg Days at Airport',defaultOn: true },
   { id: 'chart_nationality', label: 'Chart · By Nationality',   defaultOn: true },
   { id: 'chart_airline',     label: 'Chart · By Airline',       defaultOn: true },
+  { id: 'chart_flight',      label: 'Chart · Top No-Show Flights', defaultOn: true },
   { id: 'chart_destination', label: 'Chart · By Destination',   defaultOn: true },
   { id: 'chart_shift',       label: 'Chart · By Shift',         defaultOn: true },
   { id: 'chart_paxtype',     label: 'Chart · Passenger Type',   defaultOn: true },
@@ -179,6 +180,11 @@ function BarAvatar({ name, mode }) {
     const iata = iataForAirlineName(name);
     if (iata) brand = { iata, name };
   }
+  // For flights, derive the operating airline from the flight number
+  // (e.g. "SV123" → "Saudia") and reuse its logo as the avatar.
+  if (mode === 'flight') {
+    brand = brands[airlineFromFlightNumber(name)] || null;
+  }
   const src = flag || brand?.avatar || brand?.logo || null;
   // Supervisor click-to-edit: enabled whenever we have an IATA we can upload to.
   const editable = mode === 'airline' && !!brand?.iata && typeof onEdit === 'function';
@@ -218,7 +224,10 @@ function BarRow({ d, pct, mode, onClick }) {
   const { brands } = useContext(AirlineBrandContext);
   const isAirline     = mode === 'airline';
   const isNationality = mode === 'nationality';
-  const brand = isAirline     ? brands[d.name]   : null;
+  const isFlight      = mode === 'flight';
+  const brand = isAirline ? brands[d.name]
+              : isFlight  ? (brands[airlineFromFlightNumber(d.name)] || null)
+              : null;
   const flag  = isNationality ? flagUrl(d.name)  : null;
 
   useLayoutEffect(() => {
@@ -293,17 +302,19 @@ function BarRow({ d, pct, mode, onClick }) {
   );
 }
 
-// ── Custom horizontal bar list (Nationality with flags & Airline with logos)
+// ── Custom horizontal bar list (Nationality with flags, Airline & Flight with logos)
+// Bars are sized by total pax so the length matches the pax-based ranking.
 function BrandedBarList({ data, mode, onClick }) {
   if (!data || data.length === 0) {
     return <div className="xchart-empty">No data</div>;
   }
-  const max = Math.max(...data.map(d => d.value), 1);
+  const metricOf = d => (d.pax != null ? d.pax : d.value);
+  const max = Math.max(...data.map(metricOf), 1);
   return (
     <div className="xbarlist">
       {data.map((d, i) => (
         <BarRow key={i} d={d} mode={mode} onClick={onClick}
-                pct={Math.max(4, (d.value / max) * 100)} />
+                pct={Math.max(4, (metricOf(d) / max) * 100)} />
       ))}
     </div>
   );
@@ -800,7 +811,7 @@ export default function Analytics() {
                 <div className="xpanel-head">
                   <h3>BY NATIONALITY</h3>
                   {data.byNationality.most &&
-                    <span className="xtag xtag-hot">🔥 {data.byNationality.most.name} ({data.byNationality.most.value})</span>}
+                    <span className="xtag xtag-hot">🔥 {data.byNationality.most.name} ({data.byNationality.most.pax} pax)</span>}
                 </div>
                 <BrandedBarList data={data.byNationality.data} mode="nationality"
                                 onClick={name => onDrill('nationality', name)} />
@@ -812,10 +823,21 @@ export default function Analytics() {
                 <div className="xpanel-head">
                   <h3>BY AIRLINE</h3>
                   {data.byAirline.most &&
-                    <span className="xtag xtag-hot">🔥 {data.byAirline.most.name} ({data.byAirline.most.value})</span>}
+                    <span className="xtag xtag-hot">🔥 {data.byAirline.most.name} ({data.byAirline.most.pax} pax)</span>}
                 </div>
                 <BrandedBarList data={data.byAirline.data} mode="airline"
                                 onClick={name => onDrill('airline', name)} />
+              </div>
+            )}
+
+            {on('chart_flight') && (
+              <div className="xpanel xspan-6">
+                <div className="xpanel-head">
+                  <h3>TOP NO-SHOW FLIGHTS</h3>
+                  {data.byFlight?.most &&
+                    <span className="xtag xtag-hot">🔥 {data.byFlight.most.name} ({data.byFlight.most.pax} pax)</span>}
+                </div>
+                <BrandedBarList data={data.byFlight?.data || []} mode="flight" />
               </div>
             )}
 
