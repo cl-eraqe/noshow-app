@@ -478,7 +478,12 @@ export default function Analytics() {
 
   const activeFilterCount = [shift, status, airline, nationality, destination, paxType].filter(Boolean).length + (drill ? 1 : 0);
 
-  function onDrill(field, name) { setDrill({ field, value: name, label: name }); }
+  function onDrill(field, name) {
+    const prefix = field === 'daysBucket' ? 'Days at airport: '
+                 : field === 'resBucket'  ? 'Resolution: '
+                 : '';
+    setDrill({ field, value: name, label: `${prefix}${name}` });
+  }
   function clearDrill() { setDrill(null); }
   function clearAllFilters() {
     setShift(''); setStatus(''); setAirline(''); setNat('');
@@ -885,14 +890,16 @@ export default function Analytics() {
 
             {on('chart_days') && (
               <div className="xpanel xspan-4">
-                <div className="xpanel-head"><h3>DAYS AT AIRPORT</h3></div>
+                <div className="xpanel-head"><h3>DAYS AT AIRPORT</h3><span className="xtag">click to filter</span></div>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={data.daysHistogram}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1f2b45"/>
                     <XAxis dataKey="name" tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
                     <YAxis allowDecimals={false} tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
                     <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
-                    <Bar dataKey="value" fill="#b794f4" radius={[4,4,0,0]} />
+                    <Bar dataKey="value" fill="#b794f4" radius={[4,4,0,0]}
+                         onClick={d => onDrill('daysBucket', d.name)}
+                         style={{ cursor:'pointer' }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -900,14 +907,16 @@ export default function Analytics() {
 
             {on('chart_resolution') && (
               <div className="xpanel xspan-4">
-                <div className="xpanel-head"><h3>RESOLUTION TIME</h3><span className="xtag">created → confirmed</span></div>
+                <div className="xpanel-head"><h3>RESOLUTION TIME</h3><span className="xtag">created → confirmed · click to filter</span></div>
                 <ResponsiveContainer width="100%" height={180}>
                   <BarChart data={data.resolutionHistogram}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1f2b45"/>
                     <XAxis dataKey="name" tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
                     <YAxis allowDecimals={false} tick={{ fill:'#8ba3b8', fontSize:11 }} stroke="#2b3a5a"/>
                     <Tooltip contentStyle={{ background:'#0f1a2e', border:'1px solid #2b3a5a', color:'#e6eefb' }}/>
-                    <Bar dataKey="value" fill="#22c55e" radius={[4,4,0,0]} />
+                    <Bar dataKey="value" fill="#22c55e" radius={[4,4,0,0]}
+                         onClick={d => onDrill('resBucket', d.name)}
+                         style={{ cursor:'pointer' }} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
