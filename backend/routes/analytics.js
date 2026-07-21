@@ -23,6 +23,33 @@ function parseJeddahMs(dtStr) {
   return isNaN(ms) ? null : ms;
 }
 
+// Which "Days at Airport" histogram bucket a report falls in (or null).
+// Must stay in sync with the daysHistogram buckets below.
+function daysBucketOf(r) {
+  const d = r.days_at_airport;
+  if (d == null || isNaN(d)) return null;
+  if (d < 1) return '0d';
+  if (d < 2) return '1d';
+  if (d < 3) return '2d';
+  if (d < 4) return '3d';
+  return '4d+';
+}
+
+// Which "Resolution Time" (created → confirmed) bucket a report falls in (or null).
+// Must stay in sync with the resolutionHistogram buckets below.
+function resBucketOf(r) {
+  const createdMs = parseJeddahMs(r.created_at);
+  if (!r.confirmed_at || !createdMs) return null;
+  const c = parseJeddahMs(r.confirmed_at);
+  if (!c || c < createdMs) return null;
+  const h = (c - createdMs) / 3600000;
+  if (h < 1) return '<1h';
+  if (h < 4) return '1-4h';
+  if (h < 12) return '4-12h';
+  if (h < 24) return '12-24h';
+  return '24h+';
+}
+
 function computeRange({ range, from, to }) {
   const today = jeddahNowDateOnly();
   let fromDate = today, toDate = today;
@@ -72,7 +99,7 @@ router.get('/dashboard', async (req, res) => {
       [fromDate, toDate]
     );
 
-    const { shift, status, airline, nationality, destination, terminal, pax_type } = req.query;
+    const { shift, status, airline, nationality, destination, terminal, pax_type, daysBucket, resBucket } = req.query;
     const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
 
     const filtered = rows.filter(r => {
@@ -89,6 +116,8 @@ router.get('/dashboard', async (req, res) => {
         if (t !== terminal) return false;
       }
       if (pax_type && r.pax_type !== pax_type) return false;
+      if (daysBucket && daysBucketOf(r) !== daysBucket) return false;
+      if (resBucket && resBucketOf(r) !== resBucket) return false;
       return true;
     });
 
