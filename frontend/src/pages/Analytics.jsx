@@ -926,6 +926,7 @@ export default function Analytics() {
               <div className="xpanel xspan-4">
                 <div className="xpanel-head">
                   <h3>BY SHIFT</h3>
+                  <span className="xtag">by flight STD</span>
                   {data.byShift.most && <span className="xtag xtag-hot">🔥 {data.byShift.most.name}</span>}
                 </div>
                 <ResponsiveContainer width="100%" height={180}>
@@ -970,7 +971,7 @@ export default function Analytics() {
               <div className="xpanel xspan-8">
                 <div className="xpanel-head">
                   <h3>PEAK HOURS HEATMAP</h3>
-                  <span className="xtag">Day of week × Hour · darker = more cases</span>
+                  <span className="xtag">flight STD · day × hour · darker = more cases</span>
                 </div>
                 <Heatmap data={data.heatmapData}/>
               </div>
