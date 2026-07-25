@@ -103,7 +103,7 @@ router.get('/dashboard', async (req, res) => {
     const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
 
     const filtered = rows.filter(r => {
-      if (shift && getShift(r.created_at) !== shift) return false;
+      if (shift && getShift(r.prev_datetime) !== shift) return false;
       if (status && r.status !== status) return false;
       if (airline && r.prev_airline !== airline) return false;
       if (nationality && r.nationality !== nationality) return false;
@@ -247,7 +247,9 @@ router.get('/dashboard', async (req, res) => {
       return m ? m[1] : r.prev_destination;
     }).slice(0, 10);
     const byPaxType = groupCount('pax_type');
-    const byShift = groupCount(null, r => getShift(r.created_at));
+    // By Shift: bucketed by the shift during which the missed flight was
+    // scheduled to depart (prev_datetime / STD), not when the case was logged.
+    const byShift = groupCount(null, r => getShift(r.prev_datetime));
     ['A','B','C'].forEach(s => { if (!byShift.find(x => x.name === s)) byShift.push({name:s, value:0, pax:0}); });
     byShift.sort((a,b) => a.name.localeCompare(b.name));
     const byTerminal = groupCount(null, r => TERMINAL_MAP[getAirlineCode(r.prev_flight)] || 'T1');
@@ -273,12 +275,15 @@ router.get('/dashboard', async (req, res) => {
     });
     const resolutionHistogram = Object.entries(resBuckets).map(([name, value]) => ({ name, value }));
 
+    // Peak Hours: bucketed by the missed flight's scheduled departure time
+    // (prev_datetime / STD), not by when the report was created.
     const heatmap = Array.from({length: 7}, () => Array(24).fill(0));
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     filtered.forEach(r => {
-      if (!r.created_at || r.created_at.length < 13) return;
-      const jeddahHour = parseInt(r.created_at.slice(11, 13));
-      const jeddahDay  = new Date(r.created_at.slice(0, 10) + 'T12:00:00Z').getUTCDay();
+      const dt = r.prev_datetime;
+      if (!dt || dt.length < 13) return;
+      const jeddahHour = parseInt(dt.slice(11, 13));
+      const jeddahDay  = new Date(dt.slice(0, 10) + 'T12:00:00Z').getUTCDay();
       if (isNaN(jeddahHour) || isNaN(jeddahDay)) return;
       heatmap[jeddahDay][jeddahHour] += 1;
     });
