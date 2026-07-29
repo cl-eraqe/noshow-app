@@ -38,6 +38,32 @@ function needsBus(flight) {
   const t = getTerminal(flight);
   return t === 'North' || t === 'Hajj';
 }
+
+// ── Multi-terminal scoping ──────────────────────────────────────────────
+// owner_terminal ('T1' | 'North') records which terminal's queue a report
+// belongs to — it comes from the REPORTING USER, never from the flight. This
+// is a completely separate concept from getTerminal()/needsBus() above, which
+// derive a terminal from the flight's airline purely to decide whether a bus
+// transfer badge is needed; that logic is untouched by anything below.
+
+// Returns the owner_terminal value a list/aggregate query should filter by,
+// or null for "no filter" (supervisor viewing All Terminals).
+// Normal users are ALWAYS forced to their own assigned terminal — the
+// ?scope= query param, if present, is ignored for them.
+function scopeValue(req) {
+  if (req.role === 'supervisor') {
+    const q = String(req.query.scope || '').trim();
+    return (q === 'T1' || q === 'North') ? q : null;
+  }
+  return req.ownerTerminal || null;
+}
+
+// Returns true if req's user is allowed to see/act on a single report.
+// Supervisors can access any report; normal users only their own terminal's.
+function ownsReport(req, report) {
+  if (req.role === 'supervisor') return true;
+  return report.owner_terminal === req.ownerTerminal;
+}
 function iataCode(dest) {
   if (!dest) return '???';
   const match = dest.match(/\(([A-Z]{3})\)/);
@@ -104,19 +130,23 @@ async function purgeFiles(pool, reportId) {
 
 // ── Analytics summary (must be before /:id) ───────────────────────────
 
-router.get('/analytics/summary', async (_req, res) => {
+router.get('/analytics/summary', async (req, res) => {
   try {
     const pool = getDb();
+    const scope = scopeValue(req);
+    const scopeAnd   = scope ? ' AND owner_terminal = $2' : '';
+    const scopeWhere = scope ? ' WHERE owner_terminal = $1' : '';
+    const scopeOnly  = scope ? [scope] : [];
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const startOfMonth = jeddahISO().slice(0, 7) + '-01';
 
     const [week, month, topDest, byNat, byType] = await Promise.all([
-      pool.query(`SELECT COUNT(*) AS count FROM reports WHERE LEFT(created_at,10) >= $1`, [sevenDaysAgo]),
-      pool.query(`SELECT COUNT(*) AS count FROM reports WHERE LEFT(created_at,10) >= $1`, [startOfMonth]),
-      pool.query(`SELECT prev_destination AS destination, SUM(pax_count) AS total FROM reports GROUP BY prev_destination ORDER BY total DESC LIMIT 10`),
-      pool.query(`SELECT nationality, SUM(pax_count) AS total FROM reports GROUP BY nationality ORDER BY total DESC`),
-      pool.query(`SELECT pax_type, COUNT(*) AS report_count, SUM(pax_count) AS total_pax FROM reports GROUP BY pax_type ORDER BY total_pax DESC`),
+      pool.query(`SELECT COUNT(*) AS count FROM reports WHERE LEFT(created_at,10) >= $1${scopeAnd}`, [sevenDaysAgo, ...scopeOnly]),
+      pool.query(`SELECT COUNT(*) AS count FROM reports WHERE LEFT(created_at,10) >= $1${scopeAnd}`, [startOfMonth, ...scopeOnly]),
+      pool.query(`SELECT prev_destination AS destination, SUM(pax_count) AS total FROM reports${scopeWhere} GROUP BY prev_destination ORDER BY total DESC LIMIT 10`, scopeOnly),
+      pool.query(`SELECT nationality, SUM(pax_count) AS total FROM reports${scopeWhere} GROUP BY nationality ORDER BY total DESC`, scopeOnly),
+      pool.query(`SELECT pax_type, COUNT(*) AS report_count, SUM(pax_count) AS total_pax FROM reports${scopeWhere} GROUP BY pax_type ORDER BY total_pax DESC`, scopeOnly),
     ]);
 
     res.json({
@@ -153,9 +183,12 @@ router.get('/handover', async (req, res) => {
       currentShift = 'C'; nextShift = 'A';
     }
 
+    const scope = scopeValue(req);
+    const scopeAnd = scope ? ' AND owner_terminal = $1' : '';
+    const scopeOnly = scope ? [scope] : [];
     const [upRes, fuRes] = await Promise.all([
-      pool.query("SELECT * FROM reports WHERE status = 'under_process' ORDER BY prev_datetime ASC"),
-      pool.query("SELECT * FROM reports WHERE status = 'flight_confirmed' ORDER BY new_datetime ASC"),
+      pool.query(`SELECT * FROM reports WHERE status = 'under_process'${scopeAnd} ORDER BY prev_datetime ASC`, scopeOnly),
+      pool.query(`SELECT * FROM reports WHERE status = 'flight_confirmed'${scopeAnd} ORDER BY new_datetime ASC`, scopeOnly),
     ]);
     const underProcess = upRes.rows;
     const flightConfirmed = fuRes.rows;
@@ -269,14 +302,14 @@ router.get('/shift-summary', async (req, res) => {
       C: { start: `${targetDate}T22:00`, end: `${nextDayStr}T06:00` },
     };
 
+    const scope = scopeValue(req);
     const result = {};
     for (const [shiftName, range] of Object.entries(shifts)) {
-      const { rows } = await pool.query(
-        `SELECT pax_count, pax_id_datetime FROM reports
-         WHERE pax_id_datetime >= $1 AND pax_id_datetime < $2
-         ORDER BY pax_id_datetime ASC`,
-        [range.start, range.end]
-      );
+      const params = [range.start, range.end];
+      let sql = `SELECT pax_count, pax_id_datetime FROM reports WHERE pax_id_datetime >= $1 AND pax_id_datetime < $2`;
+      if (scope) { sql += ' AND owner_terminal = $3'; params.push(scope); }
+      sql += ' ORDER BY pax_id_datetime ASC';
+      const { rows } = await pool.query(sql, params);
       const lines = rows.map(r => {
         const time  = r.pax_id_datetime ? r.pax_id_datetime.slice(11, 16) : '??:??';
         const count = String(r.pax_count || 1).padStart(2, '0');
@@ -301,11 +334,14 @@ router.get('/shift-summary', async (req, res) => {
 
 // ── GET all reports ────────────────────────────────────────────────────
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
     autoCloseReports().catch(console.error);
     const pool = getDb();
-    const { rows } = await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
+    const scope = scopeValue(req);
+    const { rows } = scope
+      ? await pool.query('SELECT * FROM reports WHERE owner_terminal = $1 ORDER BY created_at DESC', [scope])
+      : await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
     res.json(rows);
   } catch (e) {
     console.error('[GET /reports]', e);
@@ -319,7 +355,7 @@ router.get('/:id', async (req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    if (!rows[0] || !ownsReport(req, rows[0])) return res.status(404).json({ error: 'Report not found' });
     res.json(rows[0]);
   } catch (e) {
     console.error('[GET /reports/:id]', e);
@@ -341,6 +377,23 @@ router.post('/', uploadFiles, async (req, res) => {
       submitted_by, status, comment,
     } = req.body;
 
+    // owner_terminal always comes from the reporting user's assigned terminal —
+    // never from the flight. Normal users can't override it even if they send
+    // one. Supervisors have no fixed terminal, so they must choose explicitly.
+    let ownerTerminal;
+    if (req.role === 'supervisor') {
+      const t = req.body.owner_terminal;
+      if (t !== 'T1' && t !== 'North') {
+        return res.status(400).json({ error: 'Terminal is required — choose Terminal 1 or North Terminal.' });
+      }
+      ownerTerminal = t;
+    } else {
+      if (req.ownerTerminal !== 'T1' && req.ownerTerminal !== 'North') {
+        return res.status(403).json({ error: 'Your account has no terminal assigned. Contact your supervisor.' });
+      }
+      ownerTerminal = req.ownerTerminal;
+    }
+
     const filePaths = req.files?.length ? await saveFiles(req.files) : [];
     const reportStatus = status || 'under_process';
 
@@ -356,8 +409,9 @@ router.post('/', uploadFiles, async (req, res) => {
          prev_flight, prev_datetime, prev_destination, prev_airline,
          nationality, pax_type,
          new_flight, new_datetime, new_destination, new_airline,
-         days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status, comment, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+         days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status, comment, created_at,
+         owner_terminal)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING id`,
       [
         pax_id_datetime,
@@ -372,6 +426,7 @@ router.post('/', uploadFiles, async (req, res) => {
         reportStatus,
         comment || '',
         jeddahNowStr(),
+        ownerTerminal,
       ]
     );
 
@@ -408,7 +463,7 @@ router.put('/:id', uploadFiles, async (req, res) => {
   try {
     const pool = getDb();
     const { rows: existingRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
-    if (!existingRows[0]) return res.status(404).json({ error: 'Report not found' });
+    if (!existingRows[0] || !ownsReport(req, existingRows[0])) return res.status(404).json({ error: 'Report not found' });
     const existing = existingRows[0];
 
     const {
@@ -419,6 +474,8 @@ router.put('/:id', uploadFiles, async (req, res) => {
       days_at_airport, pax_count,
       status, comment,
     } = req.body;
+    // owner_terminal is immutable once set at creation — never touched here,
+    // even by a supervisor editing the case.
 
     const reportStatus = status || existing.status || 'under_process';
 
@@ -492,10 +549,11 @@ router.patch('/:id', express.json(), async (req, res) => {
   try {
     const pool = getDb();
     const { rows: existing } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
-    if (!existing[0]) return res.status(404).json({ error: 'Report not found' });
+    if (!existing[0] || !ownsReport(req, existing[0])) return res.status(404).json({ error: 'Report not found' });
     const report = existing[0];
 
     const { status, new_flight, new_datetime, new_destination, new_airline, comment, pax_count } = req.body;
+    // owner_terminal is immutable — not accepted as a patchable field.
 
     const validStatuses = ['under_process', 'flight_confirmed', 'closed'];
     if (status && !validStatuses.includes(status)) {
@@ -591,7 +649,7 @@ router.post('/:id/files', uploadFiles, async (req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    if (!rows[0] || !ownsReport(req, rows[0])) return res.status(404).json({ error: 'Report not found' });
     if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
 
     const oldPaths = JSON.parse(rows[0].file_paths || '[]');
@@ -641,7 +699,7 @@ router.post('/:id/nusuk', express.json(), async (req, res) => {
   try {
     const pool = getDb();
     const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
-    if (!rows[0]) return res.status(404).json({ error: 'Report not found' });
+    if (!rows[0] || !ownsReport(req, rows[0])) return res.status(404).json({ error: 'Report not found' });
     const report = rows[0];
 
     const { received, user } = req.body;

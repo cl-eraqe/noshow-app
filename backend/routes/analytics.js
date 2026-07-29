@@ -87,7 +87,9 @@ function highlights(arr, metric = 'value') {
   return { most, least };
 }
 
-router.get('/dashboard', async (req, res) => {
+// Analytics is supervisor-only. requireRole runs after requireAuth (mounted
+// in server.js), so req.role is already set here.
+router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
   try {
     const pool = getDb();
     const { fromDate, toDate } = computeRange(req.query);
@@ -99,10 +101,18 @@ router.get('/dashboard', async (req, res) => {
       [fromDate, toDate]
     );
 
-    const { shift, status, airline, nationality, destination, terminal, pax_type, daysBucket, resBucket } = req.query;
+    const { shift, status, airline, nationality, destination, terminal, pax_type, daysBucket, resBucket, scope } = req.query;
     const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
 
+    // scope ('T1' | 'North' | 'All'/absent) narrows to a single terminal's OWN
+    // reports before any other filter runs. This is the report-ownership
+    // dimension (owner_terminal, set from the reporting user) — distinct from
+    // the `terminal` filter above, which is the flight-derived T1/North/Hajj
+    // bus-transfer dimension and is unaffected by scope.
+    const scopeVal = (scope === 'T1' || scope === 'North') ? scope : null;
+
     const filtered = rows.filter(r => {
+      if (scopeVal && r.owner_terminal !== scopeVal) return false;
       if (shift && getShift(r.prev_datetime) !== shift) return false;
       if (status && r.status !== status) return false;
       if (airline && r.prev_airline !== airline) return false;
@@ -332,7 +342,7 @@ router.get('/dashboard', async (req, res) => {
     }
 
     res.json({
-      meta: { range: { from: fromDate, to: toDate }, filters: { shift, status, airline, nationality, destination, terminal, pax_type }, totalMatched: filtered.length },
+      meta: { range: { from: fromDate, to: toDate }, scope: scopeVal || 'All', filters: { shift, status, airline, nationality, destination, terminal, pax_type }, totalMatched: filtered.length },
       kpi: { totalCases, totalPax, active, activePax, underProcessCases, underProcessPax, confirmedCases, confirmedPax, closedCases, closedPax, needsNusukCases, needsNusukPax, needsNusukList, departedRecentCases, departedRecentPax, atAirportSoonCases, atAirportSoonPax, atAirportLaterCases, atAirportLaterPax, stuck24Cases, stuck24Pax, avgRebookHrs, avgCloseHrs, avgDaysAtAirport, busPct, sparkCases, sparkPax, sparkDays },
       byNationality: { data: byNationality, ...highlights(byNationality, 'pax') },
       byAirline: { data: byAirline, ...highlights(byAirline, 'pax') },
@@ -350,14 +360,23 @@ router.get('/dashboard', async (req, res) => {
   }
 });
 
-router.get('/filter-options', async (_req, res) => {
+// Used both by the supervisor-only Analytics filter row AND by the
+// New Report destination autocomplete for all staff — stays open to any
+// authenticated user. `scope` only narrows the result when a supervisor
+// passes it explicitly; normal users always get the unscoped full list
+// (these are generic dimension values, not report content).
+router.get('/filter-options', async (req, res) => {
   try {
     const pool = getDb();
+    const scope = (req.role === 'supervisor' && (req.query.scope === 'T1' || req.query.scope === 'North'))
+      ? req.query.scope : null;
+    const scopeWhere = (col) => scope ? `WHERE ${col} IS NOT NULL AND ${col} != '' AND owner_terminal = $1` : `WHERE ${col} IS NOT NULL AND ${col} != ''`;
+    const scopeParams = scope ? [scope] : [];
     const [a, n, d, p] = await Promise.all([
-      pool.query("SELECT DISTINCT prev_airline AS v FROM reports WHERE prev_airline IS NOT NULL AND prev_airline != '' ORDER BY prev_airline"),
-      pool.query("SELECT DISTINCT nationality AS v FROM reports WHERE nationality IS NOT NULL AND nationality != '' ORDER BY nationality"),
-      pool.query("SELECT DISTINCT prev_destination AS v FROM reports WHERE prev_destination IS NOT NULL AND prev_destination != '' ORDER BY prev_destination"),
-      pool.query("SELECT DISTINCT pax_type AS v FROM reports WHERE pax_type IS NOT NULL AND pax_type != '' ORDER BY pax_type"),
+      pool.query(`SELECT DISTINCT prev_airline AS v FROM reports ${scopeWhere('prev_airline')} ORDER BY prev_airline`, scopeParams),
+      pool.query(`SELECT DISTINCT nationality AS v FROM reports ${scopeWhere('nationality')} ORDER BY nationality`, scopeParams),
+      pool.query(`SELECT DISTINCT prev_destination AS v FROM reports ${scopeWhere('prev_destination')} ORDER BY prev_destination`, scopeParams),
+      pool.query(`SELECT DISTINCT pax_type AS v FROM reports ${scopeWhere('pax_type')} ORDER BY pax_type`, scopeParams),
     ]);
     const airlines = a.rows.map(r => r.v);
     const nationalities = n.rows.map(r => r.v);

@@ -163,29 +163,28 @@ export default function Dashboard() {
   // Quick-view modal (comment / attachments from emoji click)
   const [quickView, setQuickView] = useState(null); // { report, tab: 'comment'|'attachments' }
   const [qvDeleting, setQvDeleting] = useState(null); // filename being deleted
-  const [excelMenu, setExcelMenu] = useState(false);
-  const excelMenuRef = useRef(null);
-  const [customExport, setCustomExport] = useState(false); // custom-range modal open
+  const [customExport, setCustomExport] = useState(false); // export modal open
   const todayStr = new Date().toISOString().slice(0, 10);
   const [exportFrom, setExportFrom] = useState(todayStr);
   const [exportTo, setExportTo]     = useState(todayStr);
+  const [exportTerminal, setExportTerminal] = useState('All'); // 'T1' | 'North' | 'All'
 
-  useEffect(() => { load(); }, []);
+  // Supervisor-only terminal scope. Normal users never see this selector —
+  // their view is always forced server-side to their assigned terminal
+  // regardless of what's sent here, so 'All' is a harmless default for them.
+  const [terminalScope, setTerminalScope] = useState('All'); // 'T1' | 'North' | 'All'
+
+  useEffect(() => { load(); }, [terminalScope]);
   useEffect(() => {
     getFilterOptions().then(o => setKnownDestinations(o.destinationsFull || [])).catch(() => {});
     loadTerminalsCache().catch(() => {});
-  }, []);
-  useEffect(() => {
-    function onDown(e) { if (excelMenuRef.current && !excelMenuRef.current.contains(e.target)) setExcelMenu(false); }
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
   async function load() {
     setLoading(true);
     setError('');
     try {
-      const data = await getReports();
+      const data = await getReports(terminalScope);
       setReports(data);
     } catch (err) {
       setError(err.message);
@@ -482,7 +481,7 @@ export default function Dashboard() {
     setShiftDate(date);
     setShiftLoading(true);
     try {
-      const data = await getShiftSummary(date);
+      const data = await getShiftSummary(date, terminalScope);
       setShiftData(data);
     } catch (err) {
       alert('Failed: ' + err.message);
@@ -509,7 +508,7 @@ export default function Dashboard() {
   async function loadHandover(shift) {
     setHandoverLoading(true);
     try {
-      const data = await getHandoverReport(shift);
+      const data = await getHandoverReport(shift, terminalScope);
       setHandoverData(data);
     } catch (err) {
       alert('Failed to generate handover: ' + err.message);
@@ -524,53 +523,35 @@ export default function Dashboard() {
   }
 
   // ── Export cases to Excel (supervisor only)
-  // sel can be: '24h' | 'week' | 'all' | { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+  // sel = { from, to, terminal } — terminal: 'T1' | 'North' | 'All'.
+  // Terminal filtering happens server-side via getReports(scope) so a normal
+  // user calling this (they never see the modal, but defensively) only ever
+  // gets their own terminal's data regardless of what's requested.
   async function exportExcel(sel) {
-    setExcelMenu(false);
     try {
-      const all = await getReports();
+      const scopeArg = sel.terminal && sel.terminal !== 'All' ? sel.terminal : undefined;
+      const all = await getReports(scopeArg);
 
-      // Resolve the selection into a filter + human labels used for the
-      // sheet name, the "no results" message and the download filename.
-      let filterFn, emptyLabel, sheetName, fileTag;
-      if (sel === 'all') {
-        filterFn  = () => true;
-        emptyLabel = 'the system';
-        sheetName  = 'All Cases';
-        fileTag    = 'all';
-      } else if (sel && typeof sel === 'object') {
-        const fromMs = sel.from ? new Date(`${sel.from}T00:00:00`).getTime() : -Infinity;
-        const toMs   = sel.to   ? new Date(`${sel.to}T23:59:59`).getTime()   :  Infinity;
-        filterFn = r => {
-          if (!r.created_at) return false;
-          const t = new Date(r.created_at.replace(' ', 'T')).getTime();
-          return !isNaN(t) && t >= fromMs && t <= toMs;
-        };
-        emptyLabel = `${sel.from || '…'} → ${sel.to || '…'}`;
-        sheetName  = 'Custom Range';
-        fileTag    = `${sel.from || 'start'}_to_${sel.to || 'end'}`;
-      } else {
-        const ms = sel === 'week' ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-        const cutoff = Date.now() - ms;
-        filterFn = r => {
-          if (!r.created_at) return false;
-          const t = new Date(r.created_at.replace(' ', 'T')).getTime();
-          return !isNaN(t) && t >= cutoff;
-        };
-        emptyLabel = sel === 'week' ? 'the last 7 days' : 'the last 24 hours';
-        sheetName  = sel === 'week' ? 'Last 7 Days' : 'Last 24h';
-        fileTag    = sel;
-      }
+      const fromMs = sel.from ? new Date(`${sel.from}T00:00:00`).getTime() : -Infinity;
+      const toMs   = sel.to   ? new Date(`${sel.to}T23:59:59`).getTime()   :  Infinity;
+      const recent = all.filter(r => {
+        if (!r.created_at) return false;
+        const t = new Date(r.created_at.replace(' ', 'T')).getTime();
+        return !isNaN(t) && t >= fromMs && t <= toMs;
+      });
 
-      const recent = all.filter(filterFn);
+      const terminalLabelFull = { T1: 'Terminal 1', North: 'North Terminal', All: 'All Terminals' }[sel.terminal] || 'All Terminals';
+      const emptyLabel = `${terminalLabelFull} · ${sel.from || '…'} → ${sel.to || '…'}`;
+      const sheetName  = sel.terminal && sel.terminal !== 'All' ? terminalLabelFull : 'All Terminals';
+      const fileTag     = `${sel.terminal || 'all'}-${sel.from || 'start'}_to_${sel.to || 'end'}`;
 
       if (recent.length === 0) {
-        alert(`No reports were recorded in ${emptyLabel}.`);
+        alert(`No reports were recorded for ${emptyLabel}.`);
         return;
       }
 
       const headers = [
-        'Recorded Date', 'Recorded Time', 'Terminal',
+        'Recorded Date', 'Recorded Time', 'Case Terminal', 'Flight Terminal',
         'Original Departure Time', 'Original Departure Date', 'Original Flight Number',
         'Visa Type', 'Pax Type', 'Nationality', 'Total Pax',
         'Status', 'Root Causes', 'Action Taken',
@@ -586,10 +567,18 @@ export default function Dashboard() {
 
       ws.addRow(headers);
 
+      // "Case Terminal" reflects who OWNS the case (the reporting employee's
+      // terminal) — this is the authoritative terminal for the report, always
+      // as-stored, never re-derived from the flight. "Flight Terminal" is the
+      // separate, pre-existing flight/bus-transfer dimension.
       recent.forEach(r => {
+        const caseTerminal = r.owner_terminal === 'North' ? 'North Terminal'
+                            : r.owner_terminal === 'T1'    ? 'Terminal 1'
+                            : '—';
         ws.addRow([
           fmtDayMonth(r.created_at),
           fmtTime24(r.created_at),
+          caseTerminal,
           terminalLabel(r.prev_flight),
           fmtTime24(r.prev_datetime),
           fmtDayMonth(r.prev_datetime),
@@ -771,6 +760,21 @@ export default function Dashboard() {
           <img src="/jedco-logo.png" alt="JEDCO" className="header-logo" />
           <span className="header-title">No-Show App</span>
           <span className="header-role">{role}</span>
+          {isSupervisor() && (
+            <div className="terminal-scope-toggle" style={{ display: 'flex', gap: 4 }}>
+              {[['All', 'All Terminals'], ['T1', 'Terminal 1'], ['North', 'North Terminal']].map(([val, label]) => (
+                <button
+                  key={val}
+                  type="button"
+                  className={`btn btn-xs ${terminalScope === val ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setTerminalScope(val)}
+                  title={`Show ${label}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="header-actions">
           <button className="btn btn-handover btn-sm" onClick={openHandover} title="Shift Handover">
@@ -784,36 +788,9 @@ export default function Dashboard() {
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/analytics')}>
                 Analytics
               </button>
-              <div ref={excelMenuRef} style={{ position: 'relative' }}>
-                <button className="btn btn-secondary btn-sm" onClick={() => setExcelMenu(m => !m)} title="Export to Excel">
-                  📊 Excel ▾
-                </button>
-                {excelMenu && (
-                  <div style={{
-                    position: 'absolute', left: 0, top: '100%', marginTop: 4, zIndex: 50,
-                    background: '#0f1a2e', border: '1px solid #2b3a5a',
-                    borderRadius: 8, minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-                  }}>
-                    {[
-                      { label: 'Last 24 hours', action: () => exportExcel('24h') },
-                      { label: 'Last 7 days',   action: () => exportExcel('week') },
-                      { label: 'All cases (ever)', action: () => exportExcel('all') },
-                      { label: 'Custom range…', action: () => { setExcelMenu(false); setCustomExport(true); } },
-                    ].map(({ label, action }) => (
-                      <button key={label}
-                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '11px 16px',
-                          background: 'none', border: 'none', color: '#e6eefb',
-                          cursor: 'pointer', fontSize: '0.92rem', fontWeight: 500 }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#1a2a45'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'none'}
-                        onClick={action}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => setCustomExport(true)} title="Export to Excel">
+                📊 Export Excel
+              </button>
               <button className="btn btn-secondary btn-sm" onClick={() => navigate('/users')} title="Manage users">
                 Users
               </button>
@@ -1256,7 +1233,7 @@ export default function Dashboard() {
       {customExport && (
         <div className="modal-overlay" onClick={() => setCustomExport(false)}>
           <div className="modal-content" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">Export Custom Range</h2>
+            <h2 className="modal-title">Export Excel</h2>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted, #8ba3b8)', marginTop: 0 }}>
               Exports every case recorded between the two dates (inclusive), by recorded date.
             </p>
@@ -1265,16 +1242,32 @@ export default function Dashboard() {
               <input type="date" className="field-input" value={exportFrom} max={exportTo || todayStr}
                 onChange={e => setExportFrom(e.target.value)} />
             </div>
-            <div className="field" style={{ marginBottom: 16 }}>
+            <div className="field" style={{ marginBottom: 12 }}>
               <label className="field-label">To</label>
               <input type="date" className="field-input" value={exportTo} min={exportFrom} max={todayStr}
                 onChange={e => setExportTo(e.target.value)} />
+            </div>
+            <div className="field" style={{ marginBottom: 16 }}>
+              <label className="field-label">Terminal</label>
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                {[['All', 'All Terminals'], ['T1', 'Terminal 1'], ['North', 'North Terminal']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    className={`btn btn-sm ${exportTerminal === val ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setExportTerminal(val)}
+                    style={{ flex: 1 }}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary btn-sm" onClick={() => setCustomExport(false)}>Cancel</button>
               <button className="btn btn-primary btn-sm"
                 disabled={!exportFrom || !exportTo || exportFrom > exportTo}
-                onClick={() => { setCustomExport(false); exportExcel({ from: exportFrom, to: exportTo }); }}>
+                onClick={() => { setCustomExport(false); exportExcel({ from: exportFrom, to: exportTo, terminal: exportTerminal }); }}>
                 📊 Export
               </button>
             </div>

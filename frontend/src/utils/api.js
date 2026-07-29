@@ -109,8 +109,12 @@ export async function lookupFlight(flightNumber) {
 }
 
 // ── Reports
-export async function getReports() {
-  return request('/api/reports');
+// scope: 'T1' | 'North' | 'All' (or omitted) — only meaningful for a
+// supervisor; normal users are always forced server-side to their own
+// assigned terminal regardless of what's passed here.
+export async function getReports(scope) {
+  const q = scope && scope !== 'All' ? `?scope=${encodeURIComponent(scope)}` : '';
+  return request(`/api/reports${q}`);
 }
 
 export async function getReport(id) {
@@ -204,8 +208,9 @@ export async function readSharedFiles() {
 }
 
 // ── Analytics
-export async function getAnalytics() {
-  return request('/api/reports/analytics/summary');
+export async function getAnalytics(scope) {
+  const q = scope && scope !== 'All' ? `?scope=${encodeURIComponent(scope)}` : '';
+  return request(`/api/reports/analytics/summary${q}`);
 }
 
 export async function getDashboardData(filters = {}) {
@@ -214,8 +219,9 @@ export async function getDashboardData(filters = {}) {
   return request(`/api/analytics/dashboard?${params.toString()}`);
 }
 
-export async function getFilterOptions() {
-  return request('/api/analytics/filter-options');
+export async function getFilterOptions(scope) {
+  const q = scope && scope !== 'All' ? `?scope=${encodeURIComponent(scope)}` : '';
+  return request(`/api/analytics/filter-options${q}`);
 }
 
 // ── Flight Manager (supervisor)
@@ -277,11 +283,18 @@ export async function resetUserPin(id, pin) {
     body: JSON.stringify({ pin }),
   });
 }
-export async function createInvite(role) {
+export async function setUserTerminal(id, terminal) {
+  return request(`/api/users/${id}/terminal`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ terminal }),
+  });
+}
+export async function createInvite(role, terminal) {
   return request('/api/users/invite', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, terminal }),
   });
 }
 export async function getInvites() {
@@ -334,15 +347,21 @@ export async function revertAirlineLogo(iata) {
 }
 
 // ── Shift Summary
-export async function getShiftSummary(date) {
-  const params = date ? `?date=${date}` : '';
-  return request(`/api/reports/shift-summary${params}`);
+export async function getShiftSummary(date, scope) {
+  const params = new URLSearchParams();
+  if (date) params.set('date', date);
+  if (scope && scope !== 'All') params.set('scope', scope);
+  const qs = params.toString();
+  return request(`/api/reports/shift-summary${qs ? `?${qs}` : ''}`);
 }
 
 // ── Handover Report
-export async function getHandoverReport(shift) {
-  const params = shift ? `?shift=${shift}` : '';
-  return request(`/api/reports/handover${params}`);
+export async function getHandoverReport(shift, scope) {
+  const params = new URLSearchParams();
+  if (shift) params.set('shift', shift);
+  if (scope && scope !== 'All') params.set('scope', scope);
+  const qs = params.toString();
+  return request(`/api/reports/handover${qs ? `?${qs}` : ''}`);
 }
 
 // ── Airline code → name mapping (client-side, no API call needed)

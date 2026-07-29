@@ -4,7 +4,7 @@ import imageCompression from 'browser-image-compression';
 import { jsPDF } from 'jspdf';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
-import { getRole, getUsername } from '../utils/auth';
+import { getRole, getUsername, isSupervisor } from '../utils/auth';
 
 const IMG_TYPES = /^image\/(jpeg|jpg|png|gif|webp|bmp)$/i;
 const A4 = { w: 210, h: 297 }; // mm
@@ -280,6 +280,15 @@ export default function NewReport({ editMode }) {
   const [flightWarning, setFlightWarning] = useState('');
   const [knownDestinations, setKnownDestinations] = useState([]);
 
+  // A supervisor has no assigned terminal, so when creating a NEW report they
+  // must explicitly choose which terminal it belongs to — this is the only
+  // source of truth for the case's terminal (never derived from the flight).
+  // Normal users never see this: their terminal is inherited automatically
+  // from their account, and it's immutable once a report is created, so it
+  // never appears in edit mode either.
+  const needsTerminalChoice = isSupervisor() && !isEdit;
+  const [ownerTerminal, setOwnerTerminal] = useState('');
+
   useEffect(() => {
     getFilterOptions().then(o => setKnownDestinations(o.destinationsFull || [])).catch(() => {});
   }, []);
@@ -438,6 +447,10 @@ export default function NewReport({ editMode }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!validatePrevFlight()) return;
+    if (needsTerminalChoice && ownerTerminal !== 'T1' && ownerTerminal !== 'North') {
+      setSubmitError('Please choose which terminal this case belongs to.');
+      return;
+    }
     setSubmitting(true);
     setSubmitError('');
     try {
@@ -448,6 +461,9 @@ export default function NewReport({ editMode }) {
 
       if (!isEdit) {
         fd.append('submitted_by', getUsername() || getRole());
+        // Normal users' terminal is inherited server-side from their account —
+        // only a supervisor (who has none) needs to send one explicitly.
+        if (needsTerminalChoice) fd.append('owner_terminal', ownerTerminal);
       }
 
       // Include new flight fields if status is flight_confirmed
@@ -804,13 +820,45 @@ export default function NewReport({ editMode }) {
           </div>
         </div>
 
+        {needsTerminalChoice && (
+          <div className="form-section">
+            <h2 className="section-title">Case Terminal</h2>
+            <div className="field">
+              <label className="field-label">
+                Which terminal is this case for? <span className="req">*</span>
+              </label>
+              <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.35rem' }}>
+                {[['T1', 'Terminal 1'], ['North', 'North Terminal']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    className={`btn ${ownerTerminal === val ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setOwnerTerminal(val)}
+                    style={{ flex: 1 }}
+                  >
+                    {ownerTerminal === val ? '✓ ' : ''}{label}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted, #888)', marginTop: '0.4rem' }}>
+                Case ownership is based on the reporting employee's terminal, not the flight —
+                choose the terminal handling this case.
+              </p>
+            </div>
+          </div>
+        )}
+
         {submitError && <p className="form-error">{submitError}</p>}
 
         <div className="form-actions">
           <button type="button" className="btn btn-secondary" onClick={() => navigate('/dashboard')}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary" disabled={submitting || converting}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={submitting || converting || (needsTerminalChoice && !ownerTerminal)}
+          >
             {converting ? 'Converting…' : submitting ? 'Saving…' : (isEdit ? 'Save Changes' : 'Submit Report')}
           </button>
         </div>

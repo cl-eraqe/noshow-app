@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { checkInvite, registerUser } from '../utils/api';
-import { saveRole, saveToken, saveUsername } from '../utils/auth';
+import { saveRole, saveToken, saveUsername, saveOwnerTerminal } from '../utils/auth';
 
 const PIN_RULES = 'At least 6 digits. No sequences (123456) or repeated digits (111111).';
 
@@ -46,6 +46,7 @@ export default function RegisterPage() {
       const data = await registerUser(inviteToken, name.trim(), pin);
       saveRole(data.role);
       saveToken(data.token);
+      saveOwnerTerminal(data.ownerTerminal);
       saveUsername(data.username);
       navigate('/dashboard');
     } catch (err) {
@@ -80,6 +81,7 @@ export default function RegisterPage() {
   }
 
   const roleLabel = invite.role === 'supervisor' ? 'Supervisor' : 'Staff';
+  const terminalLabel = invite.ownerTerminal === 'North' ? 'North Terminal' : invite.ownerTerminal === 'T1' ? 'Terminal 1' : null;
 
   return (
     <div className="login-screen">
@@ -90,6 +92,7 @@ export default function RegisterPage() {
         <h1 className="login-title">Create Account</h1>
         <p className="login-subtitle">
           You're registering as <strong>{roleLabel}</strong>
+          {terminalLabel && <> · <strong>{terminalLabel}</strong></>}
         </p>
 
         <form onSubmit={handleSubmit} className="login-form">
