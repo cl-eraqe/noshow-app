@@ -31,16 +31,27 @@ router.patch('/:id/terminal', requireRole('supervisor'), async (req, res) => {
     return res.status(400).json({ error: 'terminal must be "T1" or "North".' });
   }
   try {
-    const { getDb } = require('../db');
-    const { rows: existing } = await getDb().query(`SELECT id, role FROM users WHERE id = $1`, [req.params.id]);
-    if (!existing[0]) return res.status(404).json({ error: 'User not found.' });
-    if (existing[0].role === 'supervisor') {
+    const { getDb, logAudit } = require('../db');
+    const db = getDb();
+    const { rows: existing } = await db.query(
+      `SELECT id, name, role, owner_terminal FROM users WHERE id = $1`, [req.params.id]
+    );
+    const target = existing[0];
+    if (!target) return res.status(404).json({ error: 'User not found.' });
+    if (target.role === 'supervisor') {
       return res.status(400).json({ error: 'The supervisor account is not assigned to a single terminal.' });
     }
-    const { rows } = await getDb().query(
+    if (target.owner_terminal === terminal) return res.json(target); // no-op
+
+    const { rows } = await db.query(
       `UPDATE users SET owner_terminal = $1 WHERE id = $2 RETURNING id, name, role, owner_terminal, active`,
       [terminal, req.params.id]
     );
+    await logAudit({
+      user: req.username || req.role,
+      action: 'user_terminal_change',
+      changes: { user: target.name, owner_terminal: { from: target.owner_terminal, to: terminal } },
+    });
     return res.json(rows[0]);
   } catch (err) {
     console.error('Assign terminal error:', err);
@@ -63,6 +74,48 @@ router.patch('/:id/active', requireRole('supervisor'), async (req, res) => {
   } catch (err) {
     console.error('Toggle active error:', err);
     return res.status(500).json({ error: 'Could not update user.' });
+  }
+});
+
+// ── Delete a user permanently (supervisor only) ───────────────────────────────
+// Reports keep their submitted_by name (plain TEXT, no foreign key), so past
+// cases and their audit history survive the account being removed. Guarded so
+// the supervisor can't lock themselves — or everyone — out.
+router.delete('/:id', requireRole('supervisor'), async (req, res) => {
+  try {
+    const { getDb, logAudit } = require('../db');
+    const db = getDb();
+    const { rows: existing } = await db.query(
+      `SELECT id, name, role, owner_terminal, active, created_at FROM users WHERE id = $1`,
+      [req.params.id]
+    );
+    const target = existing[0];
+    if (!target) return res.status(404).json({ error: 'User not found.' });
+
+    if (req.username && target.name.toLowerCase() === req.username.toLowerCase()) {
+      return res.status(400).json({ error: 'You cannot delete your own account.' });
+    }
+    if (target.role === 'supervisor') {
+      const { rows: sup } = await db.query(`SELECT COUNT(*)::int AS n FROM users WHERE role = 'supervisor'`);
+      if (sup[0].n <= 1) {
+        return res.status(400).json({ error: 'Cannot delete the only supervisor account.' });
+      }
+    }
+
+    await db.query(`DELETE FROM users WHERE id = $1`, [req.params.id]);
+    await logAudit({
+      user: req.username || req.role,
+      action: 'user_delete',
+      snapshot: {
+        id: target.id, name: target.name, role: target.role,
+        owner_terminal: target.owner_terminal, active: target.active,
+        created_at: target.created_at,
+      },
+    });
+    return res.json({ success: true, deleted: target.name });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    return res.status(500).json({ error: 'Could not delete user.' });
   }
 });
 

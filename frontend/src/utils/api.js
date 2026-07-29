@@ -283,6 +283,9 @@ export async function resetUserPin(id, pin) {
     body: JSON.stringify({ pin }),
   });
 }
+export async function deleteUser(id) {
+  return request(`/api/users/${id}`, { method: 'DELETE' });
+}
 export async function setUserTerminal(id, terminal) {
   return request(`/api/users/${id}/terminal`, {
     method: 'PATCH',
@@ -347,6 +350,10 @@ export async function revertAirlineLogo(iata) {
 }
 
 // ── Shift Summary
+// The Shift Summary button was removed from the Dashboard header (its slot now
+// holds the terminal filter), so this currently has no callers. The backend
+// endpoint is still live and terminal-scoped — kept here so the feature can be
+// re-surfaced elsewhere without rebuilding the client call.
 export async function getShiftSummary(date, scope) {
   const params = new URLSearchParams();
   if (date) params.set('date', date);
