@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '../utils/api';
-import { saveRole, saveToken, saveUsername, getUsername } from '../utils/auth';
+import { saveRole, saveToken, saveUsername, saveOwnerTerminal, getUsername } from '../utils/auth';
 
 export default function LoginPage() {
   const [name, setName]     = useState(getUsername);   // pre-fill from last login
@@ -19,6 +19,7 @@ export default function LoginPage() {
       const data = await login(trimmedName, pin);
       saveRole(data.role);
       saveToken(data.token);
+      saveOwnerTerminal(data.ownerTerminal);
       if (data.username) saveUsername(data.username);
       navigate('/dashboard');
     } catch (err) {

@@ -42,7 +42,8 @@ async function initDb() {
       closed_at        TEXT,
       confirmed_at     TEXT,
       nusuk_received   TEXT,
-      nusuk_by         TEXT
+      nusuk_by         TEXT,
+      owner_terminal   TEXT CHECK (owner_terminal IN ('T1', 'North'))
     )
   `);
 
@@ -88,25 +89,27 @@ async function initDb() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id         SERIAL PRIMARY KEY,
-      name       TEXT NOT NULL UNIQUE,
-      role       TEXT NOT NULL CHECK (role IN ('staff', 'supervisor')),
-      pin_hash   TEXT NOT NULL,
-      active     BOOLEAN NOT NULL DEFAULT true,
-      created_at TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
+      id             SERIAL PRIMARY KEY,
+      name           TEXT NOT NULL UNIQUE,
+      role           TEXT NOT NULL CHECK (role IN ('staff', 'supervisor')),
+      owner_terminal TEXT CHECK (owner_terminal IN ('T1', 'North')),
+      pin_hash       TEXT NOT NULL,
+      active         BOOLEAN NOT NULL DEFAULT true,
+      created_at     TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_users_name ON users(LOWER(name))`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS invite_tokens (
-      id         SERIAL PRIMARY KEY,
-      token      TEXT NOT NULL UNIQUE,
-      role       TEXT NOT NULL CHECK (role IN ('staff', 'supervisor')),
-      created_by TEXT NOT NULL,
-      expires_at TIMESTAMPTZ NOT NULL,
-      used       BOOLEAN NOT NULL DEFAULT false,
-      created_at TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
+      id              SERIAL PRIMARY KEY,
+      token           TEXT NOT NULL UNIQUE,
+      role            TEXT NOT NULL CHECK (role IN ('staff', 'supervisor')),
+      owner_terminal  TEXT CHECK (owner_terminal IN ('T1', 'North')),
+      created_by      TEXT NOT NULL,
+      expires_at      TIMESTAMPTZ NOT NULL,
+      used            BOOLEAN NOT NULL DEFAULT false,
+      created_at      TEXT DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_invite_token ON invite_tokens(token)`);
@@ -123,6 +126,47 @@ async function initDb() {
 
   // Add confirmed_by column if not exists (idempotent migration)
   await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS confirmed_by TEXT`);
+
+  // Multi-terminal support (idempotent migration) — owner_terminal records which
+  // terminal's queue a user/report/invite belongs to. This is a distinct concept
+  // from the flight-derived terminal (TERMINAL_MAP / getTerminal / needsBus), which
+  // continues to drive bus-transfer badges and the existing analytics terminal
+  // breakdown unchanged. See ALTER statements + backfill below.
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
+  await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
+  await pool.query(`ALTER TABLE invite_tokens ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
+  // Add the CHECK constraints separately (idempotent — Postgres has no "ADD CONSTRAINT
+  // IF NOT EXISTS", so guard with a catalog lookup instead of failing on re-run).
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'users_owner_terminal_check'
+      ) THEN
+        ALTER TABLE users ADD CONSTRAINT users_owner_terminal_check
+          CHECK (owner_terminal IN ('T1', 'North') OR owner_terminal IS NULL);
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'reports_owner_terminal_check'
+      ) THEN
+        ALTER TABLE reports ADD CONSTRAINT reports_owner_terminal_check
+          CHECK (owner_terminal IN ('T1', 'North') OR owner_terminal IS NULL);
+      END IF;
+    END $$;
+  `);
+  await pool.query(`
+    DO $$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'invite_tokens_owner_terminal_check'
+      ) THEN
+        ALTER TABLE invite_tokens ADD CONSTRAINT invite_tokens_owner_terminal_check
+          CHECK (owner_terminal IN ('T1', 'North') OR owner_terminal IS NULL);
+      END IF;
+    END $$;
+  `);
 
   // Fix column defaults on existing tables (safe, idempotent)
   await pool.query(`ALTER TABLE reports ALTER COLUMN created_at SET DEFAULT to_char(now() AT TIME ZONE 'Asia/Riyadh', 'YYYY-MM-DD HH24:MI:SS')`);
@@ -144,6 +188,18 @@ async function initDb() {
     `);
     await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('utc_to_jeddah_created_at', $1)`, [jeddahNowStr()]);
     console.log('Migration applied: created_at converted from UTC to Jeddah time');
+  }
+
+  // One-time migration: backfill existing staff users and all existing reports
+  // to Terminal 1, preserving historical data now that multi-terminal support
+  // exists. The sole supervisor account is left with owner_terminal = NULL
+  // (supervisors aren't scoped to one terminal).
+  const { rows: termMigRows } = await pool.query(`SELECT 1 FROM _migrations WHERE name = 'backfill_owner_terminal_t1'`);
+  if (termMigRows.length === 0) {
+    await pool.query(`UPDATE users SET owner_terminal = 'T1' WHERE owner_terminal IS NULL AND role = 'staff'`);
+    await pool.query(`UPDATE reports SET owner_terminal = 'T1' WHERE owner_terminal IS NULL`);
+    await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('backfill_owner_terminal_t1', $1)`, [jeddahNowStr()]);
+    console.log('Migration applied: existing users and reports backfilled to Terminal 1');
   }
 
   console.log('Database ready (PostgreSQL)');

@@ -5,8 +5,9 @@ function requireAuth(req, res, next) {
   const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
   const result = verifyToken(token);
   if (!result) return res.status(401).json({ error: 'Unauthorized' });
-  req.role     = result.role;
-  req.username = result.username || null;
+  req.role          = result.role;
+  req.ownerTerminal = result.ownerTerminal || null; // 'T1' | 'North' | null (supervisor)
+  req.username      = result.username || null;
   next();
 }
 

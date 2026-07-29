@@ -12,12 +12,39 @@ router.get('/', requireRole('supervisor'), async (req, res) => {
   try {
     const { getDb } = require('../db');
     const { rows } = await getDb().query(
-      `SELECT id, name, role, active, created_at FROM users ORDER BY created_at DESC`
+      `SELECT id, name, role, owner_terminal, active, created_at FROM users ORDER BY created_at DESC`
     );
     return res.json(rows);
   } catch (err) {
     console.error('List users error:', err);
     return res.status(500).json({ error: 'Could not fetch users.' });
+  }
+});
+
+// ── Assign / change a staff user's terminal (supervisor only) ─────────────────
+// The supervisor account itself has no terminal (owner_terminal stays NULL) —
+// reassigning it is rejected. Per the design, owner_terminal on already-
+// created REPORTS is immutable; this only affects the USER's future reports.
+router.patch('/:id/terminal', requireRole('supervisor'), async (req, res) => {
+  const { terminal } = req.body;
+  if (terminal !== 'T1' && terminal !== 'North') {
+    return res.status(400).json({ error: 'terminal must be "T1" or "North".' });
+  }
+  try {
+    const { getDb } = require('../db');
+    const { rows: existing } = await getDb().query(`SELECT id, role FROM users WHERE id = $1`, [req.params.id]);
+    if (!existing[0]) return res.status(404).json({ error: 'User not found.' });
+    if (existing[0].role === 'supervisor') {
+      return res.status(400).json({ error: 'The supervisor account is not assigned to a single terminal.' });
+    }
+    const { rows } = await getDb().query(
+      `UPDATE users SET owner_terminal = $1 WHERE id = $2 RETURNING id, name, role, owner_terminal, active`,
+      [terminal, req.params.id]
+    );
+    return res.json(rows[0]);
+  } catch (err) {
+    console.error('Assign terminal error:', err);
+    return res.status(500).json({ error: 'Could not assign terminal.' });
   }
 });
 
@@ -60,11 +87,21 @@ router.patch('/:id/pin', requireRole('supervisor'), async (req, res) => {
 });
 
 // ── Create invite link (supervisor only) ──────────────────────────────────────
-// role=staff → 24h, role=supervisor → 6h
+// role=staff → 24h, role=supervisor → 6h. A staff invite must carry a terminal
+// (T1 or North) — that's how a self-registered user's owner_terminal gets set,
+// since the supervisor never creates their row directly. Supervisor invites
+// don't take a terminal (stored NULL).
 router.post('/invite', requireRole('supervisor'), async (req, res) => {
-  const { role } = req.body;
+  const { role, terminal } = req.body;
   if (!['staff', 'supervisor'].includes(role)) {
     return res.status(400).json({ error: 'role must be staff or supervisor.' });
+  }
+  let ownerTerminal = null;
+  if (role === 'staff') {
+    if (terminal !== 'T1' && terminal !== 'North') {
+      return res.status(400).json({ error: 'terminal is required for a staff invite — choose T1 or North.' });
+    }
+    ownerTerminal = terminal;
   }
   const hours     = role === 'supervisor' ? 6 : 24;
   const expiresAt = new Date(Date.now() + hours * 3600 * 1000);
@@ -74,10 +111,10 @@ router.post('/invite', requireRole('supervisor'), async (req, res) => {
   try {
     const { getDb } = require('../db');
     await getDb().query(
-      `INSERT INTO invite_tokens (token, role, created_by, expires_at) VALUES ($1, $2, $3, $4)`,
-      [token, role, createdBy, expiresAt.toISOString()]
+      `INSERT INTO invite_tokens (token, role, owner_terminal, created_by, expires_at) VALUES ($1, $2, $3, $4, $5)`,
+      [token, role, ownerTerminal, createdBy, expiresAt.toISOString()]
     );
-    return res.status(201).json({ token, role, expiresAt: expiresAt.toISOString() });
+    return res.status(201).json({ token, role, ownerTerminal, expiresAt: expiresAt.toISOString() });
   } catch (err) {
     console.error('Create invite error:', err);
     return res.status(500).json({ error: 'Could not create invite.' });
@@ -89,7 +126,7 @@ router.get('/invites', requireRole('supervisor'), async (req, res) => {
   try {
     const { getDb } = require('../db');
     const { rows } = await getDb().query(
-      `SELECT id, token, role, created_by, expires_at, used, created_at
+      `SELECT id, token, role, owner_terminal, created_by, expires_at, used, created_at
        FROM invite_tokens ORDER BY created_at DESC LIMIT 50`
     );
     return res.json(rows);

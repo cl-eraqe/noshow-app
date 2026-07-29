@@ -21,28 +21,37 @@ const loginLimiter = rateLimit({
 });
 
 // ── Token format ─────────────────────────────────────────────────────────────
-// role.b64name.window.sig  (4 parts) — every token is tied to a user account.
+// role.ownerTerminal.b64name.window.sig  (5 parts) — every token is tied to a
+// user account. ownerTerminal is 'T1' | 'North' | '' (empty = supervisor, who
+// isn't scoped to a single terminal). This is a distinct concept from the
+// flight-derived terminal (getTerminal/needsBus in _terminal-helper.js /
+// utils/api.js), which is unaffected by this field.
+//
+// NOTE: this token format changed shape (was 4 parts). Deploying this drops
+// every existing session — everyone must log in again. This is intentional
+// and safe: old 4-part tokens simply fail verifyToken and redirect to /login.
 
-function makeToken(role, username) {
+function makeToken(role, ownerTerminal, username) {
   if (!username) throw new Error('makeToken requires a username');
-  const w   = Math.floor(Date.now() / WINDOW_MS);
-  const b64 = Buffer.from(username).toString('base64');
-  const sig = crypto.createHmac('sha256', SECRET()).update(`${role}:${b64}:${w}`).digest('hex');
-  return `${role}.${b64}.${w}.${sig}`;
+  const term = ownerTerminal || '';
+  const w    = Math.floor(Date.now() / WINDOW_MS);
+  const b64  = Buffer.from(username).toString('base64');
+  const sig  = crypto.createHmac('sha256', SECRET()).update(`${role}:${term}:${b64}:${w}`).digest('hex');
+  return `${role}.${term}.${b64}.${w}.${sig}`;
 }
 
 function verifyToken(token) {
   if (!token || typeof token !== 'string') return null;
   const parts = token.split('.');
-  if (parts.length !== 4) return null;
+  if (parts.length !== 5) return null;
 
-  const [role, b64name, win, sig] = parts;
+  const [role, term, b64name, win, sig] = parts;
   const now = Math.floor(Date.now() / WINDOW_MS);
   for (const w of [now, now - 1]) {
-    const expected = crypto.createHmac('sha256', SECRET()).update(`${role}:${b64name}:${w}`).digest('hex');
+    const expected = crypto.createHmac('sha256', SECRET()).update(`${role}:${term}:${b64name}:${w}`).digest('hex');
     if (sig === expected && parseInt(win) === w) {
       const username = Buffer.from(b64name, 'base64').toString('utf8');
-      return { role, username };
+      return { role, ownerTerminal: term || null, username };
     }
   }
   return null;
@@ -85,7 +94,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     const { getDb } = require('../db');
     const db = getDb();
     const { rows } = await db.query(
-      `SELECT id, name, role, pin_hash, active FROM users WHERE LOWER(name) = LOWER($1) LIMIT 1`,
+      `SELECT id, name, role, owner_terminal, pin_hash, active FROM users WHERE LOWER(name) = LOWER($1) LIMIT 1`,
       [name.trim()]
     );
     const user = rows[0];
@@ -95,8 +104,8 @@ router.post('/login', loginLimiter, async (req, res) => {
     const ok = await bcrypt.compare(String(pin), user.pin_hash);
     if (!ok) return res.status(401).json({ error: 'Invalid name or PIN.' });
 
-    const token = makeToken(user.role, user.name);
-    return res.json({ role: user.role, username: user.name, token });
+    const token = makeToken(user.role, user.owner_terminal, user.name);
+    return res.json({ role: user.role, ownerTerminal: user.owner_terminal || null, username: user.name, token });
   } catch (err) {
     console.error('DB login error:', err);
     return res.status(500).json({ error: 'Login failed. Please try again.' });
@@ -120,7 +129,7 @@ router.post('/register', loginLimiter, async (req, res) => {
     const db = getDb();
 
     const { rows: irows } = await db.query(
-      `SELECT id, role, expires_at, used FROM invite_tokens WHERE token = $1 LIMIT 1`,
+      `SELECT id, role, owner_terminal, expires_at, used FROM invite_tokens WHERE token = $1 LIMIT 1`,
       [inviteToken]
     );
     const invite = irows[0];
@@ -128,6 +137,11 @@ router.post('/register', loginLimiter, async (req, res) => {
     if (invite.used) return res.status(400).json({ error: 'This invite link has already been used.' });
     if (new Date(invite.expires_at) < new Date()) {
       return res.status(400).json({ error: 'This invite link has expired.' });
+    }
+    // Every staff invite must carry a terminal (assigned by the supervisor when
+    // the link was created). Supervisor invites have no terminal (NULL).
+    if (invite.role === 'staff' && !invite.owner_terminal) {
+      return res.status(400).json({ error: 'This invite link is missing a terminal assignment. Ask your supervisor for a new link.' });
     }
 
     const cleanName = name.trim();
@@ -138,13 +152,13 @@ router.post('/register', loginLimiter, async (req, res) => {
 
     const hash = await bcrypt.hash(String(pin), 12);
     await db.query(
-      `INSERT INTO users (name, role, pin_hash, active) VALUES ($1, $2, $3, true)`,
-      [cleanName, invite.role, hash]
+      `INSERT INTO users (name, role, owner_terminal, pin_hash, active) VALUES ($1, $2, $3, $4, true)`,
+      [cleanName, invite.role, invite.owner_terminal, hash]
     );
     await db.query(`UPDATE invite_tokens SET used = true WHERE id = $1`, [invite.id]);
 
-    const authToken = makeToken(invite.role, cleanName);
-    return res.status(201).json({ role: invite.role, username: cleanName, token: authToken });
+    const authToken = makeToken(invite.role, invite.owner_terminal, cleanName);
+    return res.status(201).json({ role: invite.role, ownerTerminal: invite.owner_terminal || null, username: cleanName, token: authToken });
   } catch (err) {
     console.error('Register error:', err);
     return res.status(500).json({ error: 'Registration failed. Please try again.' });
@@ -157,14 +171,14 @@ router.get('/invite/:token', async (req, res) => {
     const { getDb } = require('../db');
     const db = getDb();
     const { rows } = await db.query(
-      `SELECT role, expires_at, used FROM invite_tokens WHERE token = $1 LIMIT 1`,
+      `SELECT role, owner_terminal, expires_at, used FROM invite_tokens WHERE token = $1 LIMIT 1`,
       [req.params.token]
     );
     const invite = rows[0];
     if (!invite || invite.used || new Date(invite.expires_at) < new Date()) {
       return res.status(400).json({ error: 'Invalid or expired invite link.' });
     }
-    return res.json({ role: invite.role, expiresAt: invite.expires_at });
+    return res.json({ role: invite.role, ownerTerminal: invite.owner_terminal || null, expiresAt: invite.expires_at });
   } catch (err) {
     console.error('Invite check error:', err);
     return res.status(500).json({ error: 'Could not validate invite.' });

@@ -384,6 +384,11 @@ export default function Analytics() {
   const [destination, setDest] = useState('');
   const [paxType, setPaxType] = useState('');
   const [drill, setDrill] = useState(null);
+  // Terminal SCOPE (report ownership: T1 / North / All) — a separate axis
+  // from the existing `terminal` filter dropdown further down, which is the
+  // flight-derived T1/North/Hajj bus-transfer dimension. Analytics is
+  // supervisor-only already, so this is always meaningful here.
+  const [terminalScope, setTerminalScope] = useState('All');
 
   const [filterOpts, setFilterOpts] = useState({ airlines: [], nationalities: [], destinations: [], paxTypes: [] });
   const [widgets, setWidgets] = useState(loadWidgets);
@@ -446,8 +451,8 @@ export default function Analytics() {
   }, []);
 
   useEffect(() => {
-    getFilterOptions().then(setFilterOpts).catch(() => {});
-  }, []);
+    getFilterOptions(terminalScope).then(setFilterOpts).catch(() => {});
+  }, [terminalScope]);
 
   async function reload() {
     setLoading(true);
@@ -458,6 +463,7 @@ export default function Analytics() {
         from: range === 'custom' ? from : '',
         to:   range === 'custom' ? to : '',
         shift, status, airline, nationality, destination, pax_type: paxType,
+        scope: terminalScope,
       };
       if (drill) payload[drill.field] = drill.value;
       const d = await getDashboardData(payload);
@@ -466,7 +472,7 @@ export default function Analytics() {
     finally    { setLoading(false); }
   }
 
-  useEffect(() => { reload(); }, [range, from, to, shift, status, airline, nationality, destination, paxType, drill]);
+  useEffect(() => { reload(); }, [range, from, to, shift, status, airline, nationality, destination, paxType, drill, terminalScope]);
 
   // auto-refresh every 30s for TV mode
   useEffect(() => {
@@ -558,7 +564,9 @@ export default function Analytics() {
           <div className="xlive-dot"/>
           <div>
             <div className="xtitle">NO-SHOW PASSENGER INTELLIGENCE</div>
-            <div className="xsubtitle">Operations Control Center · Terminal 1</div>
+            <div className="xsubtitle">
+              Operations Control Center · {terminalScope === 'T1' ? 'Terminal 1' : terminalScope === 'North' ? 'North Terminal' : 'All Terminals'}
+            </div>
           </div>
         </div>
         <div className="xheader-center">
@@ -593,6 +601,12 @@ export default function Analytics() {
 
       {/* ── Secondary filter row ── */}
       <div className="xfilterbar">
+        <select className="xinput" value={terminalScope} onChange={e => setTerminalScope(e.target.value)}
+                title="Which terminal's cases to analyze">
+          <option value="All">All Terminals</option>
+          <option value="T1">Terminal 1</option>
+          <option value="North">North Terminal</option>
+        </select>
         <select className="xinput" value={shift} onChange={e => setShift(e.target.value)}>
           <option value="">All Shifts</option>
           <option value="A">Shift A (06-14)</option>

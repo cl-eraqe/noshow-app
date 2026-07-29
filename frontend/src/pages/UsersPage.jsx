@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  getUsers, setUserActive,
+  getUsers, setUserActive, setUserTerminal,
   createInvite, getInvites, deleteInvite,
 } from '../utils/api';
+
+function terminalLabel(t) {
+  return t === 'North' ? 'North Terminal' : t === 'T1' ? 'Terminal 1' : '—';
+}
 
 const BASE = import.meta.env.VITE_API_URL || window.location.origin;
 
@@ -64,14 +68,23 @@ export default function UsersPage() {
     }
   }
 
-  async function handleCreateInvite(role) {
+  async function handleCreateInvite(role, terminal) {
     try {
-      const inv = await createInvite(role);
+      const inv = await createInvite(role, terminal);
       await load(); // reload to get proper ids from DB
       const url = buildInviteUrl(inv.token);
       copyToClipboard(url);
       setCopied(inv.token);
       setTimeout(() => setCopied(''), 3000);
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  async function handleSetTerminal(user, terminal) {
+    try {
+      const updated = await setUserTerminal(user.id, terminal);
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, ...updated } : u));
     } catch (e) {
       alert(e.message);
     }
@@ -107,8 +120,11 @@ export default function UsersPage() {
       <section style={{ marginBottom: '2rem' }}>
         <h3 style={{ fontSize: '1rem', marginBottom: '0.75rem' }}>Invite Links</h3>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-          <button className="btn btn-primary btn-sm" onClick={() => handleCreateInvite('staff')}>
-            + Staff Invite (24h)
+          <button className="btn btn-primary btn-sm" onClick={() => handleCreateInvite('staff', 'T1')}>
+            + Staff Invite · Terminal 1 (24h)
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => handleCreateInvite('staff', 'North')}>
+            + Staff Invite · North Terminal (24h)
           </button>
           <button className="btn btn-secondary btn-sm" onClick={() => handleCreateInvite('supervisor')}>
             + Supervisor Invite (6h)
@@ -138,6 +154,15 @@ export default function UsersPage() {
                 <span style={{ fontWeight: 600, fontSize: '0.85rem', minWidth: 80 }}>
                   {inv.role === 'supervisor' ? 'Supervisor' : 'Staff'}
                 </span>
+                {inv.role === 'staff' && (
+                  <span style={{
+                    fontSize: '0.75rem', padding: '0.15rem 0.5rem', borderRadius: 4,
+                    background: inv.owner_terminal === 'North' ? '#fdf1e0' : '#e8f4fd',
+                    color: inv.owner_terminal === 'North' ? '#a85d00' : '#1a6fb0',
+                  }}>
+                    {terminalLabel(inv.owner_terminal)}
+                  </span>
+                )}
                 <span style={{ fontSize: '0.78rem', color: 'var(--text-muted, #888)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {inv.used ? 'Used' : expired ? 'Expired' : `Expires ${formatExpiry(inv.expires_at)}`}
                 </span>
@@ -196,6 +221,21 @@ export default function UsersPage() {
               }}>
                 {user.role === 'supervisor' ? 'Supervisor' : 'Staff'}
               </span>
+              {user.role === 'staff' && (
+                <div style={{ display: 'flex', gap: '0.3rem' }}>
+                  {['T1', 'North'].map(t => (
+                    <button
+                      key={t}
+                      className={`btn btn-sm ${user.owner_terminal === t ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem' }}
+                      onClick={() => handleSetTerminal(user, t)}
+                      title={`Assign to ${terminalLabel(t)}`}
+                    >
+                      {t === 'North' ? 'North' : 'T1'}
+                    </button>
+                  ))}
+                </div>
+              )}
               <span style={{
                 fontSize: '0.75rem', padding: '0.15rem 0.5rem', borderRadius: 4,
                 background: user.active ? '#e6f9ec' : '#fbe8e8',
