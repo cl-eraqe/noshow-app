@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExcelJS from 'exceljs';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getShiftSummary, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile, apiLogout, loadTerminalsCache } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile, apiLogout, loadTerminalsCache } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 import { getRole, isSupervisor, logout as clearLocalAuth } from '../utils/auth';
@@ -131,12 +131,6 @@ export default function Dashboard() {
   const [bulkPerLookup, setBulkPerLookup] = useState({}); // { [id]: 'idle'|'loading'|'found'|'notfound' }
   const [bulkSaving, setBulkSaving] = useState(false);
 
-  // Shift summary modal
-  const [shiftModal, setShiftModal] = useState(false);
-  const [shiftData, setShiftData] = useState(null);
-  const [shiftDate, setShiftDate] = useState(new Date().toISOString().slice(0, 10));
-  const [shiftLoading, setShiftLoading] = useState(false);
-  const [shiftCopied, setShiftCopied] = useState(null);
 
 
   // Inline pax edit
@@ -463,39 +457,6 @@ export default function Dashboard() {
     }
   }
 
-  // ── Shift summary
-  async function openShiftSummary() {
-    setShiftModal(true);
-    setShiftLoading(true);
-    try {
-      const data = await getShiftSummary(shiftDate);
-      setShiftData(data);
-    } catch (err) {
-      alert('Failed to load shift summary: ' + err.message);
-    } finally {
-      setShiftLoading(false);
-    }
-  }
-
-  async function loadShiftForDate(date) {
-    setShiftDate(date);
-    setShiftLoading(true);
-    try {
-      const data = await getShiftSummary(date, terminalScope);
-      setShiftData(data);
-    } catch (err) {
-      alert('Failed: ' + err.message);
-    } finally {
-      setShiftLoading(false);
-    }
-  }
-
-  function copyShiftText(shiftName, text) {
-    navigator.clipboard.writeText(text).then(() => {
-      setShiftCopied(shiftName);
-      setTimeout(() => setShiftCopied(null), 2000);
-    });
-  }
 
   // ── Handover
   async function openHandover() {
@@ -760,28 +721,10 @@ export default function Dashboard() {
           <img src="/jedco-logo.png" alt="JEDCO" className="header-logo" />
           <span className="header-title">No-Show App</span>
           <span className="header-role">{role}</span>
-          {isSupervisor() && (
-            <div className="terminal-scope-toggle" style={{ display: 'flex', gap: 4 }}>
-              {[['All', 'All Terminals'], ['T1', 'Terminal 1'], ['North', 'North Terminal']].map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  className={`btn btn-xs ${terminalScope === val ? 'btn-primary' : 'btn-ghost'}`}
-                  onClick={() => setTerminalScope(val)}
-                  title={`Show ${label}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <div className="header-actions">
           <button className="btn btn-handover btn-sm" onClick={openHandover} title="Shift Handover">
             Handover
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={openShiftSummary} title="Shift Summary">
-            Shift Summary
           </button>
           {isSupervisor() && (
             <>
@@ -821,10 +764,21 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* ── Search + Airline Filter */}
+      {/* ── Search + Terminal / Airline Filters */}
       <div className="dashboard-toolbar">
         <input type="search" className="search-input" placeholder="Search reports…"
           value={search} onChange={e => setSearch(e.target.value)} />
+        {/* Terminal scope is supervisor-only; normal users are locked to their
+            own terminal server-side and never see this control. */}
+        {isSupervisor() && (
+          <select className="airline-filter" value={terminalScope}
+                  onChange={e => setTerminalScope(e.target.value)}
+                  title="Filter by terminal">
+            <option value="All">All Terminals</option>
+            <option value="T1">Terminal 1</option>
+            <option value="North">North Terminal</option>
+          </select>
+        )}
         <select className="airline-filter" value={airlineFilter} onChange={e => setAirlineFilter(e.target.value)}>
           <option value="">All Airlines</option>
           {airlines.map(a => <option key={a} value={a}>{a}</option>)}
@@ -1229,7 +1183,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Shift Summary Modal */}
+      {/* ── Export Excel Modal */}
       {customExport && (
         <div className="modal-overlay" onClick={() => setCustomExport(false)}>
           <div className="modal-content" style={{ maxWidth: 380 }} onClick={e => e.stopPropagation()}>
@@ -1270,50 +1224,6 @@ export default function Dashboard() {
                 onClick={() => { setCustomExport(false); exportExcel({ from: exportFrom, to: exportTo, terminal: exportTerminal }); }}>
                 📊 Export
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {shiftModal && (
-        <div className="modal-overlay" onClick={() => setShiftModal(false)}>
-          <div className="modal-content shift-modal" onClick={e => e.stopPropagation()}>
-            <h2 className="modal-title">Shift Summary</h2>
-            <div className="field" style={{ marginBottom: 16 }}>
-              <label className="field-label">Date</label>
-              <input type="date" className="field-input" value={shiftDate}
-                onChange={e => loadShiftForDate(e.target.value)} />
-            </div>
-
-            {shiftLoading && <p className="state-msg">Loading…</p>}
-
-            {!shiftLoading && shiftData && (
-              <div className="shift-cards">
-                {['A', 'B', 'C'].map(s => {
-                  const shift = shiftData.shifts[s];
-                  const hours = s === 'A' ? '06:00–14:00' : s === 'B' ? '14:00–22:00' : '22:00–06:00';
-                  return (
-                    <div key={s} className="shift-card">
-                      <div className="shift-card-header">
-                        <strong>Shift {s}</strong>
-                        <span className="shift-hours">{hours}</span>
-                        <span className="shift-total">{shift.totalPax} PAX</span>
-                      </div>
-                      <pre className="shift-text">{shift.text}</pre>
-                      <button
-                        className={`btn btn-sm ${shiftCopied === s ? 'btn-success' : 'btn-whatsapp'}`}
-                        onClick={() => copyShiftText(s, shift.text)}
-                      >
-                        {shiftCopied === s ? '✓ Copied' : 'Copy for WhatsApp'}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShiftModal(false)}>Close</button>
             </div>
           </div>
         </div>

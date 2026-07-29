@@ -1033,6 +1033,29 @@ html, body, #root {
 @media (max-width: 640px) {
   .dashboard-header { padding: 12px 14px; }
   .page { padding: 12px 10px 30px; }
+
+  /* ── Header: stack brand above actions so nothing overflows the viewport */
+  .header-brand { flex: 1 1 100%; }
+  .header-title { font-size: 1rem; white-space: nowrap; }
+  .header-actions { flex: 1 1 100%; }
+
+  /* ── Status tabs: stack each tab's label / count / pax vertically so all
+       three tabs (incl. "Closed") fit across a phone without being clipped.
+       .status-tabs has overflow:hidden, so anything too wide is cut off. */
+  .status-tab {
+    flex-direction: column;
+    gap: 3px;
+    padding: 10px 4px;
+    min-width: 0;
+    font-size: 0.74rem;
+  }
+  .tab-label {
+    text-align: center;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+  .tab-count { padding: 1px 6px; min-width: 20px; font-size: 0.68rem; }
+  .tab-pax { font-size: 0.62rem; white-space: nowrap; }
   .form-section { padding: 14px; }
   .stat-value { font-size: 1.7rem; }
   .success-card { padding: 24px 16px; }
@@ -2192,4 +2215,121 @@ html, body, #root {
 
 .ss-empty {
   padding: 20px 16px; color: #aab8c2; font-size: 0.9rem; text-align: center;
+}
+
+/* ════════════════ USER MANAGEMENT ════════════════ */
+.um-page { max-width: 860px; margin: 0 auto; padding: 16px; }
+
+.um-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.um-title { margin: 0; font-size: 1.25rem; font-weight: 700; color: var(--navy); }
+
+.um-section-title {
+  font-size: 0.95rem; font-weight: 700; color: var(--navy);
+  margin: 0 0 10px; letter-spacing: 0.01em;
+}
+
+/* ── Filter tabs (All / T1 / North / Supervisors) */
+.um-tabs {
+  display: flex; gap: 0; margin-bottom: 14px;
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.um-tab {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 11px 8px;
+  background: transparent; border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer; font-size: 0.85rem; font-weight: 600;
+  color: var(--text-muted); transition: background 0.15s, color 0.15s;
+  min-width: 0;
+}
+.um-tab:hover { background: var(--bg); }
+.um-tab.active {
+  background: var(--bg); color: var(--navy);
+  border-bottom-color: var(--navy);
+}
+.um-tab-count {
+  font-size: 0.7rem; font-weight: 700; color: #fff;
+  background: var(--text-muted);
+  padding: 1px 7px; border-radius: 10px; min-width: 20px; text-align: center;
+}
+.um-tab.active .um-tab-count { background: var(--navy); }
+
+/* ── User card */
+.um-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.um-card.inactive { opacity: 0.62; }
+
+.um-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.um-row + .um-row {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid #eef2f6;
+}
+.um-name {
+  flex: 1; min-width: 120px;
+  font-size: 0.95rem; font-weight: 600; color: var(--text);
+  overflow-wrap: anywhere;
+}
+.um-badge {
+  font-size: 0.72rem; font-weight: 600;
+  padding: 2px 8px; border-radius: 4px; white-space: nowrap;
+}
+.um-badge-sup      { background: #e8f4fd; color: #1a6fb0; }
+.um-badge-staff    { background: #f0f0f0; color: #555; }
+.um-badge-active   { background: #e6f9ec; color: #1a8a3a; }
+.um-badge-inactive { background: #fbe8e8; color: #b01a1a; }
+.um-badge-t1       { background: #e8f4fd; color: #1a6fb0; }
+.um-badge-north    { background: #fdf1e0; color: #a85d00; }
+
+.um-field-label {
+  font-size: 0.75rem; font-weight: 600; color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Segmented terminal switcher */
+.um-seg {
+  display: inline-flex; border: 1.5px solid var(--border);
+  border-radius: 6px; overflow: hidden;
+}
+.um-seg-btn {
+  padding: 4px 12px; background: var(--surface); border: none;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
+  cursor: pointer; transition: background 0.15s, color 0.15s;
+}
+.um-seg-btn + .um-seg-btn { border-left: 1.5px solid var(--border); }
+.um-seg-btn:hover:not(.active) { background: var(--bg); }
+.um-seg-btn.active { background: var(--navy); color: #fff; }
+
+.um-actions { display: flex; gap: 6px; margin-left: auto; }
+
+/* Destructive actions sit next to benign ones, so keep them clearly available
+   but visually quieter than the default action — an outline, not a solid slab. */
+.btn-danger-soft {
+  background: transparent;
+  color: var(--danger);
+  border: 1.5px solid rgba(192,57,43,0.45);
+}
+.btn-danger-soft:not(:disabled):hover {
+  background: var(--danger); color: #fff; border-color: var(--danger);
+}
+
+.um-empty {
+  color: var(--text-muted); font-size: 0.9rem;
+  padding: 18px 4px; text-align: center;
+}
+
+@media (max-width: 640px) {
+  .um-page { padding: 12px 10px 30px; }
+  .um-tab { flex-direction: column; gap: 2px; padding: 9px 4px; font-size: 0.72rem; }
+  .um-tab-label { text-align: center; line-height: 1.15; overflow-wrap: anywhere; }
+  .um-actions { margin-left: 0; width: 100%; }
+  .um-actions .btn { flex: 1; justify-content: center; }
 }
