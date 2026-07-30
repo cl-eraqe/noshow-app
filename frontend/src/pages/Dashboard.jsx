@@ -615,16 +615,43 @@ export default function Dashboard() {
     }
   }
 
-  function copyHandover() {
-    if (!handoverData) return;
+  // Single source of truth for the handover message, so Copy and Share always
+  // send exactly the same text (including any notes typed in the modal).
+  function handoverText() {
+    if (!handoverData) return '';
     let text = handoverData.text;
     if (handoverNotes.trim()) {
       text += '\n\n━━ NOTES ━━\n' + handoverNotes.trim();
     }
+    return text;
+  }
+
+  function copyHandover() {
+    const text = handoverText();
+    if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
       setHandoverCopied(true);
       setTimeout(() => setHandoverCopied(false), 2000);
-    });
+    }).catch(() => alert('Could not copy. Select the text above and copy manually.'));
+  }
+
+  async function shareHandover() {
+    const text = handoverText();
+    if (!text) return;
+    // On phones this opens the native share sheet (WhatsApp, Mail, …).
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Shift Handover ${handoverData?.shift?.current || ''} → ${handoverData?.shift?.next || ''}`.trim(),
+          text,
+        });
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return; // user dismissed the sheet
+      }
+    }
+    // Desktop / unsupported browsers: hand off to WhatsApp Web instead.
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
   }
 
   async function logout() {
@@ -1275,11 +1302,19 @@ export default function Dashboard() {
             <div className="modal-actions">
               <button className="btn btn-secondary" onClick={() => setHandoverModal(false)}>Close</button>
               <button
-                className={`btn ${handoverCopied ? 'btn-success' : 'btn-whatsapp'}`}
+                className={`btn ${handoverCopied ? 'btn-success' : 'btn-primary'}`}
                 onClick={copyHandover}
                 disabled={!handoverData}
               >
-                {handoverCopied ? '✓ Copied!' : 'Copy for WhatsApp'}
+                {handoverCopied ? '✓ Copied!' : 'Copy'}
+              </button>
+              <button
+                className="btn btn-whatsapp"
+                onClick={shareHandover}
+                disabled={!handoverData}
+                title="Share via WhatsApp or another app"
+              >
+                Share
               </button>
             </div>
           </div>

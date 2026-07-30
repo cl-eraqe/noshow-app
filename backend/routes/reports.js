@@ -195,7 +195,6 @@ router.get('/handover', async (req, res) => {
 
     const nowJeddah          = jeddahISO();
     const threeHoursFromNow  = jeddahISO(3 * 60 * 60 * 1000);
-    const twentyFourHoursAgo = jeddahISO(-24 * 60 * 60 * 1000);
 
     const upSV    = underProcess.filter(r => getAirlineCode(r.prev_flight) === 'SV');
     const upOther = underProcess.filter(r => getAirlineCode(r.prev_flight) !== 'SV');
@@ -206,75 +205,113 @@ router.get('/handover', async (req, res) => {
       r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > nowJeddah
     );
     const busTransfers = flightConfirmed.filter(r => needsBus(r.new_flight));
-    const over24 = [...underProcess, ...flightConfirmed].filter(r =>
-      r.prev_datetime && r.prev_datetime < twentyFourHoursAgo
-    );
+
+    // ── Text formatting ──────────────────────────────────────────────────
+    // Punctuation is consistent throughout:
+    //   " · "  separates fields on the same line
+    //   "   ↳" introduces the alternative flight
+    //   "   →" introduces the free-text note
+    // Every case ends with its "#id" on the FIRST line so it can be found at
+    // a glance, and consecutive cases are separated by one blank line.
+    const SEP = ' · ';
+
+    // A comment may contain newlines. Indent the continuation lines so the
+    // whole note stays visually attached to its case instead of breaking out
+    // to the left margin and reading like a new entry.
+    function commentBlock(comment) {
+      const body = String(comment)
+        .split(/\r?\n/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .join('\n     ');
+      return `   → ${body}`;
+    }
+
+    function paxLabel(r) {
+      return `${String(r.pax_count || 1).padStart(2, '0')}PAX`;
+    }
 
     function fmtReport(r, showNewFlight = false) {
-      const count    = String(r.pax_count || 1).padStart(2, '0');
       const paxType  = (r.pax_type || 'Unknown').toUpperCase();
       const dest     = iataCode(r.prev_destination);
       const airline  = getAirlineCode(r.prev_flight);
       const prevDate = fmtDateShort(r.prev_datetime);
       const prevTime = fmtTimeShort(r.prev_datetime);
       const bus      = needsBus(r.new_flight) ? ' 🚌' : '';
-      let line = `${count}PAX ${paxType} ${airline} ${dest} ${prevDate} STD ${prevTime}`;
+      let line = [
+        paxLabel(r), paxType, `${airline} ${dest}`,
+        `${prevDate} STD ${prevTime}`, `#${r.id}`,
+      ].join(SEP);
       if (showNewFlight && r.status === 'flight_confirmed' && r.new_flight) {
-        const newDate    = fmtDateShort(r.new_datetime);
-        const newTime    = fmtTimeShort(r.new_datetime);
-        const terminal   = getTerminal(r.new_flight);
-        const termNote   = terminal !== 'T1' ? ` (${terminal})` : '';
-        line += `\n- ALT FLT ${r.new_flight} STD ${newTime} ${newDate} ✅${termNote}${bus}`;
+        const newDate  = fmtDateShort(r.new_datetime);
+        const newTime  = fmtTimeShort(r.new_datetime);
+        const terminal = getTerminal(r.new_flight);
+        const termNote = terminal !== 'T1' ? `${SEP}(${terminal})` : '';
+        line += `\n   ↳ ALT FLT ${r.new_flight}${SEP}STD ${newTime} ${newDate} ✅${termNote}${bus}`;
       }
-      if (r.comment) line += `\n   → ${r.comment}`;
-      line += ` #${r.id}`;
+      if (r.comment) line += `\n${commentBlock(r.comment)}`;
       return line;
     }
 
     const lines = [];
+    // Emits a section: header, blank, then each case separated by a blank line.
+    function section(title, list, render) {
+      if (!list.length) return;
+      lines.push(`━━ ${title} ━━`);
+      lines.push('');
+      list.forEach((r, i) => {
+        if (i > 0) lines.push('');
+        lines.push(render(r));
+      });
+      lines.push('');
+    }
+
+    const totalUp = underProcess.reduce((s, r) => s + (r.pax_count || 0), 0);
+    const totalFu = flightConfirmed.reduce((s, r) => s + (r.pax_count || 0), 0);
+
     lines.push(`📋 SHIFT HANDOVER ${currentShift} → ${nextShift}`);
     lines.push(`${fmtDateShort(nowJeddah)} ${fmtTimeShort(nowJeddah)}`);
     lines.push('');
 
-    if (departingSoon.length > 0) {
-      lines.push('━━ ⏰ DEPARTING SOON (< 3hrs) ━━'); lines.push('');
-      departingSoon.forEach(r => {
-        const bus      = needsBus(r.new_flight) ? ' 🚌' : '';
-        const terminal = getTerminal(r.new_flight);
-        const termNote = terminal !== 'T1' ? ` (${terminal})` : '';
-        lines.push(`${String(r.pax_count||1).padStart(2,'0')}PAX ${r.new_flight} ${iataCode(r.new_destination)} → STD ${fmtTimeShort(r.new_datetime)} TODAY${termNote}${bus} #${r.id}`);
-        if (r.comment) lines.push(`   → ${r.comment}`);
-      });
-      lines.push('');
-    }
-    if (busTransfers.length > 0) {
-      lines.push('━━ 🚌 BUS TRANSFER NEEDED ━━'); lines.push('');
-      busTransfers.forEach(r => {
-        const terminal = getTerminal(r.new_flight);
-        lines.push(`${String(r.pax_count||1).padStart(2,'0')}PAX → ${r.new_flight} ${iataCode(r.new_destination)} STD ${fmtTimeShort(r.new_datetime)} ${fmtDateShort(r.new_datetime)} (${terminal}) #${r.id}`);
-        if (r.comment) lines.push(`   → ${r.comment}`);
-      });
-      lines.push('');
-    }
-    if (upSV.length > 0)    { lines.push('━━ UNDER PROCESS SV ━━'); lines.push(''); upSV.forEach(r => lines.push(fmtReport(r))); lines.push(''); }
-    if (upOther.length > 0) { lines.push('━━ UNDER PROCESS OTHER AIRLINES ━━'); lines.push(''); upOther.forEach(r => lines.push(fmtReport(r))); lines.push(''); }
-    if (fuSV.length > 0)    { lines.push('━━ FOLLOW UP SV ━━'); lines.push(''); fuSV.forEach(r => lines.push(fmtReport(r, true))); lines.push(''); }
-    if (fuOther.length > 0) { lines.push('━━ FOLLOW UP OTHER AIRLINES ━━'); lines.push(''); fuOther.forEach(r => lines.push(fmtReport(r, true))); lines.push(''); }
-    if (over24.length > 0) {
-      lines.push('━━ ⚠ OVER 24HRS ━━'); lines.push('');
-      over24.forEach(r => {
-        const days = ((Date.now() - new Date(r.prev_datetime).getTime()) / (1000*60*60*24)).toFixed(0);
-        lines.push(fmtReport(r, true) + ` (${days} days)`);
-      });
-      lines.push('');
-    }
-
-    const totalUp = underProcess.reduce((s,r) => s+(r.pax_count||0), 0);
-    const totalFu = flightConfirmed.reduce((s,r) => s+(r.pax_count||0), 0);
+    // Summary leads the message so the incoming shift sees the shape of the
+    // handover before scrolling through the detail.
     lines.push('━━ SUMMARY ━━');
+    lines.push('');
     lines.push(`Under Process: ${underProcess.length} cases (${totalUp} PAX)`);
     lines.push(`Flight Confirmed: ${flightConfirmed.length} cases (${totalFu} PAX)`);
     lines.push(`Total Active: ${underProcess.length + flightConfirmed.length} cases (${totalUp + totalFu} PAX)`);
+    lines.push('');
+
+    section('⏰ DEPARTING SOON (< 3hrs)', departingSoon, r => {
+      const bus      = needsBus(r.new_flight) ? ' 🚌' : '';
+      const terminal = getTerminal(r.new_flight);
+      const termNote = terminal !== 'T1' ? `${SEP}(${terminal})` : '';
+      let line = [
+        paxLabel(r), `${r.new_flight} ${iataCode(r.new_destination)}`,
+        `STD ${fmtTimeShort(r.new_datetime)} TODAY`, `#${r.id}`,
+      ].join(SEP) + termNote + bus;
+      if (r.comment) line += `\n${commentBlock(r.comment)}`;
+      return line;
+    });
+
+    section('🚌 BUS TRANSFER NEEDED', busTransfers, r => {
+      const terminal = getTerminal(r.new_flight);
+      let line = [
+        paxLabel(r), `${r.new_flight} ${iataCode(r.new_destination)}`,
+        `STD ${fmtTimeShort(r.new_datetime)} ${fmtDateShort(r.new_datetime)}`,
+        `(${terminal})`, `#${r.id}`,
+      ].join(SEP);
+      if (r.comment) line += `\n${commentBlock(r.comment)}`;
+      return line;
+    });
+
+    section('UNDER PROCESS SV',             upSV,    r => fmtReport(r));
+    section('UNDER PROCESS OTHER AIRLINES', upOther, r => fmtReport(r));
+    section('FOLLOW UP SV',                 fuSV,    r => fmtReport(r, true));
+    section('FOLLOW UP OTHER AIRLINES',     fuOther, r => fmtReport(r, true));
+
+    // Trailing blank from the last section — drop it so the message ends clean.
+    while (lines.length && lines[lines.length - 1] === '') lines.pop();
 
     res.json({ text: lines.join('\n'), shift: { current: currentShift, next: nextShift } });
   } catch (e) {
