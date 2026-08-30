@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { getRole, getUsername, isSupervisor } from '../utils/auth';
+import { toLatinDigits } from '../utils/digits';
 
 const IMG_TYPES = /^image\/(jpeg|jpg|png|gif|webp|bmp)$/i;
 const A4 = { w: 210, h: 297 }; // mm
@@ -125,19 +126,56 @@ function calcDaysAtAirport(paxIdDatetime, newDatetime) {
   return Math.max(0, parseFloat(diff.toFixed(2)));
 }
 
-function stdToDatetime(std) {
-  if (!std) return '';
-  const today = new Date().toISOString().slice(0, 10);
-  return `${today}T${std}`;
+// Jeddah is UTC+3 year-round (no DST). Every wall-clock time in this form —
+// the STD from the timetable, and whatever the user types into a
+// datetime-local input — is Jeddah local time, so anchor to that offset rather
+// than to UTC or to whatever timezone the device happens to be set to.
+const JEDDAH_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+// A flight counts as departed from 30 min before STD: that is when the gate
+// closes and a no-show is actually identified.
+const DEPARTURE_GRACE_MS = 30 * 60 * 1000;
+
+const pad2 = n => String(n).padStart(2, '0');
+
+// Parse a "YYYY-MM-DDTHH:MM" wall-clock string as Jeddah time → epoch ms.
+function jeddahDtMs(local) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(local || '').trim());
+  if (!m) return NaN;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)) - JEDDAH_OFFSET_MS;
+}
+
+// The timetable stores a recurring departure time ("08:50") with no date, so a
+// lookup has to choose which day's departure is meant. Pick the occurrence that
+// matches how the field is used:
+//   'past'   → previous flight: the most recent departure already gone
+//   'future' → new flight: the next departure still to come
+// This is only the starting guess — the field stays editable.
+function stdToDatetime(std, direction) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(std || '').trim());
+  if (!m) return '';
+  const h = +m[1], min = +m[2];
+  if (h > 23 || min > 59) return '';
+
+  // A Date whose UTC fields read as Jeddah wall-clock, so getUTC* below gives
+  // us today's Jeddah calendar date even between 00:00 and 03:00.
+  const nowJed = new Date(Date.now() + JEDDAH_OFFSET_MS);
+  const stdMs  = Date.UTC(nowJed.getUTCFullYear(), nowJed.getUTCMonth(), nowJed.getUTCDate(), h, min);
+
+  let dayShift = 0;
+  if (direction === 'past'   && stdMs - DEPARTURE_GRACE_MS > nowJed.getTime()) dayShift = -1;
+  if (direction === 'future' && stdMs <= nowJed.getTime())                     dayShift = +1;
+
+  const target = new Date(stdMs + dayShift * 86400000);
+  return `${target.getUTCFullYear()}-${pad2(target.getUTCMonth() + 1)}-${pad2(target.getUTCDate())}T${pad2(h)}:${pad2(min)}`;
 }
 
 // Check if a flight datetime has departed (allow 30 min before STD)
 function hasFlightDeparted(flightDatetime) {
   if (!flightDatetime) return true; // if no datetime, allow it
-  const flightTime = new Date(flightDatetime).getTime();
-  const now = Date.now();
-  const thirtyMinBefore = flightTime - (30 * 60 * 1000);
-  return now >= thirtyMinBefore;
+  const flightMs = jeddahDtMs(flightDatetime);
+  if (isNaN(flightMs)) return true;
+  return Date.now() >= flightMs - DEPARTURE_GRACE_MS;
 }
 
 const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)$/i;
@@ -358,7 +396,7 @@ export default function NewReport({ editMode }) {
   // Show Nusuk badge when pax is Umrah AND new flight departs 24h+ from now
   const showNusuk = form.pax_type === 'Umrah' &&
     form.new_datetime &&
-    (new Date(form.new_datetime) - Date.now()) >= 24 * 60 * 60 * 1000;
+    (jeddahDtMs(form.new_datetime) - Date.now()) >= 24 * 60 * 60 * 1000;
 
   // Load report data in edit mode
   useEffect(() => {
@@ -401,7 +439,7 @@ export default function NewReport({ editMode }) {
       const data = await lookupFlight(fn);
       setForm(prev => ({
         ...prev,
-        prev_datetime:    stdToDatetime(data.std),
+        prev_datetime:    stdToDatetime(data.std, 'past'),
         prev_destination: `${data.city} (${data.destination})`,
         prev_airline:     airlineFromFlightNumber(fn),
         nationality:      prev.nationality || data.nationality,
@@ -423,7 +461,7 @@ export default function NewReport({ editMode }) {
       const data = await lookupFlight(fn);
       setForm(prev => ({
         ...prev,
-        new_datetime:    stdToDatetime(data.std),
+        new_datetime:    stdToDatetime(data.std, 'future'),
         new_destination: `${data.city} (${data.destination})`,
         new_airline:     airlineFromFlightNumber(fn),
       }));
@@ -447,6 +485,12 @@ export default function NewReport({ editMode }) {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!validatePrevFlight()) return;
+    // The pax field is type="text" so phones show the bare number pad, which
+    // means min="1" no longer applies — check it here instead.
+    if (!(Number(form.pax_count) >= 1)) {
+      setSubmitError('Number of Passengers must be at least 1.');
+      return;
+    }
     if (needsTerminalChoice && ownerTerminal !== 'T1' && ownerTerminal !== 'North') {
       setSubmitError('Please choose which terminal this case belongs to.');
       return;
@@ -638,8 +682,10 @@ export default function NewReport({ editMode }) {
             </div>
             <div className="field">
               <label className="field-label">13. Number of Passengers <span className="req">*</span></label>
-              <input type="number" className="field-input" min="1" required
-                value={form.pax_count} onChange={e => set('pax_count', e.target.value)} />
+              <input type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off"
+                className="field-input" maxLength={3} required
+                value={form.pax_count}
+                onChange={e => set('pax_count', toLatinDigits(e.target.value))} />
             </div>
           </div>
         </div>
