@@ -12,6 +12,16 @@ function fmt(dt) {
   catch { return dt; }
 }
 
+const MONTHS_TITLE = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// "2026-08-31T01:05" or "2026-08-31 01:05:00" → "31 Aug, 01:05". No year.
+// Read straight off the string rather than through Date, so the stored Jeddah
+// wall-clock is reproduced exactly whatever timezone the device is set to.
+function fmtDayTime(dt) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(dt || '').trim());
+  return m ? `${m[3]} ${MONTHS_TITLE[+m[2] - 1]}, ${m[4]}:${m[5]}` : '';
+}
+
 function fmtInline(dt) {
   if (!dt) return '';
   try {
@@ -197,14 +207,21 @@ export default function Dashboard() {
     });
   }
 
+  // Kept byte-for-byte in step with whatsappText() in backend/routes/reports.js —
+  // the backend stores this text on the report, this rebuilds it for the Copy
+  // button, and the two must produce identical output.
   function buildWhatsApp(r) {
-    return (
-      `No-Show Report #${r.id}\n` +
-      `Flight: ${r.prev_flight || '—'} → ${r.prev_destination || '—'}\n` +
-      `Pax: ${r.pax_count} × ${r.pax_type || '—'}\n` +
-      `Nationality: ${r.nationality || '—'}\n` +
-      `New Flight: ${r.new_flight || '—'} on ${fmt(r.new_datetime)}`
-    );
+    const when = dt => { const s = fmtDayTime(dt); return s ? ` on ${s}` : ''; };
+    const lines = [
+      `No-Show Report #${r.id}`,
+      `Flight: ${r.prev_flight || '—'}${when(r.prev_datetime)} → ${r.prev_destination || '—'}`,
+      `Pax: ${r.pax_count} × ${r.pax_type || '—'}`,
+      `Nationality: ${r.nationality || '—'}`,
+    ];
+    if (r.new_flight) {
+      lines.push('', `✅ New Flight: ${r.new_flight}${when(r.new_datetime)} → ${r.new_destination || '—'}`);
+    }
+    return lines.join('\n');
   }
 
   function duplicate(report) {
