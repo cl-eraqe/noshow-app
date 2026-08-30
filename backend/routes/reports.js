@@ -81,6 +81,37 @@ function fmtTimeShort(dt) {
   return String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
 }
 
+// ── WhatsApp confirmation message ─────────────────────────────────────
+
+const MONTHS_TITLE = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// "2026-08-31T01:05" or "2026-08-31 01:05:00" → "31 Aug, 01:05". No year.
+// Read straight off the string rather than through Date, so the stored Jeddah
+// wall-clock is reproduced exactly whatever timezone the server runs in.
+function fmtDayTime(dt) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(dt || '').trim());
+  return m ? `${m[3]} ${MONTHS_TITLE[+m[2] - 1]}, ${m[4]}:${m[5]}` : '';
+}
+
+// One builder for all three write paths (create / full update / patch) so the
+// message cannot drift between them.
+function whatsappText(r) {
+  const when = dt => { const s = fmtDayTime(dt); return s ? ` on ${s}` : ''; };
+  const lines = [
+    `No-Show Report #${r.id}`,
+    `Flight: ${r.prev_flight || '—'}${when(r.prev_datetime)} → ${r.prev_destination || '—'}`,
+    `Pax: ${r.pax_count} × ${r.pax_type || '—'}`,
+    `Nationality: ${r.nationality || '—'}`,
+  ];
+  // Blank line, then the new flight. Both are omitted when no new flight is
+  // booked yet: the ✅ reads as "confirmed", so it must not show on a case
+  // that is still under process.
+  if (r.new_flight) {
+    lines.push('', `✅ New Flight: ${r.new_flight}${when(r.new_datetime)} → ${r.new_destination || '—'}`);
+  }
+  return lines.join('\n');
+}
+
 // ── Multer (memory storage — files uploaded to cloud/local via storage.js) ──
 
 const ALLOWED_MIME_TYPES = new Set([
@@ -469,12 +500,10 @@ router.post('/', uploadFiles, async (req, res) => {
 
     const id = rows[0].id;
 
-    const whatsapp_text =
-      `No-Show Report #${id}\n` +
-      `Flight: ${prev_flight || '—'} → ${prev_destination || '—'}\n` +
-      `Pax: ${pax_count} × ${pax_type || '—'}\n` +
-      `Nationality: ${nationality || '—'}\n` +
-      `New Flight: ${new_flight || '—'} on ${new_datetime || '—'}`;
+    const whatsapp_text = whatsappText({
+      id, prev_flight, prev_datetime, prev_destination, pax_count, pax_type,
+      nationality, new_flight, new_datetime, new_destination,
+    });
 
     await pool.query('UPDATE reports SET whatsapp_text = $1 WHERE id = $2', [whatsapp_text, id]);
 
@@ -527,12 +556,10 @@ router.put('/:id', uploadFiles, async (req, res) => {
       if (!isNaN(diff) && diff >= 0) computedDays = parseFloat(Math.max(0, diff).toFixed(2));
     }
 
-    const whatsapp_text =
-      `No-Show Report #${existing.id}\n` +
-      `Flight: ${prev_flight || '—'} → ${prev_destination || '—'}\n` +
-      `Pax: ${pax_count} × ${pax_type || '—'}\n` +
-      `Nationality: ${nationality || '—'}\n` +
-      `New Flight: ${new_flight || '—'} on ${new_datetime || '—'}`;
+    const whatsapp_text = whatsappText({
+      id: existing.id, prev_flight, prev_datetime, prev_destination, pax_count, pax_type,
+      nationality, new_flight, new_datetime, new_destination,
+    });
 
     await pool.query(
       `UPDATE reports SET
@@ -619,13 +646,20 @@ router.patch('/:id', express.json(), async (req, res) => {
     const finalNewFlight   = new_flight   !== undefined ? new_flight   : report.new_flight;
     const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
     const finalPaxCount    = pax_count    !== undefined ? (parseInt(pax_count) || 0) : report.pax_count;
+    const finalNewDest     = new_destination !== undefined ? new_destination : report.new_destination;
 
-    const whatsapp_text =
-      `No-Show Report #${report.id}\n` +
-      `Flight: ${report.prev_flight || '—'} → ${report.prev_destination || '—'}\n` +
-      `Pax: ${finalPaxCount} × ${report.pax_type || '—'}\n` +
-      `Nationality: ${report.nationality || '—'}\n` +
-      `New Flight: ${finalNewFlight || '—'} on ${finalNewDatetime || '—'}`;
+    const whatsapp_text = whatsappText({
+      id:               report.id,
+      prev_flight:      report.prev_flight,
+      prev_datetime:    report.prev_datetime,
+      prev_destination: report.prev_destination,
+      pax_count:        finalPaxCount,
+      pax_type:         report.pax_type,
+      nationality:      report.nationality,
+      new_flight:       finalNewFlight,
+      new_datetime:     finalNewDatetime,
+      new_destination:  finalNewDest,
+    });
     updates.push(`whatsapp_text = $${idx++}`);
     values.push(whatsapp_text);
 
