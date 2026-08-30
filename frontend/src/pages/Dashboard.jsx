@@ -5,6 +5,7 @@ import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlight
 import SearchableSelect from '../components/SearchableSelect';
 
 import { getRole, isSupervisor, logout as clearLocalAuth } from '../utils/auth';
+import { toLatinDigits } from '../utils/digits';
 
 function fmt(dt) {
   if (!dt) return '—';
@@ -940,11 +941,14 @@ export default function Dashboard() {
                         <td data-label="Pax" className="col-center">
                           {editingPax === r.id ? (
                             <input
-                              type="number"
-                              min="0"
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              autoComplete="off"
+                              maxLength={3}
                               className="pax-inline-edit"
                               value={editPaxValue}
-                              onChange={e => setEditPaxValue(e.target.value)}
+                              onChange={e => setEditPaxValue(toLatinDigits(e.target.value))}
                               onBlur={() => savePax(r.id)}
                               onKeyDown={e => { if (e.key === 'Enter') savePax(r.id); if (e.key === 'Escape') setEditingPax(null); }}
                               autoFocus
