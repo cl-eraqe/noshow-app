@@ -135,6 +135,16 @@ async function initDb() {
   await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
   await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
   await pool.query(`ALTER TABLE invite_tokens ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
+
+  // Gate and estimated departure, captured from the live schedule. Neither is
+  // displayed anywhere — they are recorded so a history exists to analyse
+  // later. Both are volatile during the day (a gate assigned at 00:01 can move
+  // by noon), so they are written at save time and then corrected by each sync
+  // for as long as the flight stays inside KAIA's window; once it falls out,
+  // the value that stands is the last one KAIA reported, which is the final one.
+  for (const col of ['prev_gate', 'prev_estimated', 'new_gate', 'new_estimated']) {
+    await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS ${col} TEXT`);
+  }
   // Add the CHECK constraints separately (idempotent — Postgres has no "ADD CONSTRAINT
   // IF NOT EXISTS", so guard with a catalog lookup instead of failing on re-run).
   await pool.query(`

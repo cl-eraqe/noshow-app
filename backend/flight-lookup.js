@@ -222,8 +222,34 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
   };
 }
 
+/**
+ * Gate and estimated departure for one flight on one day, from the live copy.
+ *
+ * Neither is shown anywhere; they are captured so a history exists to analyse
+ * later. Both are volatile — a gate assigned at 00:01 can move by noon — so
+ * this is only the value at save time. settleReportExtras() in kaia-sync keeps
+ * correcting it for as long as the flight stays inside KAIA's window.
+ *
+ * @param {string} rawNumber
+ * @param {string} datetime  "YYYY-MM-DDTHH:MM" (only the date part is matched:
+ *                           the time may have been edited by hand)
+ */
+async function flightExtras(rawNumber, datetime) {
+  const flightNumber = kaia.normalizeFlightNumber(rawNumber);
+  const day = String(datetime || '').slice(0, 10);
+  if (!flightNumber || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return { gate: null, estimated: null };
+
+  const pool = getDb();
+  const { rows } = await pool.query(
+    `SELECT gate, estimated_time FROM kaia_flights
+      WHERE flight_number = $1 AND date = $2
+      ORDER BY scheduled_time LIMIT 1`, [flightNumber, day]);
+  return { gate: rows[0]?.gate || null, estimated: rows[0]?.estimated_time || null };
+}
+
 module.exports = {
   resolveFlight,
+  flightExtras,
   resolveTimetableDate,
   pickOccurrence,
   destinationFacts,
