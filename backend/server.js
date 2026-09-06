@@ -102,6 +102,9 @@ async function start() {
   });
   autoCloseReports().catch(console.error);
   setInterval(() => autoCloseReports().catch(console.error), 60 * 1000);
+  // Pulls the KAIA window once a day at 00:01 Jeddah. Lookups always read the
+  // local copy, so nothing here is in the path of a user typing.
+  require('./kaia-sync').start();
 }
 
 start().catch(err => {

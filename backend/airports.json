@@ -1,0 +1,1217 @@
+{
+ "AAE": {
+  "city": "Annaba",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "ABJ": {
+  "city": "Abidjan",
+  "country": "Ivory Coast",
+  "nationality": "Ivorian"
+ },
+ "ABV": {
+  "city": "Abuja",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "ACC": {
+  "city": "Accra",
+  "country": "Ghana",
+  "nationality": "Ghanaian"
+ },
+ "ADB": {
+  "city": "Izmir",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "ADD": {
+  "city": "Addis Ababa",
+  "country": "Ethiopia",
+  "nationality": "Ethiopian"
+ },
+ "ADE": {
+  "city": "Aden",
+  "country": "Yemen",
+  "nationality": "Yemeni"
+ },
+ "ADF": {
+  "city": "Adiyaman",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "AGA": {
+  "city": "Agadir",
+  "country": "Morocco",
+  "nationality": "Moroccan"
+ },
+ "ALA": {
+  "city": "Almaty",
+  "country": "Kazakhstan",
+  "nationality": "Kazakhstani"
+ },
+ "ALG": {
+  "city": "Algiers",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "ALP": {
+  "city": "Aleppo",
+  "country": "Syria",
+  "nationality": "Syrian"
+ },
+ "AMD": {
+  "city": "Ahmedabad",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "AMM": {
+  "city": "Amman",
+  "country": "Jordan",
+  "nationality": "Jordanian"
+ },
+ "AMS": {
+  "city": "Amsterdam",
+  "country": "Netherlands",
+  "nationality": "Dutch"
+ },
+ "AOE": {
+  "city": "Eskişehir (Anadolu)",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "ASM": {
+  "city": "Asmara",
+  "country": "Eritrea",
+  "nationality": "Eritrean"
+ },
+ "ASR": {
+  "city": "Kayseri",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "ATH": {
+  "city": "Athens",
+  "country": "Greece",
+  "nationality": "Greek"
+ },
+ "ATZ": {
+  "city": "Assiut",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "AUH": {
+  "city": "Abu Dhabi",
+  "country": "United Arab Emirates",
+  "nationality": "Emirati"
+ },
+ "AYT": {
+  "city": "Antalya",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "AZN": {
+  "city": "Andizhan",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "AZR": {
+  "city": "Adrar",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "BAH": {
+  "city": "Bahrain",
+  "country": "Bahrain",
+  "nationality": "Bahraini"
+ },
+ "BCN": {
+  "city": "Barcelona",
+  "country": "Spain",
+  "nationality": "Spanish"
+ },
+ "BCU": {
+  "city": "Bauchi",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "BDJ": {
+  "city": "Banjarmasin",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "BEN": {
+  "city": "Benghazi",
+  "country": "Libya",
+  "nationality": "Libyan"
+ },
+ "BER": {
+  "city": "Berlin",
+  "country": "Germany",
+  "nationality": "German"
+ },
+ "BEY": {
+  "city": "Beirut",
+  "country": "Lebanon",
+  "nationality": "Lebanese"
+ },
+ "BGW": {
+  "city": "Baghdad",
+  "country": "Iraq",
+  "nationality": "Iraqi"
+ },
+ "BGY": {
+  "city": "Bergamo (Milan)",
+  "country": "Italy",
+  "nationality": "Italian"
+ },
+ "BHK": {
+  "city": "Bukhara",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "BHX": {
+  "city": "Birmingham",
+  "country": "United Kingdom",
+  "nationality": "British"
+ },
+ "BJL": {
+  "city": "Banjul",
+  "country": "Gambia",
+  "nationality": "Gambian"
+ },
+ "BKK": {
+  "city": "Bangkok",
+  "country": "Thailand",
+  "nationality": "Thai"
+ },
+ "BKO": {
+  "city": "Bamako",
+  "country": "Mali",
+  "nationality": "Malian"
+ },
+ "BLJ": {
+  "city": "Batna",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "BLR": {
+  "city": "Bengaluru",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "BOM": {
+  "city": "Mumbai",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "BOY": {
+  "city": "Bobo-Dioulasso",
+  "country": "Burkina Faso",
+  "nationality": "Burkinabé"
+ },
+ "BPN": {
+  "city": "Balikpapan",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "BRU": {
+  "city": "Brussels",
+  "country": "Belgium",
+  "nationality": "Belgian"
+ },
+ "BSR": {
+  "city": "Basra",
+  "country": "Iraq",
+  "nationality": "Iraqi"
+ },
+ "BTH": {
+  "city": "Batam",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "BTJ": {
+  "city": "Banda Aceh",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "BUS": {
+  "city": "Batumi",
+  "country": "Georgia",
+  "nationality": "Georgian"
+ },
+ "BWN": {
+  "city": "Bandar Seri Begawan",
+  "country": "Brunei",
+  "nationality": "Bruneian"
+ },
+ "CAI": {
+  "city": "Cairo",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "CAN": {
+  "city": "Guangzhou",
+  "country": "China",
+  "nationality": "Chinese"
+ },
+ "CCJ": {
+  "city": "Kozhikode (Calicut)",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "CCU": {
+  "city": "Kolkata",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "CDG": {
+  "city": "Paris",
+  "country": "France",
+  "nationality": "French"
+ },
+ "CGK": {
+  "city": "Jakarta",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "CGN": {
+  "city": "Cologne",
+  "country": "Germany",
+  "nationality": "German"
+ },
+ "CGP": {
+  "city": "Chittagong",
+  "country": "Bangladesh",
+  "nationality": "Bangladeshi"
+ },
+ "CIT": {
+  "city": "Shymkent",
+  "country": "Kazakhstan",
+  "nationality": "Kazakhstani"
+ },
+ "CKY": {
+  "city": "Conakry",
+  "country": "Guinea",
+  "nationality": "Guinean"
+ },
+ "CMN": {
+  "city": "Casablanca",
+  "country": "Morocco",
+  "nationality": "Moroccan"
+ },
+ "CNN": {
+  "city": "Kannur",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "COK": {
+  "city": "Kochi (Cochin)",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "COO": {
+  "city": "Cotonou",
+  "country": "Benin",
+  "nationality": "Beninese"
+ },
+ "COV": {
+  "city": "Mersin",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "CZL": {
+  "city": "Constantine",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "DAC": {
+  "city": "Dhaka",
+  "country": "Bangladesh",
+  "nationality": "Bangladeshi"
+ },
+ "DAM": {
+  "city": "Damascus",
+  "country": "Syria",
+  "nationality": "Syrian"
+ },
+ "DBB": {
+  "city": "Dabaa (El Alamein)",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "DEL": {
+  "city": "Delhi",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "DIY": {
+  "city": "Diyarbakir",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "DJE": {
+  "city": "Djerba",
+  "country": "Tunisia",
+  "nationality": "Tunisian"
+ },
+ "DKA": {
+  "city": "Katsina (Dutsin-Ma Airport)",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "DLA": {
+  "city": "Douala",
+  "country": "Cameroon",
+  "nationality": "Cameroonian"
+ },
+ "DME": {
+  "city": "Moscow",
+  "country": "Russia",
+  "nationality": "Russian"
+ },
+ "DNZ": {
+  "city": "Denizli",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "DOH": {
+  "city": "Doha",
+  "country": "Qatar",
+  "nationality": "Qatari"
+ },
+ "DPS": {
+  "city": "Bali (Denpasar)",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "DSS": {
+  "city": "Dakar (Blaise Diagne)",
+  "country": "Senegal",
+  "nationality": "Senegalese"
+ },
+ "DXB": {
+  "city": "Dubai",
+  "country": "United Arab Emirates",
+  "nationality": "Emirati"
+ },
+ "DYU": {
+  "city": "Dushanbe",
+  "country": "Tajikistan",
+  "nationality": "Tajik"
+ },
+ "EBB": {
+  "city": "Entebbe/Kampala",
+  "country": "Uganda",
+  "nationality": "Ugandan"
+ },
+ "EDO": {
+  "city": "Edremit",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "ELU": {
+  "city": "El Oued",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "ERC": {
+  "city": "Erzincan",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "ERZ": {
+  "city": "Erzurum",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "ESB": {
+  "city": "Ankara",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "FCO": {
+  "city": "Rome",
+  "country": "Italy",
+  "nationality": "Italian"
+ },
+ "FEG": {
+  "city": "Fergana",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "FEZ": {
+  "city": "Fez",
+  "country": "Morocco",
+  "nationality": "Moroccan"
+ },
+ "FNA": {
+  "city": "Freetown (Lungi)",
+  "country": "Sierra Leone",
+  "nationality": "Sierra Leonean"
+ },
+ "FRA": {
+  "city": "Frankfurt",
+  "country": "Germany",
+  "nationality": "German"
+ },
+ "GAE": {
+  "city": "Gabès",
+  "country": "Tunisia",
+  "nationality": "Tunisian"
+ },
+ "GAF": {
+  "city": "Gafsa",
+  "country": "Tunisia",
+  "nationality": "Tunisian"
+ },
+ "GAU": {
+  "city": "Guwahati",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "GBT": {
+  "city": "Gorgan",
+  "country": "Iran",
+  "nationality": "Iranian"
+ },
+ "GGR": {
+  "city": "Garoe",
+  "country": "Somalia",
+  "nationality": "Somali"
+ },
+ "GNY": {
+  "city": "Sanliurfa",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "GOU": {
+  "city": "Garoua",
+  "country": "Cameroon",
+  "nationality": "Cameroonian"
+ },
+ "GVA": {
+  "city": "Geneva",
+  "country": "Switzerland",
+  "nationality": "Swiss"
+ },
+ "GWI": {
+  "city": "Iperu",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "GXF": {
+  "city": "Seiyun",
+  "country": "Yemen",
+  "nationality": "Yemeni"
+ },
+ "GYD": {
+  "city": "Baku",
+  "country": "Azerbaijan",
+  "nationality": "Azerbaijani"
+ },
+ "GZT": {
+  "city": "Gaziantep",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "HAH": {
+  "city": "Moroni (Hahaya)",
+  "country": "Comoros",
+  "nationality": "Comorian"
+ },
+ "HAK": {
+  "city": "Haikou",
+  "country": "China",
+  "nationality": "Chinese"
+ },
+ "HBE": {
+  "city": "Alexandria (Borg El Arab)",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "HDY": {
+  "city": "Hat Yai",
+  "country": "Thailand",
+  "nationality": "Thai"
+ },
+ "HEA": {
+  "city": "Herat",
+  "country": "Afghanistan",
+  "nationality": "Afghan"
+ },
+ "HGA": {
+  "city": "Hargeisa",
+  "country": "Somalia",
+  "nationality": "Somali"
+ },
+ "HKT": {
+  "city": "Phuket",
+  "country": "Thailand",
+  "nationality": "Thai"
+ },
+ "HMB": {
+  "city": "Sohag",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "HRG": {
+  "city": "Hurghada",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "HTY": {
+  "city": "Hatay",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "HYD": {
+  "city": "Hyderabad",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "IAD": {
+  "city": "Washington D.C.",
+  "country": "United States",
+  "nationality": "American"
+ },
+ "IDR": {
+  "city": "Indore",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "IFN": {
+  "city": "Isfahan",
+  "country": "Iran",
+  "nationality": "Iranian"
+ },
+ "IKA": {
+  "city": "Tehran",
+  "country": "Iran",
+  "nationality": "Iranian"
+ },
+ "ISB": {
+  "city": "Islamabad",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "ISE": {
+  "city": "Isparta",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "IST": {
+  "city": "Istanbul",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "IXE": {
+  "city": "Mangalore",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "JAI": {
+  "city": "Jaipur",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "JFK": {
+  "city": "New York",
+  "country": "United States",
+  "nationality": "American"
+ },
+ "JHB": {
+  "city": "Johor Bahru",
+  "country": "Malaysia",
+  "nationality": "Malaysian"
+ },
+ "JIB": {
+  "city": "Djibouti",
+  "country": "Djibouti",
+  "nationality": "Djiboutian"
+ },
+ "KAD": {
+  "city": "Kaduna",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "KAN": {
+  "city": "Kano",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "KBL": {
+  "city": "Kabul",
+  "country": "Afghanistan",
+  "nationality": "Afghan"
+ },
+ "KFS": {
+  "city": "Kastamonu",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "KHI": {
+  "city": "Karachi",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "KJT": {
+  "city": "Kertajati",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "KNO": {
+  "city": "Medan",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "KRT": {
+  "city": "Khartoum",
+  "country": "Sudan",
+  "nationality": "Sudanese"
+ },
+ "KUL": {
+  "city": "Kuala Lumpur",
+  "country": "Malaysia",
+  "nationality": "Malaysian"
+ },
+ "KWI": {
+  "city": "Kuwait City",
+  "country": "Kuwait",
+  "nationality": "Kuwaiti"
+ },
+ "KYA": {
+  "city": "Konya",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "KZN": {
+  "city": "Kazan",
+  "country": "Russia",
+  "nationality": "Russian"
+ },
+ "KZR": {
+  "city": "Kayseri",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "LAX": {
+  "city": "Los Angeles",
+  "country": "United States",
+  "nationality": "American"
+ },
+ "LFW": {
+  "city": "Lomé",
+  "country": "Togo",
+  "nationality": "Togolese"
+ },
+ "LGW": {
+  "city": "London (Gatwick)",
+  "country": "United Kingdom",
+  "nationality": "British"
+ },
+ "LHE": {
+  "city": "Lahore",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "LHR": {
+  "city": "London (Heathrow)",
+  "country": "United Kingdom",
+  "nationality": "British"
+ },
+ "LKO": {
+  "city": "Lucknow",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "LOP": {
+  "city": "Lombok",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "LOS": {
+  "city": "Lagos",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "LXR": {
+  "city": "Luxor",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "LYP": {
+  "city": "Faisalabad",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "MAD": {
+  "city": "Madrid",
+  "country": "Spain",
+  "nationality": "Spanish"
+ },
+ "MAN": {
+  "city": "Manchester",
+  "country": "United Kingdom",
+  "nationality": "British"
+ },
+ "MCT": {
+  "city": "Muscat",
+  "country": "Oman",
+  "nationality": "Omani"
+ },
+ "MCX": {
+  "city": "Makhachkala",
+  "country": "Russia",
+  "nationality": "Russian"
+ },
+ "MGQ": {
+  "city": "Mogadishu",
+  "country": "Somalia",
+  "nationality": "Somali"
+ },
+ "MHD": {
+  "city": "Mashhad",
+  "country": "Iran",
+  "nationality": "Iranian"
+ },
+ "MIR": {
+  "city": "Monastir",
+  "country": "Tunisia",
+  "nationality": "Tunisian"
+ },
+ "MJI": {
+  "city": "Mitiga (Tripoli)",
+  "country": "Libya",
+  "nationality": "Libyan"
+ },
+ "MLE": {
+  "city": "Malé",
+  "country": "Maldives",
+  "nationality": "Maldivian"
+ },
+ "MLX": {
+  "city": "Malatya",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "MNL": {
+  "city": "Manila",
+  "country": "Philippines",
+  "nationality": "Filipino"
+ },
+ "MQM": {
+  "city": "Mardan",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "MRA": {
+  "city": "Misrata",
+  "country": "Libya",
+  "nationality": "Libyan"
+ },
+ "MRS": {
+  "city": "Marseille",
+  "country": "France",
+  "nationality": "French"
+ },
+ "MRU": {
+  "city": "Mauritius",
+  "country": "Mauritius",
+  "nationality": "Mauritian"
+ },
+ "MUC": {
+  "city": "Munich",
+  "country": "Germany",
+  "nationality": "German"
+ },
+ "MUX": {
+  "city": "Multan",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "MXJ": {
+  "city": "Minna",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "MXP": {
+  "city": "Milan (Malpensa)",
+  "country": "Italy",
+  "nationality": "Italian"
+ },
+ "MZH": {
+  "city": "Merzifon",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "MZR": {
+  "city": "Mazar-i-Sharif",
+  "country": "Afghanistan",
+  "nationality": "Afghan"
+ },
+ "NAG": {
+  "city": "Nagpur",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "NAL": {
+  "city": "Nalchik",
+  "country": "Russia",
+  "nationality": "Russian"
+ },
+ "NAV": {
+  "city": "Nevşehir (Cappadocia)",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "NBO": {
+  "city": "Nairobi",
+  "country": "Kenya",
+  "nationality": "Kenyan"
+ },
+ "NDJ": {
+  "city": "N'Djamena",
+  "country": "Chad",
+  "nationality": "Chadian"
+ },
+ "NIM": {
+  "city": "Niamey",
+  "country": "Niger",
+  "nationality": "Nigerien"
+ },
+ "NJF": {
+  "city": "Najaf",
+  "country": "Iraq",
+  "nationality": "Iraqi"
+ },
+ "NKC": {
+  "city": "Nouakchott",
+  "country": "Mauritania",
+  "nationality": "Mauritanian"
+ },
+ "NMA": {
+  "city": "Namangan",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "NQZ": {
+  "city": "Astana",
+  "country": "Kazakhstan",
+  "nationality": "Kazakhstani"
+ },
+ "NVI": {
+  "city": "Navoi",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "OGU": {
+  "city": "Ordu–Giresun",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "OGX": {
+  "city": "Ouargla",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "ORN": {
+  "city": "Oran",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "OUA": {
+  "city": "Ouagadougou",
+  "country": "Burkina Faso",
+  "nationality": "Burkinabé"
+ },
+ "OUD": {
+  "city": "Oujda",
+  "country": "Morocco",
+  "nationality": "Moroccan"
+ },
+ "OXB": {
+  "city": "Bissau",
+  "country": "Guinea-Bissau",
+  "nationality": "Bissau-Guinean"
+ },
+ "PDG": {
+  "city": "Padang",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "PEW": {
+  "city": "Peshawar",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "PKX": {
+  "city": "Beijing (Daxing)",
+  "country": "China",
+  "nationality": "Chinese"
+ },
+ "PLM": {
+  "city": "Palembang",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "PRG": {
+  "city": "Prague",
+  "country": "Czech Republic",
+  "nationality": "Czech"
+ },
+ "PRN": {
+  "city": "Pristina",
+  "country": "Kosovo",
+  "nationality": "Kosovar"
+ },
+ "PZU": {
+  "city": "Port Sudan",
+  "country": "Sudan",
+  "nationality": "Sudanese"
+ },
+ "RBA": {
+  "city": "Rabat",
+  "country": "Morocco",
+  "nationality": "Moroccan"
+ },
+ "RKT": {
+  "city": "Ras Al Khaimah",
+  "country": "United Arab Emirates",
+  "nationality": "Emirati"
+ },
+ "ROB": {
+  "city": "Monrovia (Roberts)",
+  "country": "Liberia",
+  "nationality": "Liberian"
+ },
+ "RSI": {
+  "city": "Rio Sidra",
+  "country": "Libya",
+  "nationality": "Libyan"
+ },
+ "RTM": {
+  "city": "Rotterdam",
+  "country": "Netherlands",
+  "nationality": "Dutch"
+ },
+ "RZV": {
+  "city": "Rezvanshahr",
+  "country": "Iran",
+  "nationality": "Iranian"
+ },
+ "SAW": {
+  "city": "Istanbul (Sabiha Gökçen)",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "SFA": {
+  "city": "Sfax",
+  "country": "Tunisia",
+  "nationality": "Tunisian"
+ },
+ "SHJ": {
+  "city": "Sharjah",
+  "country": "United Arab Emirates",
+  "nationality": "Emirati"
+ },
+ "SIN": {
+  "city": "Singapore",
+  "country": "Singapore",
+  "nationality": "Singaporean"
+ },
+ "SJJ": {
+  "city": "Sarajevo",
+  "country": "Bosnia and Herzegovina",
+  "nationality": "Bosnian"
+ },
+ "SKD": {
+  "city": "Samarkand",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "SKO": {
+  "city": "Sokoto",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "SKT": {
+  "city": "Sialkot",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "SLL": {
+  "city": "Salalah",
+  "country": "Oman",
+  "nationality": "Omani"
+ },
+ "SOC": {
+  "city": "Solo (Surakarta)",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "SPX": {
+  "city": "Sphinx (Cairo)",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "SSH": {
+  "city": "Sharm El Sheikh",
+  "country": "Egypt",
+  "nationality": "Egyptian"
+ },
+ "STR": {
+  "city": "Stuttgart",
+  "country": "Germany",
+  "nationality": "German"
+ },
+ "SUB": {
+  "city": "Surabaya",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "SYZ": {
+  "city": "Shiraz",
+  "country": "Iran",
+  "nationality": "Iranian"
+ },
+ "SZF": {
+  "city": "Samsun",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "TAS": {
+  "city": "Tashkent",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "TBS": {
+  "city": "Tbilisi",
+  "country": "Georgia",
+  "nationality": "Georgian"
+ },
+ "TJK": {
+  "city": "Zaraitaitine",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "TMJ": {
+  "city": "Termez",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "TML": {
+  "city": "Tamale",
+  "country": "Ghana",
+  "nationality": "Ghanaian"
+ },
+ "TMR": {
+  "city": "Tamanrasset",
+  "country": "Algeria",
+  "nationality": "Algerian"
+ },
+ "TNG": {
+  "city": "Tangier",
+  "country": "Morocco",
+  "nationality": "Moroccan"
+ },
+ "TOE": {
+  "city": "Tozeur",
+  "country": "Tunisia",
+  "nationality": "Tunisian"
+ },
+ "TRV": {
+  "city": "Thiruvananthapuram",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "TUN": {
+  "city": "Tunis",
+  "country": "Tunisia",
+  "nationality": "Tunisian"
+ },
+ "TZX": {
+  "city": "Trabzon",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "UET": {
+  "city": "Quetta",
+  "country": "Pakistan",
+  "nationality": "Pakistani"
+ },
+ "UGC": {
+  "city": "Urgench",
+  "country": "Uzbekistan",
+  "nationality": "Uzbek"
+ },
+ "UPG": {
+  "city": "Makassar",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "VAN": {
+  "city": "Van",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "VAS": {
+  "city": "Sivas",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "VGA": {
+  "city": "Vijayawada",
+  "country": "India",
+  "nationality": "Indian"
+ },
+ "VIE": {
+  "city": "Vienna",
+  "country": "Austria",
+  "nationality": "Austrian"
+ },
+ "VKO": {
+  "city": "Moscow (Vnukovo)",
+  "country": "Russia",
+  "nationality": "Russian"
+ },
+ "YEI": {
+  "city": "Bursa (Yenişehir)",
+  "country": "Turkey",
+  "nationality": "Turkish"
+ },
+ "YIA": {
+  "city": "Yogyakarta",
+  "country": "Indonesia",
+  "nationality": "Indonesian"
+ },
+ "YOL": {
+  "city": "Yola",
+  "country": "Nigeria",
+  "nationality": "Nigerian"
+ },
+ "YYZ": {
+  "city": "Toronto",
+  "country": "Canada",
+  "nationality": "Canadian"
+ },
+ "ZAH": {
+  "city": "Zahedan",
+  "country": "Iran",
+  "nationality": "Iranian"
+ },
+ "ZNZ": {
+  "city": "Zanzibar",
+  "country": "Tanzania",
+  "nationality": "Tanzanian"
+ },
+ "ZRH": {
+  "city": "Zurich",
+  "country": "Switzerland",
+  "nationality": "Swiss"
+ },
+ "ZYL": {
+  "city": "Sylhet",
+  "country": "Bangladesh",
+  "nationality": "Bangladeshi"
+ }
+}

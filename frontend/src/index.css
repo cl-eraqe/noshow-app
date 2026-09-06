@@ -385,6 +385,19 @@ html, body, #root {
   margin-top: 4px;
 }
 
+/* Advisory under a date field — the flight has no departure on the chosen
+   day. Informational, not an error: the value is still accepted. */
+.field-notice {
+  font-size: 0.78rem;
+  color: #b06a00;
+  background: #fff6e5;
+  border: 1px solid #ffd89b;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
 .lookup-row {
   display: flex;
   gap: 8px;
@@ -2332,4 +2345,57 @@ html, body, #root {
   .um-tab-label { text-align: center; line-height: 1.15; overflow-wrap: anywhere; }
   .um-actions { margin-left: 0; width: 100%; }
   .um-actions .btn { flex: 1; justify-content: center; }
+}
+
+/* ── Airline approval queue (Flight Manager) ───────────────────────────── */
+
+.pending-count {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  border-radius: 999px;
+  background: var(--danger, #c0392b);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.pending-airline {
+  border: 1px solid var(--border, #e2e6ea);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--bg-subtle, #fafbfc);
+}
+
+.pending-airline-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 2px;
+}
+
+.pending-airline-head strong { font-size: 1.05rem; letter-spacing: 0.02em; }
+
+.pending-airline .field-input { margin-top: 8px; }
+
+.pending-airline-backfill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--text-muted, #667);
+  cursor: pointer;
+}
+
+.pending-airline-backfill input { width: auto; margin: 0; }
+
+.pending-airline-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
 }

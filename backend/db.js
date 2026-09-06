@@ -202,6 +202,109 @@ async function initDb() {
     console.log('Migration applied: existing users and reports backfilled to Terminal 1');
   }
 
+  // ── KAIA live schedule ──────────────────────────────────────────────────
+  // A rolling copy of the -6..+2 day window pulled from KAIA once a day. Old
+  // rows are deleted as the window moves, so this table's size is constant
+  // (~390 departures x 9 days). Unlike flights.json / flights_custom, which
+  // are recurring timetables keyed by flight number alone, these rows carry a
+  // date — that is the whole point of them.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS kaia_flights (
+      flight_number    TEXT NOT NULL,
+      date             TEXT NOT NULL,
+      scheduled_time   TEXT NOT NULL,
+      estimated_time   TEXT,
+      terminal_raw     TEXT,
+      gate             TEXT,
+      airline_code     TEXT,
+      airline_name     TEXT,
+      destination_code TEXT,
+      destination_city TEXT,
+      synced_at        TEXT,
+      PRIMARY KEY (flight_number, date, scheduled_time)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_kaia_flights_number ON kaia_flights (flight_number)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_kaia_flights_date ON kaia_flights (date)`);
+
+  // One row per sync attempt, so staleness is visible rather than silent.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS kaia_sync_log (
+      id          SERIAL PRIMARY KEY,
+      started_at  TEXT,
+      finished_at TEXT,
+      ok          INTEGER DEFAULT 0,
+      days_ok     INTEGER DEFAULT 0,
+      days_failed INTEGER DEFAULT 0,
+      rows_synced INTEGER DEFAULT 0,
+      detail      TEXT
+    )
+  `);
+
+  // KAIA's terminal codes, as data rather than as a hardcoded map: when
+  // Terminal 4 opens it is one row, not a code change and a deploy.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS terminal_codes (
+      code       TEXT PRIMARY KEY,   -- what KAIA sends, e.g. 'N'
+      terminal   TEXT NOT NULL,      -- what the app uses, e.g. 'North'
+      needs_bus  INTEGER DEFAULT 0,
+      label      TEXT,
+      updated_at TEXT
+    )
+  `);
+  const { rows: tcRows } = await pool.query(`SELECT 1 FROM _migrations WHERE name = 'seed_terminal_codes'`);
+  if (tcRows.length === 0) {
+    for (const [code, terminal, bus, label] of [
+      ['N',  'North', 1, 'North Terminal'],
+      ['T1', 'T1',    0, 'Terminal 1'],
+      ['H',  'Hajj',  1, 'Hajj Terminal'],
+      ['T4', 'T4',    1, 'Terminal 4'],
+    ]) {
+      await pool.query(
+        `INSERT INTO terminal_codes (code, terminal, needs_bus, label, updated_at)
+         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (code) DO NOTHING`,
+        [code, terminal, bus, label, jeddahNowStr()]
+      );
+    }
+    await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('seed_terminal_codes', $1)`, [jeddahNowStr()]);
+    console.log('Migration applied: terminal codes seeded (N/T1/H/T4)');
+  }
+
+  // Airline names are the key that analytics groups by, so a name KAIA spells
+  // differently ("SAUDI ARABIAN AIRLINES" vs "Saudia") would split one airline
+  // into two bars and break its logo lookup. KAIA's name is therefore never
+  // used directly: the IATA code is the key, our name wins, and a code we do
+  // not know waits here until a supervisor approves a name for it.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS airlines (
+      code       TEXT PRIMARY KEY,        -- IATA, e.g. 'IA'
+      name       TEXT,                    -- the approved name; NULL until approved
+      kaia_name  TEXT,                    -- what KAIA calls it, for reference
+      status     TEXT DEFAULT 'pending',  -- pending | approved | ignored
+      seen_count INTEGER DEFAULT 0,
+      samples    TEXT DEFAULT '[]',       -- a few flight numbers, to identify it
+      first_seen TEXT,
+      updated_at TEXT
+    )
+  `);
+
+  // Seed the 75 airlines the app already knows as approved, so only genuinely
+  // new codes ever surface for review.
+  const { rows: alRows } = await pool.query(`SELECT 1 FROM _migrations WHERE name = 'seed_airlines'`);
+  if (alRows.length === 0) {
+    const seed = require('./airlines-seed.json');
+    const now = jeddahNowStr();
+    for (const [code, name] of Object.entries(seed)) {
+      await pool.query(
+        `INSERT INTO airlines (code, name, status, first_seen, updated_at)
+         VALUES ($1, $2, 'approved', $3, $3) ON CONFLICT (code) DO NOTHING`,
+        [code, name, now]
+      );
+    }
+    await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('seed_airlines', $1)`, [jeddahNowStr()]);
+    console.log(`Migration applied: ${Object.keys(seed).length} known airlines seeded as approved`);
+  }
+
   console.log('Database ready (PostgreSQL)');
 }
 

@@ -168,6 +168,24 @@ def normalize_terminal(raw):
     return TERMINAL_ALIASES.get(val)
 
 
+def _detect_encoding(path):
+    """Pick the encoding to read the CSV with.
+
+    The import used to hardcode cp1252, which cannot represent Turkish 'ş' —
+    Eskişehir arrived as "Eski?ehir" with no error raised. UTF-8 is what Excel
+    writes today (often with a BOM, hence -sig). latin-1 decodes any byte, so
+    it is the fallback that never throws for a genuinely legacy file.
+    """
+    for enc in ("utf-8-sig", "cp1252"):
+        try:
+            with open(path, encoding=enc) as f:
+                f.read()
+            return enc
+        except UnicodeDecodeError:
+            continue
+    return "latin-1"
+
+
 def main():
     if len(sys.argv) < 2:
         print("Usage: python csv_to_flights_json.py <input.csv> [output.json]")
@@ -182,7 +200,10 @@ def main():
     flights = {}
     unknown = []
 
-    with open(input_path, encoding="cp1252") as f:
+    # utf-8-sig, not cp1252: cp1252 has no Turkish 'ş', so city names like
+    # Eskişehir silently became "Eski?ehir" on import. -sig eats the BOM Excel
+    # writes; latin-1 is the last-resort fallback for a genuinely legacy file.
+    with open(input_path, encoding=_detect_encoding(input_path)) as f:
         reader = csv.DictReader(f)
         # Strip whitespace from header names (e.g. 'Country  ')
         reader.fieldnames = [h.strip() for h in reader.fieldnames]

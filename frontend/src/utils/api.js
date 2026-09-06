@@ -93,17 +93,28 @@ export function apiLogout() {
 }
 
 // ── Flights
-export async function lookupFlight(flightNumber) {
+//
+// direction: 'past' for the previous flight (the most recent departure already
+// gone) or 'future' for the new one (the next still to come). `on` pins a
+// specific YYYY-MM-DD, used when the user edits the date by hand.
+export async function lookupFlight(flightNumber, { direction = 'past', on = null } = {}) {
   const key = flightNumber.toUpperCase().trim();
-  const data = await request(`/api/flights/${encodeURIComponent(key)}`);
-  // flights.json is the source of truth for terminal — override whatever the backend returned
+  const q = new URLSearchParams({ direction: direction === 'future' ? 'future' : 'past' });
+  // Only a real date is forwarded. These handlers hang off DOM events, and a
+  // stray event object stringifies to "[object Object]" — which the server
+  // would reject, silently turning a good lookup into "not found".
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(on || ''))) q.set('on', on);
+  const data = await request(`/api/flights/${encodeURIComponent(key)}?${q}`);
+
+  // Terminal precedence: a live KAIA value wins, because it is the only source
+  // that knows about a terminal opening (T4) or an airline moving between
+  // them. flights.json and the airline-code map only fill the gap behind it.
   await loadTerminalsCache().catch(() => {});
-  const cached = _terminalCache?.[key];
-  if (cached === 'T1' || cached === 'Hajj' || cached === 'North') {
-    data.terminal = cached;
-  } else if (data.terminal !== 'T1' && data.terminal !== 'Hajj' && data.terminal !== 'North') {
-    // Last-resort: airline-code map (only if json had no entry and backend gave no valid value)
-    data.terminal = TERMINAL_MAP[key.slice(0, 2)] || 'T1';
+  if (!VALID_TERMINALS.has(data.terminal)) {
+    const cached = _terminalCache?.[key];
+    data.terminal = VALID_TERMINALS.has(cached)
+      ? cached
+      : (TERMINAL_MAP[key.slice(0, 2)] || 'T1');
   }
   return data;
 }
@@ -227,6 +238,28 @@ export async function getFilterOptions(scope) {
 // ── Flight Manager (supervisor)
 export async function getCustomFlights() {
   return request('/api/flights/custom/list');
+}
+
+// Airline codes KAIA reported that the app has no approved name for. Until a
+// supervisor names one, reports for it keep an empty airline — an unreviewed
+// name would split the airline in two in analytics and lose its logo.
+export async function getPendingAirlines() {
+  return request('/api/flights/airlines/pending');
+}
+export async function approveAirline(code, name, backfill) {
+  return request(`/api/flights/airlines/${encodeURIComponent(code)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, backfill: !!backfill }),
+  });
+}
+export async function ignoreAirline(code) {
+  return request(`/api/flights/airlines/${encodeURIComponent(code)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'ignored' }),
+  });
+}
+export async function getKaiaStatus() {
+  return request('/api/flights/kaia/status');
 }
 export async function saveFlight(data) {
   return request('/api/flights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
@@ -480,7 +513,13 @@ const TERMINAL_MAP = {
 // Cache of per-flight terminals from flights.json (loaded once after login)
 let _terminalCache = null;
 let _terminalCachePromise = null;
-const VALID_TERMINALS = new Set(['T1', 'Hajj', 'North']);
+// T4 is included ahead of the terminal opening: KAIA starts reporting a new
+// terminal from its first operational day, and a value missing from this set
+// is discarded and replaced by a guess from the airline-code map.
+const VALID_TERMINALS = new Set(['T1', 'Hajj', 'North', 'T4']);
+
+// Terminals a passenger has to be bussed to.
+const BUS_TERMINALS = new Set(['North', 'Hajj', 'T4']);
 
 export async function loadTerminalsCache(force = false) {
   if (_terminalCache && !force) return _terminalCache;
@@ -504,8 +543,7 @@ export function getTerminal(flightNumber) {
 }
 
 export function needsBus(flightNumber) {
-  const terminal = getTerminal(flightNumber);
-  return terminal === 'North' || terminal === 'Hajj';
+  return BUS_TERMINALS.has(getTerminal(flightNumber));
 }
 
 export function getAirlineCode(flightNumber) {

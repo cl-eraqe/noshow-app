@@ -610,7 +610,7 @@
   "F37426": {
     "destination": "YEI",
     "std": "01:00",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -1418,7 +1418,7 @@
   "TK5135": {
     "destination": "YEI",
     "std": "02:20",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -1546,7 +1546,7 @@
   "TK5371": {
     "destination": "YEI",
     "std": "02:35",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -2386,7 +2386,7 @@
   "F37406": {
     "destination": "YEI",
     "std": "04:15",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -3458,7 +3458,7 @@
   "F37400": {
     "destination": "YEI",
     "std": "06:00",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -3858,7 +3858,7 @@
   "XY1223": {
     "destination": "AOE",
     "std": "06:30",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "T1"
@@ -6106,7 +6106,7 @@
   "FH9140": {
     "destination": "AOE",
     "std": "10:30",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -6666,7 +6666,7 @@
   "FH9636": {
     "destination": "AOE",
     "std": "11:15",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -6754,7 +6754,7 @@
   "FH9242": {
     "destination": "AOE",
     "std": "11:30",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -7946,7 +7946,7 @@
   "XC9702": {
     "destination": "YEI",
     "std": "13:05",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -8154,7 +8154,7 @@
   "XC9612": {
     "destination": "YEI",
     "std": "13:25",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -9114,7 +9114,7 @@
   "TK5315": {
     "destination": "YEI",
     "std": "15:10",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -9274,7 +9274,7 @@
   "F37408": {
     "destination": "YEI",
     "std": "15:30",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -9346,7 +9346,7 @@
   "FH9326": {
     "destination": "AOE",
     "std": "15:40",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -9474,7 +9474,7 @@
   "F37404": {
     "destination": "YEI",
     "std": "16:00",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -10202,7 +10202,7 @@
   "F37402": {
     "destination": "YEI",
     "std": "17:30",
-    "city": "Bursa (Yeni?ehir)",
+    "city": "Bursa (Yenişehir)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -10330,7 +10330,7 @@
   "TK5065": {
     "destination": "AOE",
     "std": "17:40",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -11426,7 +11426,7 @@
   "TK5133": {
     "destination": "AOE",
     "std": "19:45",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -12962,7 +12962,7 @@
   "FH9514": {
     "destination": "AOE",
     "std": "22:25",
-    "city": "Eski?ehir (Anadolu)",
+    "city": "Eskişehir (Anadolu)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
@@ -13170,7 +13170,7 @@
   "XC9914": {
     "destination": "NAV",
     "std": "22:45",
-    "city": "Nev?ehir (Cappadocia)",
+    "city": "Nevşehir (Cappadocia)",
     "country": "Turkey",
     "nationality": "Turkish",
     "terminal": "Hajj"
