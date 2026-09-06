@@ -316,6 +316,10 @@ export default function NewReport({ editMode }) {
   const [success, setSuccess]         = useState(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const [flightWarning, setFlightWarning] = useState('');
+  // Shown when a chosen date has no scheduled departure for that flight —
+  // only ever set inside the window where KAIA's data is complete.
+  const [dateNotice, setDateNotice]       = useState('');
+  const [newDateNotice, setNewDateNotice] = useState('');
   const [knownDestinations, setKnownDestinations] = useState([]);
 
   // A supervisor has no assigned terminal, so when creating a NEW report they
@@ -429,49 +433,83 @@ export default function NewReport({ editMode }) {
     setForm(prev => ({ ...prev, [field]: value }));
   }
 
+  // The server resolves which day's departure is meant, because only it holds
+  // KAIA's dated records. stdToDatetime stays as the fallback for a response
+  // that carries no resolved datetime (an older cached service worker, say).
+  function resolvedDatetime(data, direction) {
+    return data.datetime || stdToDatetime(data.std, direction);
+  }
+
   // ── Previous flight auto-fill (no validation here — user may change the date)
-  const lookupPrev = useCallback(async () => {
+  //
+  // `on` re-resolves for one specific date. The same flight number can serve a
+  // different destination at a different time on another day, so changing the
+  // date has to re-fetch everything, not just relabel the one field.
+  const lookupPrev = useCallback(async (on = null) => {
     const fn = form.prev_flight.trim();
     if (!fn) return;
     setPrevStatus('loading');
     setFlightWarning('');
     try {
-      const data = await lookupFlight(fn);
+      const data = await lookupFlight(fn, { direction: 'past', on });
       setForm(prev => ({
         ...prev,
-        prev_datetime:    stdToDatetime(data.std, 'past'),
+        prev_datetime:    resolvedDatetime(data, 'past'),
         prev_destination: `${data.city} (${data.destination})`,
-        prev_airline:     airlineFromFlightNumber(fn),
-        nationality:      prev.nationality || data.nationality,
+        prev_airline:     data.airline || airlineFromFlightNumber(fn),
+        // On an explicit date change the nationality follows the new
+        // destination; on a first lookup an existing value is left alone.
+        nationality:      on ? (data.nationality || prev.nationality) : (prev.nationality || data.nationality),
       }));
       setPrevTerminal(data.terminal || '');
       setPrevStatus('found');
+      // operated === false only inside the -6..+2 window, where KAIA is
+      // complete. Outside it a miss says nothing and this stays null.
+      setDateNotice(data.operated === false
+        ? `${fn} has no scheduled departure on that date — check the date.`
+        : '');
     } catch {
       setPrevTerminal('');
       setPrevStatus('notfound');
+      setDateNotice('');
     }
   }, [form.prev_flight]);
 
   // ── New flight auto-fill
-  const lookupNew = useCallback(async () => {
+  const lookupNew = useCallback(async (on = null) => {
     const fn = form.new_flight.trim();
     if (!fn) return;
     setNewLookupStatus('loading');
     try {
-      const data = await lookupFlight(fn);
+      const data = await lookupFlight(fn, { direction: 'future', on });
       setForm(prev => ({
         ...prev,
-        new_datetime:    stdToDatetime(data.std, 'future'),
+        new_datetime:    resolvedDatetime(data, 'future'),
         new_destination: `${data.city} (${data.destination})`,
-        new_airline:     airlineFromFlightNumber(fn),
+        new_airline:     data.airline || airlineFromFlightNumber(fn),
       }));
       setNewTerminal(data.terminal || '');
       setNewLookupStatus('found');
+      setNewDateNotice(data.operated === false
+        ? `${fn} has no scheduled departure on that date — check the date.`
+        : '');
     } catch {
       setNewTerminal('');
       setNewLookupStatus('notfound');
+      setNewDateNotice('');
     }
   }, [form.new_flight]);
+
+  // Editing a date re-resolves that flight for the chosen day: destination,
+  // time, airline and nationality all follow. Everything stays editable
+  // afterwards — this only replaces the auto-filled starting point.
+  function onDateEdited(field, value) {
+    set(field, value);
+    const day = /^(\d{4}-\d{2}-\d{2})/.exec(value || '')?.[1];
+    if (!day) return;
+    if (field === 'prev_datetime' && form.prev_flight.trim() && prevStatus === 'found') lookupPrev(day);
+    if (field === 'new_datetime'  && form.new_flight.trim()  && newLookupStatus === 'found') lookupNew(day);
+  }
 
   // ── Validate prev_datetime on submit
   function validatePrevFlight() {
@@ -607,11 +645,11 @@ export default function NewReport({ editMode }) {
                 placeholder="e.g. SV305"
                 value={form.prev_flight}
                 onChange={e => { set('prev_flight', e.target.value.toUpperCase()); setPrevStatus('idle'); setPrevTerminal(''); setFlightWarning(''); }}
-                onBlur={lookupPrev}
+                onBlur={() => lookupPrev()}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupPrev())}
                 required
               />
-              <button type="button" className="btn btn-lookup" onClick={lookupPrev}
+              <button type="button" className="btn btn-lookup" onClick={() => lookupPrev()}
                 disabled={prevStatus === 'loading'}>
                 {prevStatus === 'loading' ? '…' : 'Look up'}
               </button>
@@ -632,7 +670,8 @@ export default function NewReport({ editMode }) {
             <div className="field">
               <label className="field-label">3. Previous Flight Date & Time <span className="req">*</span></label>
               <input type="datetime-local" className="field-input autofilled" required
-                value={form.prev_datetime} onChange={e => set('prev_datetime', e.target.value)} />
+                value={form.prev_datetime} onChange={e => onDateEdited('prev_datetime', e.target.value)} />
+              {dateNotice && <p className="field-notice">⚠ {dateNotice}</p>}
             </div>
             <div className="field">
               <label className="field-label">4. Previous Destination <span className="req">*</span></label>
@@ -729,11 +768,11 @@ export default function NewReport({ editMode }) {
                   placeholder="e.g. SV309"
                   value={form.new_flight}
                   onChange={e => { set('new_flight', e.target.value.toUpperCase()); setNewLookupStatus('idle'); setNewTerminal(''); }}
-                  onBlur={lookupNew}
+                  onBlur={() => lookupNew()}
                   onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), lookupNew())}
                   required
                 />
-                <button type="button" className="btn btn-lookup" onClick={lookupNew}
+                <button type="button" className="btn btn-lookup" onClick={() => lookupNew()}
                   disabled={newLookupStatus === 'loading'}>
                   {newLookupStatus === 'loading' ? '…' : 'Look up'}
                 </button>
@@ -751,7 +790,8 @@ export default function NewReport({ editMode }) {
               <div className="field">
                 <label className="field-label">New Flight Date & Time <span className="req">*</span></label>
                 <input type="datetime-local" className="field-input autofilled" required
-                  value={form.new_datetime} onChange={e => set('new_datetime', e.target.value)} />
+                  value={form.new_datetime} onChange={e => onDateEdited('new_datetime', e.target.value)} />
+                {newDateNotice && <p className="field-notice">⚠ {newDateNotice}</p>}
               </div>
               <div className="field">
                 <label className="field-label">New Destination <span className="req">*</span></label>

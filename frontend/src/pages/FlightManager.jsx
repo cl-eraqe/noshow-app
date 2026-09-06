@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { lookupFlight, getCustomFlights, saveFlight, deleteFlight } from '../utils/api';
+import { lookupFlight, getCustomFlights, saveFlight, deleteFlight,
+         getPendingAirlines, approveAirline, ignoreAirline, getKaiaStatus } from '../utils/api';
 
 const EMPTY = { flight_number: '', destination: '', std: '', city: '', country: '', nationality: '' };
 
@@ -17,12 +18,19 @@ export default function FlightManager() {
   const [lookupStatus, setLookupStatus] = useState('idle');
   const [confirmDel, setConfirmDel]     = useState(null);
 
+  const [pending, setPending]       = useState([]);
+  const [kaiaStatus, setKaiaStatus] = useState(null);
+
   async function load() {
     setLoading(true);
     try { setCustoms(await getCustomFlights()); } catch { setCustoms([]); }
     setLoading(false);
   }
-  useEffect(() => { load(); }, []);
+  async function loadPending() {
+    try { setPending(await getPendingAirlines()); } catch { setPending([]); }
+    try { setKaiaStatus(await getKaiaStatus()); } catch { setKaiaStatus(null); }
+  }
+  useEffect(() => { load(); loadPending(); }, []);
 
   async function handleLookup() {
     const key = form.flight_number.toUpperCase().trim();
@@ -105,7 +113,21 @@ export default function FlightManager() {
         <button className="btn-back" onClick={() => navigate('/dashboard')}>← Back</button>
         <h1 className="page-title">✈ Flight Manager</h1>
         <p className="page-sub">Add, edit, or remove flights from the lookup database</p>
+        {kaiaStatus && (
+          <p className="page-sub" style={{ marginTop: 4 }}>
+            Live schedule: {kaiaStatus.flights.toLocaleString()} flights
+            {kaiaStatus.last
+              ? <> · last synced {kaiaStatus.last.finished_at}
+                  {kaiaStatus.last.ok ? '' : ` (${kaiaStatus.last.days_failed} day(s) failed)`}</>
+              : ' · not synced yet'}
+          </p>
+        )}
       </div>
+
+      <PendingAirlines
+        rows={pending}
+        onDone={loadPending}
+      />
 
       {/* ── Add / Edit Form */}
       <div className="form-card">
@@ -247,6 +269,93 @@ export default function FlightManager() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Airline codes KAIA reported that we have no approved name for.
+//
+// KAIA's own spelling is shown but never adopted automatically: analytics
+// groups by the airline name, so "SAUDI ARABIAN AIRLINES" alongside "Saudia"
+// would split one airline into two bars and lose its logo. Until a name is
+// approved here, reports for the code keep an empty airline — exactly the
+// behaviour before this feature existed.
+function PendingAirlines({ rows, onDone }) {
+  const [names, setNames]       = useState({});
+  const [backfill, setBackfill] = useState({});
+  const [busy, setBusy]         = useState(null);
+  const [error, setError]       = useState('');
+
+  if (!rows.length) return null;
+
+  const nameFor = r => (names[r.code] ?? r.kaia_name ?? '');
+
+  async function approve(r) {
+    const name = nameFor(r).trim();
+    if (!name) { setError(`Enter a name for ${r.code}.`); return; }
+    setBusy(r.code); setError('');
+    try {
+      await approveAirline(r.code, name, !!backfill[r.code]);
+      await onDone();
+    } catch (e) { setError(e.message); }
+    setBusy(null);
+  }
+
+  async function ignore(r) {
+    setBusy(r.code); setError('');
+    try { await ignoreAirline(r.code); await onDone(); }
+    catch (e) { setError(e.message); }
+    setBusy(null);
+  }
+
+  return (
+    <div className="form-card">
+      <h2 className="section-title">
+        ✈ New airlines awaiting approval <span className="pending-count">{rows.length}</span>
+      </h2>
+      <p className="field-hint" style={{ marginBottom: 12 }}>
+        Seen in the live schedule with no name set here. Their reports keep an empty
+        airline until you approve one.
+      </p>
+
+      {error && <p className="login-error">{error}</p>}
+
+      {rows.map(r => (
+        <div key={r.code} className="pending-airline">
+          <div className="pending-airline-head">
+            <strong>{r.code}</strong>
+            <span className="field-hint">
+              {r.seen_count} flight{r.seen_count === 1 ? '' : 's'}
+              {r.samples?.length ? ` · ${r.samples.join(', ')}` : ''}
+            </span>
+          </div>
+          <div className="field-hint">KAIA calls it: {r.kaia_name || '—'}</div>
+          <input
+            className="field-input"
+            value={nameFor(r)}
+            placeholder="Name to use in reports and analytics"
+            onChange={e => setNames(n => ({ ...n, [r.code]: e.target.value }))}
+          />
+          <label className="pending-airline-backfill">
+            <input
+              type="checkbox"
+              checked={!!backfill[r.code]}
+              onChange={e => setBackfill(b => ({ ...b, [r.code]: e.target.checked }))}
+            />
+            Also apply to existing reports with no airline
+          </label>
+          <div className="pending-airline-actions">
+            <button type="button" className="btn btn-primary btn-sm"
+              disabled={busy === r.code} onClick={() => approve(r)}>
+              {busy === r.code ? 'Saving…' : 'Approve'}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm"
+              disabled={busy === r.code} onClick={() => ignore(r)}>
+              Ignore
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
