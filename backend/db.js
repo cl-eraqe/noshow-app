@@ -145,6 +145,12 @@ async function initDb() {
   for (const col of ['prev_gate', 'prev_estimated', 'new_gate', 'new_estimated']) {
     await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS ${col} TEXT`);
   }
+
+  // Where a flights_custom row came from. The sync copies flights KAIA knows
+  // but flights.json does not into this table, so they survive KAIA forgetting
+  // them a week later — and this column keeps those distinguishable from the
+  // ones a supervisor typed, which the sync must never overwrite.
+  await pool.query(`ALTER TABLE flights_custom ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual'`);
   // Add the CHECK constraints separately (idempotent — Postgres has no "ADD CONSTRAINT
   // IF NOT EXISTS", so guard with a catalog lookup instead of failing on re-run).
   await pool.query(`

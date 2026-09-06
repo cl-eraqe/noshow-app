@@ -150,6 +150,17 @@ function pickOccurrence(rows, direction, on) {
   return behind[0]?.r || null;
 }
 
+// The occurrence closest in time to a target date — used to describe a flight
+// on a day it did not operate, so the values shown come from the nearest day
+// it did rather than an arbitrary one.
+function nearestTo(rows, targetDate) {
+  const t = jeddahMs(targetDate, '12:00');
+  return rows
+    .map(r => ({ r, d: Math.abs(jeddahMs(r.date, r.scheduled_time) - t) }))
+    .filter(x => !isNaN(x.d))
+    .sort((a, b) => a.d - b.d)[0]?.r || rows[rows.length - 1];
+}
+
 // ── The public resolver ───────────────────────────────────────────────────
 
 /**
@@ -193,11 +204,56 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
   // No KAIA record. Fall through to the timetable — silently, because outside
   // the -6..+2 window a miss says nothing about whether the flight exists.
   const entry = await timetableEntry(flightNumber);
+
+  // The flight is one KAIA knows, just not on the date asked for. Returning
+  // 404 here would report "flight not found" for a flight we can describe, and
+  // would lose the one thing worth saying: it did not operate that day. Fall
+  // back to the nearest occurrence we do hold, keep the user's date, and flag
+  // it. A number KAIA has never seen has no occurrences and is unaffected —
+  // it still 404s, so a mistyped number is still reported as not found.
+  if (!entry && occurrences.length && on) {
+    const near = nearestTo(occurrences, on);
+    const dest = destinationFacts(near.destination_code);
+    const mapped = await terminalFromCode(near.terminal_raw);
+    return {
+      flight_number:   flightNumber,
+      source:          'kaia-other-day',
+      date:            on,
+      std:             near.scheduled_time,
+      // The time is the one it flew on another day; the date is the user's.
+      // Flagged rather than hidden, and every field stays editable.
+      datetime:        `${on}T${near.scheduled_time}`,
+      estimated:       null,
+      gate:            null,
+      destination:     near.destination_code || '',
+      city:            dest.city || near.destination_city || '',
+      country:         dest.country,
+      nationality:     dest.nationality,
+      airline_code:    near.airline_code || '',
+      airline:         await airlineName(near.airline_code),
+      terminal:        mapped,
+      terminal_raw:    near.terminal_raw || null,
+      // Only inside the window, where KAIA is complete, does an absent record
+      // mean it did not fly. Outside, absence proves nothing.
+      operated:        inWindow ? false : null,
+      from_date:       near.date,
+    };
+  }
+
   if (!entry) return null;
 
   const date = on || resolveTimetableDate(entry.std, direction);
   const dest = destinationFacts(entry.destination);
   const code = flightNumber.slice(0, 2);
+
+  // flights_custom carries no terminal, and a flight learned from the live
+  // schedule lives there — so without this the bus badge would disappear the
+  // moment the answer came from the timetable instead of from KAIA. Any
+  // occurrence we hold knows the terminal, so borrow it.
+  const nearOcc = occurrences.length ? nearestTo(occurrences, date || occurrences[0].date) : null;
+  const borrowedTerminal = !entry.terminal && nearOcc
+    ? await terminalFromCode(nearOcc.terminal_raw)
+    : null;
 
   return {
     flight_number: flightNumber,
@@ -213,8 +269,8 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
     nationality:   dest.nationality || entry.nationality || '',
     airline_code:  code,
     airline:       await airlineName(code),
-    terminal:      entry.terminal,
-    terminal_raw:  null,
+    terminal:      entry.terminal || borrowedTerminal,
+    terminal_raw:  nearOcc?.terminal_raw || null,
     // Inside the window KAIA is complete, so an absent record means the flight
     // genuinely did not operate that day — worth telling the user. Outside it,
     // absence means nothing and this stays null.
