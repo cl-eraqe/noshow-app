@@ -6,6 +6,7 @@ const fs     = require('fs');
 const { uploadFile, deleteFile } = require('../storage');
 const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
 const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
+const { flightExtras } = require('../flight-lookup');
 const { requireRole } = require('../middleware/auth');
 
 // ── Jeddah time helpers ────────────────────────────────────────────────
@@ -471,6 +472,11 @@ router.post('/', uploadFiles, async (req, res) => {
       if (!isNaN(diff) && diff >= 0) computedDays = parseFloat(Math.max(0, diff).toFixed(2));
     }
 
+    const [prevExtras, newExtras] = await Promise.all([
+      flightExtras(prev_flight, prev_datetime),
+      flightExtras(new_flight, new_datetime),
+    ]);
+
     const { rows } = await pool.query(
       `INSERT INTO reports
         (pax_id_datetime,
@@ -478,8 +484,8 @@ router.post('/', uploadFiles, async (req, res) => {
          nationality, pax_type,
          new_flight, new_datetime, new_destination, new_airline,
          days_at_airport, pax_count, file_paths, whatsapp_text, submitted_by, status, comment, created_at,
-         owner_terminal)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+         owner_terminal, prev_gate, prev_estimated, new_gate, new_estimated)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING id`,
       [
         pax_id_datetime,
@@ -495,6 +501,11 @@ router.post('/', uploadFiles, async (req, res) => {
         comment || '',
         jeddahNowStr(),
         ownerTerminal,
+        // Not displayed anywhere — captured so a gate history exists to
+        // analyse later. Volatile during the day, so each sync corrects these
+        // for as long as the flight stays inside KAIA's window.
+        prevExtras.gate, prevExtras.estimated,
+        newExtras.gate, newExtras.estimated,
       ]
     );
 
@@ -561,14 +572,20 @@ router.put('/:id', uploadFiles, async (req, res) => {
       nationality, new_flight, new_datetime, new_destination,
     });
 
+    const [editPrevExtras, editNewExtras] = await Promise.all([
+      flightExtras(prev_flight, prev_datetime),
+      flightExtras(new_flight, new_datetime),
+    ]);
+
     await pool.query(
       `UPDATE reports SET
         pax_id_datetime=$1, prev_flight=$2, prev_datetime=$3, prev_destination=$4, prev_airline=$5,
         nationality=$6, pax_type=$7,
         new_flight=$8, new_datetime=$9, new_destination=$10, new_airline=$11,
         days_at_airport=$12, pax_count=$13, file_paths=$14, whatsapp_text=$15,
-        status=$16, comment=$17
-       WHERE id=$18`,
+        status=$16, comment=$17,
+        prev_gate=$18, prev_estimated=$19, new_gate=$20, new_estimated=$21
+       WHERE id=$22`,
       [
         pax_id_datetime,
         prev_flight, prev_datetime, prev_destination, prev_airline,
@@ -580,6 +597,9 @@ router.put('/:id', uploadFiles, async (req, res) => {
         whatsapp_text,
         reportStatus,
         comment || '',
+        // Re-captured because the flight or its date may have been edited.
+        editPrevExtras.gate, editPrevExtras.estimated,
+        editNewExtras.gate, editNewExtras.estimated,
         req.params.id,
       ]
     );
