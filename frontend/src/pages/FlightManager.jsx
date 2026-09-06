@@ -237,7 +237,12 @@ export default function FlightManager() {
                         ? <span style={{ color: 'var(--danger)' }}>Deleted</span>
                         : r.isOverride
                           ? <span style={{ color: 'var(--gold)' }}>Override</span>
-                          : <span style={{ color: 'var(--success)' }}>Custom</span>}
+                          : r.source === 'kaia'
+                            // Copied from the live schedule because the static
+                            // timetable had never seen it. Editable like any
+                            // other row; the sync never overwrites it.
+                            ? <span style={{ color: 'var(--text-muted)' }}>From schedule</span>
+                            : <span style={{ color: 'var(--success)' }}>Custom</span>}
                     </td>
                     <td>
                       {!r.deleted && (

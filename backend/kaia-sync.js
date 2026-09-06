@@ -17,6 +17,8 @@
 
 const { getDb, jeddahNowStr } = require('./db');
 const kaia = require('./kaia');
+const airports = require('./airports.json');
+const timetableJson = require('./flights.json');
 
 const SYNC_HOUR = 0;
 const SYNC_MINUTE = 1;
@@ -68,6 +70,7 @@ async function syncDates(dates, { mode = 'full', prune = true } = {}) {
   let daysOk = 0, daysFailed = 0, rowsSynced = 0;
   const failures = [];
   const seenAirlines = new Map();
+  const seenFlights = new Map();   // flight_number -> the record to learn from
 
   try {
     for (const date of dates) {
@@ -102,6 +105,10 @@ async function syncDates(dates, { mode = 'full', prune = true } = {}) {
             if (!seen.name && f.airline_name) seen.name = f.airline_name;
             seenAirlines.set(f.airline_code, seen);
           }
+          // Keep the latest occurrence of each number; learnNewFlights uses it
+          // to describe a flight the static timetable has never heard of.
+          const prevSeen = seenFlights.get(f.flight_number);
+          if (!prevSeen || f.date > prevSeen.date) seenFlights.set(f.flight_number, f);
         }
 
         await pruneDate(date, stamp, shaped.length);
@@ -123,6 +130,7 @@ async function syncDates(dates, { mode = 'full', prune = true } = {}) {
     }
 
     await recordAirlines(seenAirlines);
+    const learned = await learnNewFlights(seenFlights);
     const settled = await settleReportExtras();
 
     const ok = daysOk > 0 && daysFailed === 0;
@@ -136,12 +144,13 @@ async function syncDates(dates, { mode = 'full', prune = true } = {}) {
       `INSERT INTO kaia_sync_log (started_at, finished_at, ok, days_ok, days_failed, rows_synced, detail)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [startedAt, jeddahNowStr(), ok ? 1 : 0, daysOk, daysFailed, rowsSynced,
-       [mode, settled ? `settled ${settled} report field(s)` : null, ...failures]
+       [mode, learned ? `learned ${learned} new flight(s)` : null,
+        settled ? `settled ${settled} report field(s)` : null, ...failures]
          .filter(Boolean).join(' | ').slice(0, 2000)]
     );
 
     console.log(`[kaia-sync] ${mode}: ${daysOk}/${dates.length} days, ${rowsSynced} flights, ${daysFailed} failed`);
-    return { ok, daysOk, daysFailed, rowsSynced, settled, failures };
+    return { ok, daysOk, daysFailed, rowsSynced, learned, settled, failures };
   } finally {
     running = false;
   }
@@ -221,6 +230,45 @@ async function settleReportExtras() {
     changed += sets.length;
   }
   return changed;
+}
+
+// ── Learning flights the static timetable does not have ───────────────────
+//
+// KAIA forgets a flight about a week after it operates. A number that is not
+// in flights.json therefore works today and fails next month, and the employee
+// is back to typing everything by hand — so it is copied into flights_custom,
+// which is read ahead of flights.json and is not pruned.
+//
+// Only inserted, never updated: a supervisor may have corrected one of these
+// by hand, and a deleted one must stay deleted rather than reappearing every
+// night. Destination facts come from airports.json, the same source the form
+// uses, so nationality is filled in wherever the airport is known.
+async function learnNewFlights(seen) {
+  if (!seen.size) return 0;
+  const pool = getDb();
+  const now = jeddahNowStr();
+
+  const { rows: existing } = await pool.query(`SELECT flight_number FROM flights_custom`);
+  const known = new Set(existing.map(r => r.flight_number));
+
+  let added = 0;
+  for (const [number, f] of seen) {
+    if (known.has(number) || timetableJson[number]) continue;
+    if (!f.destination_code) continue;   // nothing useful to record
+
+    const a = airports[f.destination_code] || {};
+    await pool.query(
+      `INSERT INTO flights_custom
+         (flight_number, destination, std, city, country, nationality, deleted, updated_at, source)
+       VALUES ($1,$2,$3,$4,$5,$6,0,$7,'kaia')
+       ON CONFLICT (flight_number) DO NOTHING`,
+      [number, f.destination_code, f.scheduled_time,
+       a.city || f.destination_city || '', a.country || '', a.nationality || '', now]
+    );
+    added++;
+  }
+  if (added) console.log(`[kaia-sync] learned ${added} flight(s) not in the timetable`);
+  return added;
 }
 
 // ── Airline review queue ──────────────────────────────────────────────────
@@ -322,7 +370,7 @@ function start() {
 }
 
 module.exports = {
-  syncWindow, syncDates, settleReportExtras, msUntilNextSync, start,
+  syncWindow, syncDates, settleReportExtras, learnNewFlights, msUntilNextSync, start,
   SYNC_HOUR, SYNC_MINUTE, TODAY_REFRESH_MS, TOMORROW_REFRESH_MS,
   _state: () => ({ running, consecutiveFailures, skipCycles }),
   _resetState: () => { running = false; consecutiveFailures = 0; skipCycles = 0; },
