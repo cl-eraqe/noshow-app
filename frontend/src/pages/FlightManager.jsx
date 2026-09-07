@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lookupFlight, getCustomFlights, saveFlight, deleteFlight,
-         getPendingAirlines, approveAirline, ignoreAirline, getKaiaStatus } from '../utils/api';
+         getPendingAirlines, approveAirline, ignoreAirline, getKaiaStatus,
+         getPendingAirports, fillAirport, ignoreAirport } from '../utils/api';
 
 const EMPTY = { flight_number: '', destination: '', std: '', city: '', country: '', nationality: '' };
 
@@ -18,8 +19,10 @@ export default function FlightManager() {
   const [lookupStatus, setLookupStatus] = useState('idle');
   const [confirmDel, setConfirmDel]     = useState(null);
 
-  const [pending, setPending]       = useState([]);
-  const [kaiaStatus, setKaiaStatus] = useState(null);
+  const [pending, setPending]           = useState([]);
+  const [pendingAirports, setPendingAirports] = useState([]);
+  const [kaiaStatus, setKaiaStatus]     = useState(null);
+  const [listTab, setListTab]           = useState('all');
 
   async function load() {
     setLoading(true);
@@ -28,6 +31,7 @@ export default function FlightManager() {
   }
   async function loadPending() {
     try { setPending(await getPendingAirlines()); } catch { setPending([]); }
+    try { setPendingAirports(await getPendingAirports()); } catch { setPendingAirports([]); }
     try { setKaiaStatus(await getKaiaStatus()); } catch { setKaiaStatus(null); }
   }
   useEffect(() => { load(); loadPending(); }, []);
@@ -101,11 +105,32 @@ export default function FlightManager() {
     }
   }
 
-  const filtered = customs.filter(r =>
-    !search || r.flight_number.toLowerCase().includes(search.toLowerCase()) ||
-    (r.city || '').toLowerCase().includes(search.toLowerCase()) ||
-    (r.destination || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = customs.filter(r => {
+    if (listTab === 'manual' && r.source === 'kaia') return false;
+    if (listTab === 'kaia'   && r.source !== 'kaia') return false;
+    const q = search.toLowerCase();
+    return !q || r.flight_number.toLowerCase().includes(q) ||
+      (r.city || '').toLowerCase().includes(q) ||
+      (r.destination || '').toLowerCase().includes(q);
+  });
+
+  // These rows exist because the source CSV that builds flights.json does not
+  // have them. Exporting in the same shape lets them be merged back into it,
+  // so they become permanent rather than living only in the database.
+  function exportCsv() {
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Flight Number', 'Destination', 'STD', 'City', 'Country', 'Nationality', 'Source']];
+    filtered.filter(r => !r.deleted).forEach(r => rows.push(
+      [r.flight_number, r.destination, r.std, r.city, r.country, r.nationality, r.source || 'manual']));
+    const blob = new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\r\n')],
+      { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `custom-flights-${listTab}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="page-wrap">
@@ -124,10 +149,9 @@ export default function FlightManager() {
         )}
       </div>
 
-      <PendingAirlines
-        rows={pending}
-        onDone={loadPending}
-      />
+      <PendingAirports rows={pendingAirports} onDone={() => { loadPending(); load(); }} />
+
+      <PendingAirlines rows={pending} onDone={loadPending} />
 
       {/* ── Add / Edit Form */}
       <div className="form-card">
@@ -202,13 +226,33 @@ export default function FlightManager() {
       <div className="form-card" style={{ marginTop: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h2 className="section-title" style={{ margin: 0 }}>
-            Custom Flights ({customs.filter(r => !r.deleted).length})
+            Custom Flights ({filtered.filter(r => !r.deleted).length})
           </h2>
           <input
             className="field-input" style={{ width: 180, marginBottom: 0 }}
             placeholder="Search…"
             value={search} onChange={e => setSearch(e.target.value)}
           />
+        </div>
+
+        {/* Flights learned from the live schedule quickly outnumber hand-typed
+            ones, which would otherwise be lost among them. */}
+        <div className="fm-tabs">
+          {[
+            ['all',    'All',           customs.filter(r => !r.deleted).length],
+            ['manual', 'Added by hand', customs.filter(r => !r.deleted && r.source !== 'kaia').length],
+            ['kaia',   'From schedule', customs.filter(r => !r.deleted && r.source === 'kaia').length],
+          ].map(([key, label, n]) => (
+            <button key={key} type="button"
+              className={`fm-tab ${listTab === key ? 'fm-tab-active' : ''}`}
+              onClick={() => setListTab(key)}>
+              {label} <span className="fm-tab-count">{n}</span>
+            </button>
+          ))}
+          <button type="button" className="btn btn-sm btn-secondary" style={{ marginLeft: 'auto' }}
+            onClick={exportCsv} disabled={!filtered.length}>
+            ⭳ CSV
+          </button>
         </div>
 
         {loading ? (
@@ -353,6 +397,100 @@ function PendingAirlines({ rows, onDone }) {
             <button type="button" className="btn btn-primary btn-sm"
               disabled={busy === r.code} onClick={() => approve(r)}>
               {busy === r.code ? 'Saving…' : 'Approve'}
+            </button>
+            <button type="button" className="btn btn-secondary btn-sm"
+              disabled={busy === r.code} onClick={() => ignore(r)}>
+              Ignore
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Destination airports the app has no facts for.
+//
+// Nationality is resolved from the destination airport, not from the flight
+// number — so a single unknown code leaves that field blank for every flight
+// to it, on every report, indefinitely. Filling one in here fixes the airport
+// once rather than the flights one at a time.
+function PendingAirports({ rows, onDone }) {
+  const [vals, setVals]         = useState({});
+  const [backfill, setBackfill] = useState({});
+  const [busy, setBusy]         = useState(null);
+  const [error, setError]       = useState('');
+
+  if (!rows.length) return null;
+
+  const val = (code, field, fallback = '') => vals[code]?.[field] ?? fallback;
+  const set = (code, field, v) =>
+    setVals(s => ({ ...s, [code]: { ...s[code], [field]: v } }));
+
+  async function save(r) {
+    const nationality = val(r.code, 'nationality').trim();
+    if (!nationality) { setError(`Enter a nationality for ${r.code}.`); return; }
+    setBusy(r.code); setError('');
+    try {
+      await fillAirport(r.code, {
+        city:        val(r.code, 'city', r.kaia_city || '').trim(),
+        country:     val(r.code, 'country').trim(),
+        nationality,
+        backfill:    !!backfill[r.code],
+      });
+      await onDone();
+    } catch (e) { setError(e.message); }
+    setBusy(null);
+  }
+
+  async function ignore(r) {
+    setBusy(r.code); setError('');
+    try { await ignoreAirport(r.code); await onDone(); }
+    catch (e) { setError(e.message); }
+    setBusy(null);
+  }
+
+  return (
+    <div className="form-card">
+      <h2 className="section-title">
+        🌍 New destinations needing a nationality <span className="pending-count">{rows.length}</span>
+      </h2>
+      <p className="field-hint" style={{ marginBottom: 12 }}>
+        Flights to these airports leave the nationality field blank until one is set here.
+      </p>
+
+      {error && <p className="login-error">{error}</p>}
+
+      {rows.map(r => (
+        <div key={r.code} className="pending-airline">
+          <div className="pending-airline-head">
+            <strong>{r.code}</strong>
+            <span className="field-hint">
+              {r.seen_count} flight{r.seen_count === 1 ? '' : 's'}
+              {r.samples?.length ? ` · ${r.samples.join(', ')}` : ''}
+            </span>
+          </div>
+          <div className="field-hint">KAIA calls it: {r.kaia_city || '—'}</div>
+          <div className="airport-fill-grid">
+            <input className="field-input" placeholder="City"
+              value={val(r.code, 'city', r.kaia_city || '')}
+              onChange={e => set(r.code, 'city', e.target.value)} />
+            <input className="field-input" placeholder="Country"
+              value={val(r.code, 'country')}
+              onChange={e => set(r.code, 'country', e.target.value)} />
+            <input className="field-input" placeholder="Nationality *"
+              value={val(r.code, 'nationality')}
+              onChange={e => set(r.code, 'nationality', e.target.value)} />
+          </div>
+          <label className="pending-airline-backfill">
+            <input type="checkbox" checked={!!backfill[r.code]}
+              onChange={e => setBackfill(b => ({ ...b, [r.code]: e.target.checked }))} />
+            Also apply to existing reports to this destination with no nationality
+          </label>
+          <div className="pending-airline-actions">
+            <button type="button" className="btn btn-primary btn-sm"
+              disabled={busy === r.code} onClick={() => save(r)}>
+              {busy === r.code ? 'Saving…' : 'Save'}
             </button>
             <button type="button" className="btn btn-secondary btn-sm"
               disabled={busy === r.code} onClick={() => ignore(r)}>

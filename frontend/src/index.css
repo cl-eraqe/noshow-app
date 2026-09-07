@@ -2399,3 +2399,50 @@ html, body, #root {
   gap: 8px;
   margin-top: 10px;
 }
+
+/* ── Flight Manager list tabs ──────────────────────────────────────────── */
+
+.fm-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+}
+
+.fm-tab {
+  border: 1px solid var(--border, #e2e6ea);
+  background: transparent;
+  color: var(--text-muted, #667);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.fm-tab-active {
+  background: var(--primary, #1a3a5c);
+  border-color: var(--primary, #1a3a5c);
+  color: #fff;
+  font-weight: 600;
+}
+
+.fm-tab-count {
+  opacity: 0.75;
+  font-size: 0.76rem;
+  margin-left: 3px;
+}
+
+/* Three side-by-side inputs when there is room; stacked on a phone. */
+.airport-fill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.airport-fill-grid .field-input { margin-top: 0; }
+
+@media (max-width: 640px) {
+  .airport-fill-grid { grid-template-columns: 1fr; }
+}

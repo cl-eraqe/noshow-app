@@ -118,6 +118,79 @@ router.patch('/airlines/:code', requireRole('supervisor'), express.json(), async
   }
 });
 
+// ── Unknown airports (supervisor only) ────────────────────────────────────
+// Nationality is resolved from the destination airport, so a code we have no
+// facts for leaves that field blank for every flight to it. These surface here
+// rather than being discoverable only by scanning the flight list by eye.
+
+router.get('/airports/pending', requireRole('supervisor'), async (_req, res) => {
+  try {
+    const pool = getDb();
+    const { rows } = await pool.query(
+      `SELECT code, kaia_city, seen_count, samples, first_seen
+         FROM airports_custom WHERE status = 'pending' ORDER BY seen_count DESC, code`
+    );
+    res.json(rows.map(r => ({ ...r, samples: safeParse(r.samples) })));
+  } catch (e) {
+    console.error('[GET /flights/airports/pending]', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/flights/airports/:code — { city, country, nationality, status, backfill }
+router.patch('/airports/:code', requireRole('supervisor'), express.json(), async (req, res) => {
+  try {
+    const code = String(req.params.code || '').toUpperCase().trim();
+    if (!/^[A-Z]{3}$/.test(code)) return res.status(400).json({ error: 'valid IATA code required' });
+    const { city, country, nationality, status, backfill } = req.body || {};
+    const pool = getDb();
+
+    if (status === 'ignored') {
+      await pool.query(`UPDATE airports_custom SET status = 'ignored', updated_at = $1 WHERE code = $2`,
+        [jeddahNowStr(), code]);
+      return res.json({ success: true, code, status: 'ignored' });
+    }
+
+    const nat = String(nationality || '').trim();
+    if (!nat) return res.status(400).json({ error: 'nationality required' });
+
+    await pool.query(
+      `INSERT INTO airports_custom (code, city, country, nationality, status, first_seen, updated_at)
+       VALUES ($1,$2,$3,$4,'filled',$5,$5)
+       ON CONFLICT (code) DO UPDATE SET
+         city = EXCLUDED.city, country = EXCLUDED.country,
+         nationality = EXCLUDED.nationality, status = 'filled', updated_at = EXCLUDED.updated_at`,
+      [code, String(city || '').trim(), String(country || '').trim(), nat, jeddahNowStr()]
+    );
+
+    // Flights already learned for this airport carry the blanks; fill them so
+    // the next lookup is complete without waiting for another sync.
+    await pool.query(
+      `UPDATE flights_custom SET city = $1, country = $2, nationality = $3
+        WHERE destination = $4 AND source = 'kaia'`,
+      [String(city || '').trim(), String(country || '').trim(), nat, code]);
+
+    let backfilled = 0;
+    if (backfill) {
+      const like = `%(${code})`;
+      const r = await pool.query(
+        `UPDATE reports SET nationality = $1
+          WHERE (nationality IS NULL OR nationality = '') AND prev_destination LIKE $2`,
+        [nat, like]);
+      backfilled = r.rowCount || 0;
+    }
+
+    await logAudit({
+      user: req.username || req.role, action: 'airport_fill',
+      changes: JSON.stringify({ code, city, country, nationality: nat, backfilled }),
+    });
+    res.json({ success: true, code, backfilled });
+  } catch (e) {
+    console.error('[PATCH /flights/airports/:code]', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/flights/kaia/status — when the local copy was last refreshed
 router.get('/kaia/status', async (_req, res) => {
   try {

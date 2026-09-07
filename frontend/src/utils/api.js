@@ -261,6 +261,25 @@ export async function ignoreAirline(code) {
 export async function getKaiaStatus() {
   return request('/api/flights/kaia/status');
 }
+
+// Destination airports with no facts recorded. Nationality is resolved from
+// the airport, so one missing code leaves that field blank for every flight to
+// it until a supervisor fills it in.
+export async function getPendingAirports() {
+  return request('/api/flights/airports/pending');
+}
+export async function fillAirport(code, { city, country, nationality, backfill }) {
+  return request(`/api/flights/airports/${encodeURIComponent(code)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ city, country, nationality, backfill: !!backfill }),
+  });
+}
+export async function ignoreAirport(code) {
+  return request(`/api/flights/airports/${encodeURIComponent(code)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'ignored' }),
+  });
+}
 export async function saveFlight(data) {
   return request('/api/flights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
