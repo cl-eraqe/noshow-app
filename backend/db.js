@@ -151,6 +151,26 @@ async function initDb() {
   // them a week later — and this column keeps those distinguishable from the
   // ones a supervisor typed, which the sync must never overwrite.
   await pool.query(`ALTER TABLE flights_custom ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual'`);
+
+  // Airports beyond the 243 in airports.json. Nationality is resolved from the
+  // destination airport, so a route to somewhere new leaves that field blank
+  // for every flight to it, permanently, with nothing surfacing the gap. A
+  // supervisor fills a code in once here and every flight to it works — past
+  // reports included, if they choose to backfill.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS airports_custom (
+      code        TEXT PRIMARY KEY,
+      city        TEXT,
+      country     TEXT,
+      nationality TEXT,
+      kaia_city   TEXT,      -- what KAIA calls it, for reference
+      seen_count  INTEGER DEFAULT 0,
+      samples     TEXT DEFAULT '[]',
+      status      TEXT DEFAULT 'pending',   -- pending | filled | ignored
+      first_seen  TEXT,
+      updated_at  TEXT
+    )
+  `);
   // Add the CHECK constraints separately (idempotent — Postgres has no "ADD CONSTRAINT
   // IF NOT EXISTS", so guard with a catalog lookup instead of failing on re-run).
   await pool.query(`

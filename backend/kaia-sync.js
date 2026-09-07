@@ -19,6 +19,7 @@ const { getDb, jeddahNowStr } = require('./db');
 const kaia = require('./kaia');
 const airports = require('./airports.json');
 const timetableJson = require('./flights.json');
+const { titleCaseCity } = require('./flight-lookup');
 
 const SYNC_HOUR = 0;
 const SYNC_MINUTE = 1;
@@ -130,6 +131,7 @@ async function syncDates(dates, { mode = 'full', prune = true } = {}) {
     }
 
     await recordAirlines(seenAirlines);
+    await recordUnknownAirports(seenFlights);
     const learned = await learnNewFlights(seenFlights);
     const settled = await settleReportExtras();
 
@@ -243,6 +245,13 @@ async function settleReportExtras() {
 // by hand, and a deleted one must stay deleted rather than reappearing every
 // night. Destination facts come from airports.json, the same source the form
 // uses, so nationality is filled in wherever the airport is known.
+// Airport systems use a trailing 9999 as a placeholder for a charter or
+// unscheduled service that has no real number yet. Those never recur, so
+// making one a permanent timetable entry only clutters the list. They are
+// still synced and still resolve normally while KAIA holds them — this only
+// stops them being written into flights_custom for good.
+const PLACEHOLDER_NUMBER = /9999$/;
+
 async function learnNewFlights(seen) {
   if (!seen.size) return 0;
   const pool = getDb();
@@ -250,25 +259,65 @@ async function learnNewFlights(seen) {
 
   const { rows: existing } = await pool.query(`SELECT flight_number FROM flights_custom`);
   const known = new Set(existing.map(r => r.flight_number));
+  const { rows: filled } = await pool.query(
+    `SELECT code, city, country, nationality FROM airports_custom WHERE status = 'filled'`);
+  const custom = new Map(filled.map(r => [r.code, r]));
 
   let added = 0;
   for (const [number, f] of seen) {
     if (known.has(number) || timetableJson[number]) continue;
-    if (!f.destination_code) continue;   // nothing useful to record
+    if (!f.destination_code) continue;            // nothing useful to record
+    if (PLACEHOLDER_NUMBER.test(number)) continue;
 
-    const a = airports[f.destination_code] || {};
+    const a = custom.get(f.destination_code) || airports[f.destination_code] || {};
     await pool.query(
       `INSERT INTO flights_custom
          (flight_number, destination, std, city, country, nationality, deleted, updated_at, source)
        VALUES ($1,$2,$3,$4,$5,$6,0,$7,'kaia')
        ON CONFLICT (flight_number) DO NOTHING`,
       [number, f.destination_code, f.scheduled_time,
-       a.city || f.destination_city || '', a.country || '', a.nationality || '', now]
+       a.city || titleCaseCity(f.destination_city) || '', a.country || '', a.nationality || '', now]
     );
     added++;
   }
   if (added) console.log(`[kaia-sync] learned ${added} flight(s) not in the timetable`);
   return added;
+}
+
+// Destination airports we have no facts for. Nationality is resolved from the
+// airport, so one missing code leaves that field blank for every flight to it,
+// permanently — and nothing would otherwise surface the gap. Recording them
+// turns "check the list by eye" into a short queue a supervisor can fill.
+async function recordUnknownAirports(seen) {
+  if (!seen.size) return 0;
+  const pool = getDb();
+  const now = jeddahNowStr();
+
+  const byCode = new Map();
+  for (const [number, f] of seen) {
+    const code = f.destination_code;
+    if (!code || airports[code]) continue;
+    const e = byCode.get(code) || { city: f.destination_city, samples: [], count: 0 };
+    e.count++;
+    if (e.samples.length < 3 && !e.samples.includes(number)) e.samples.push(number);
+    byCode.set(code, e);
+  }
+  if (!byCode.size) return 0;
+
+  for (const [code, e] of byCode) {
+    await pool.query(
+      `INSERT INTO airports_custom (code, kaia_city, seen_count, samples, status, first_seen, updated_at)
+       VALUES ($1,$2,$3,$4,'pending',$5,$5)
+       ON CONFLICT (code) DO UPDATE SET
+         kaia_city  = COALESCE(EXCLUDED.kaia_city, airports_custom.kaia_city),
+         seen_count = EXCLUDED.seen_count,
+         samples    = CASE WHEN airports_custom.status = 'pending'
+                           THEN EXCLUDED.samples ELSE airports_custom.samples END,
+         updated_at = EXCLUDED.updated_at`,
+      [code, titleCaseCity(e.city) || null, e.count, JSON.stringify(e.samples), now]
+    );
+  }
+  return byCode.size;
 }
 
 // ── Airline review queue ──────────────────────────────────────────────────

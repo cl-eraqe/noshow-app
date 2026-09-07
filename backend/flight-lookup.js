@@ -53,8 +53,35 @@ function resolveTimetableDate(time, direction) {
 
 // ── Enrichment: the parts that never come from KAIA ───────────────────────
 
-function destinationFacts(code) {
-  const a = airports[String(code || '').toUpperCase()];
+// KAIA writes city names in capitals ("ULAANBAATAR"); ours are title case
+// ("Ulaanbaatar"). Analytics groups destinations by the IATA code inside the
+// parentheses, so this is cosmetic — but a list mixing the two reads badly,
+// and the value ends up in the Excel export.
+function titleCaseCity(s) {
+  const t = String(s || '').trim();
+  if (!t || t !== t.toUpperCase()) return t;   // leave anything already mixed-case alone
+  return t.toLowerCase().replace(/(^|[\s(\-/'])([a-z])/g, (_, p, c) => p + c.toUpperCase());
+}
+
+// The 243 airports derived from flights.json, plus anything a supervisor has
+// filled in since. The custom table wins, so a correction there is honoured.
+async function destinationFacts(code) {
+  const key = String(code || '').toUpperCase();
+  if (!key) return { city: '', country: '', nationality: '' };
+
+  try {
+    const { rows } = await getDb().query(
+      `SELECT city, country, nationality FROM airports_custom
+        WHERE code = $1 AND status = 'filled'`, [key]);
+    if (rows[0]) {
+      return {
+        city: rows[0].city || '', country: rows[0].country || '',
+        nationality: rows[0].nationality || '',
+      };
+    }
+  } catch { /* table may not exist yet on a first boot; fall through */ }
+
+  const a = airports[key];
   return a
     ? { city: a.city, country: a.country, nationality: a.nationality }
     : { city: '', country: '', nationality: '' };
@@ -177,7 +204,7 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
   const inWindow = on ? kaia.windowDates().includes(on) : true;
 
   if (hit) {
-    const dest = destinationFacts(hit.destination_code);
+    const dest = await destinationFacts(hit.destination_code);
     const mapped = await terminalFromCode(hit.terminal_raw);
     const fallback = await timetableEntry(flightNumber);
     return {
@@ -190,7 +217,7 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
       gate:            hit.gate || null,
       destination:     hit.destination_code || '',
       // City from our own table, not KAIA's, so the display name is stable.
-      city:            dest.city || hit.destination_city || '',
+      city:            dest.city || titleCaseCity(hit.destination_city) || '',
       country:         dest.country,
       nationality:     dest.nationality,
       airline_code:    hit.airline_code || '',
@@ -213,7 +240,7 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
   // it still 404s, so a mistyped number is still reported as not found.
   if (!entry && occurrences.length && on) {
     const near = nearestTo(occurrences, on);
-    const dest = destinationFacts(near.destination_code);
+    const dest = await destinationFacts(near.destination_code);
     const mapped = await terminalFromCode(near.terminal_raw);
     return {
       flight_number:   flightNumber,
@@ -226,7 +253,7 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
       estimated:       null,
       gate:            null,
       destination:     near.destination_code || '',
-      city:            dest.city || near.destination_city || '',
+      city:            dest.city || titleCaseCity(near.destination_city) || '',
       country:         dest.country,
       nationality:     dest.nationality,
       airline_code:    near.airline_code || '',
@@ -243,7 +270,7 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
   if (!entry) return null;
 
   const date = on || resolveTimetableDate(entry.std, direction);
-  const dest = destinationFacts(entry.destination);
+  const dest = await destinationFacts(entry.destination);
   const code = flightNumber.slice(0, 2);
 
   // flights_custom carries no terminal, and a flight learned from the live
@@ -264,7 +291,7 @@ async function resolveFlight(rawNumber, direction = 'past', on = null) {
     estimated:     null,
     gate:          null,
     destination:   entry.destination,
-    city:          dest.city || entry.city || '',
+    city:          dest.city || titleCaseCity(entry.city) || '',
     country:       dest.country || entry.country || '',
     nationality:   dest.nationality || entry.nationality || '',
     airline_code:  code,
@@ -305,6 +332,7 @@ async function flightExtras(rawNumber, datetime) {
 
 module.exports = {
   resolveFlight,
+  titleCaseCity,
   flightExtras,
   resolveTimetableDate,
   pickOccurrence,
