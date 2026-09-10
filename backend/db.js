@@ -136,41 +136,18 @@ async function initDb() {
   await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
   await pool.query(`ALTER TABLE invite_tokens ADD COLUMN IF NOT EXISTS owner_terminal TEXT`);
 
-  // Gate and estimated departure, captured from the live schedule. Neither is
-  // displayed anywhere — they are recorded so a history exists to analyse
-  // later. Both are volatile during the day (a gate assigned at 00:01 can move
-  // by noon), so they are written at save time and then corrected by each sync
-  // for as long as the flight stays inside KAIA's window; once it falls out,
-  // the value that stands is the last one KAIA reported, which is the final one.
+  // Gate and estimated departure. Nothing writes these any more — the live
+  // schedule they came from is gone — but the columns are kept rather than
+  // dropped so the values already captured are not destroyed.
   for (const col of ['prev_gate', 'prev_estimated', 'new_gate', 'new_estimated']) {
     await pool.query(`ALTER TABLE reports ADD COLUMN IF NOT EXISTS ${col} TEXT`);
   }
 
-  // Where a flights_custom row came from. The sync copies flights KAIA knows
-  // but flights.json does not into this table, so they survive KAIA forgetting
-  // them a week later — and this column keeps those distinguishable from the
-  // ones a supervisor typed, which the sync must never overwrite.
+  // Where a flights_custom row came from. Everything is 'manual' now that
+  // nothing copies flights in automatically; the column stays so the cleanup
+  // migration below can find the rows that were.
   await pool.query(`ALTER TABLE flights_custom ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual'`);
 
-  // Airports beyond the 243 in airports.json. Nationality is resolved from the
-  // destination airport, so a route to somewhere new leaves that field blank
-  // for every flight to it, permanently, with nothing surfacing the gap. A
-  // supervisor fills a code in once here and every flight to it works — past
-  // reports included, if they choose to backfill.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS airports_custom (
-      code        TEXT PRIMARY KEY,
-      city        TEXT,
-      country     TEXT,
-      nationality TEXT,
-      kaia_city   TEXT,      -- what KAIA calls it, for reference
-      seen_count  INTEGER DEFAULT 0,
-      samples     TEXT DEFAULT '[]',
-      status      TEXT DEFAULT 'pending',   -- pending | filled | ignored
-      first_seen  TEXT,
-      updated_at  TEXT
-    )
-  `);
   // Add the CHECK constraints separately (idempotent — Postgres has no "ADD CONSTRAINT
   // IF NOT EXISTS", so guard with a catalog lookup instead of failing on re-run).
   await pool.query(`
@@ -238,107 +215,17 @@ async function initDb() {
     console.log('Migration applied: existing users and reports backfilled to Terminal 1');
   }
 
-  // ── KAIA live schedule ──────────────────────────────────────────────────
-  // A rolling copy of the -6..+2 day window pulled from KAIA once a day. Old
-  // rows are deleted as the window moves, so this table's size is constant
-  // (~390 departures x 9 days). Unlike flights.json / flights_custom, which
-  // are recurring timetables keyed by flight number alone, these rows carry a
-  // date — that is the whole point of them.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS kaia_flights (
-      flight_number    TEXT NOT NULL,
-      date             TEXT NOT NULL,
-      scheduled_time   TEXT NOT NULL,
-      estimated_time   TEXT,
-      terminal_raw     TEXT,
-      gate             TEXT,
-      airline_code     TEXT,
-      airline_name     TEXT,
-      destination_code TEXT,
-      destination_city TEXT,
-      synced_at        TEXT,
-      PRIMARY KEY (flight_number, date, scheduled_time)
-    )
-  `);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_kaia_flights_number ON kaia_flights (flight_number)`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_kaia_flights_date ON kaia_flights (date)`);
-
-  // One row per sync attempt, so staleness is visible rather than silent.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS kaia_sync_log (
-      id          SERIAL PRIMARY KEY,
-      started_at  TEXT,
-      finished_at TEXT,
-      ok          INTEGER DEFAULT 0,
-      days_ok     INTEGER DEFAULT 0,
-      days_failed INTEGER DEFAULT 0,
-      rows_synced INTEGER DEFAULT 0,
-      detail      TEXT
-    )
-  `);
-
-  // KAIA's terminal codes, as data rather than as a hardcoded map: when
-  // Terminal 4 opens it is one row, not a code change and a deploy.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS terminal_codes (
-      code       TEXT PRIMARY KEY,   -- what KAIA sends, e.g. 'N'
-      terminal   TEXT NOT NULL,      -- what the app uses, e.g. 'North'
-      needs_bus  INTEGER DEFAULT 0,
-      label      TEXT,
-      updated_at TEXT
-    )
-  `);
-  const { rows: tcRows } = await pool.query(`SELECT 1 FROM _migrations WHERE name = 'seed_terminal_codes'`);
-  if (tcRows.length === 0) {
-    for (const [code, terminal, bus, label] of [
-      ['N',  'North', 1, 'North Terminal'],
-      ['T1', 'T1',    0, 'Terminal 1'],
-      ['H',  'Hajj',  1, 'Hajj Terminal'],
-      ['T4', 'T4',    1, 'Terminal 4'],
-    ]) {
-      await pool.query(
-        `INSERT INTO terminal_codes (code, terminal, needs_bus, label, updated_at)
-         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (code) DO NOTHING`,
-        [code, terminal, bus, label, jeddahNowStr()]
-      );
-    }
-    await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('seed_terminal_codes', $1)`, [jeddahNowStr()]);
-    console.log('Migration applied: terminal codes seeded (N/T1/H/T4)');
-  }
-
-  // Airline names are the key that analytics groups by, so a name KAIA spells
-  // differently ("SAUDI ARABIAN AIRLINES" vs "Saudia") would split one airline
-  // into two bars and break its logo lookup. KAIA's name is therefore never
-  // used directly: the IATA code is the key, our name wins, and a code we do
-  // not know waits here until a supervisor approves a name for it.
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS airlines (
-      code       TEXT PRIMARY KEY,        -- IATA, e.g. 'IA'
-      name       TEXT,                    -- the approved name; NULL until approved
-      kaia_name  TEXT,                    -- what KAIA calls it, for reference
-      status     TEXT DEFAULT 'pending',  -- pending | approved | ignored
-      seen_count INTEGER DEFAULT 0,
-      samples    TEXT DEFAULT '[]',       -- a few flight numbers, to identify it
-      first_seen TEXT,
-      updated_at TEXT
-    )
-  `);
-
-  // Seed the 75 airlines the app already knows as approved, so only genuinely
-  // new codes ever surface for review.
-  const { rows: alRows } = await pool.query(`SELECT 1 FROM _migrations WHERE name = 'seed_airlines'`);
-  if (alRows.length === 0) {
-    const seed = require('./airlines-seed.json');
-    const now = jeddahNowStr();
-    for (const [code, name] of Object.entries(seed)) {
-      await pool.query(
-        `INSERT INTO airlines (code, name, status, first_seen, updated_at)
-         VALUES ($1, $2, 'approved', $3, $3) ON CONFLICT (code) DO NOTHING`,
-        [code, name, now]
-      );
-    }
-    await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('seed_airlines', $1)`, [jeddahNowStr()]);
-    console.log(`Migration applied: ${Object.keys(seed).length} known airlines seeded as approved`);
+  // The KAIA live-schedule tables (kaia_flights, kaia_sync_log, terminal_codes,
+  // airlines, airports_custom) are no longer created: the airport blocked the
+  // API. Existing ones are left in place rather than dropped — nothing reads
+  // them, and dropping would be irreversible for no gain. Flights that had
+  // been copied in from the live schedule are removed, since they were only
+  // ever a cache of it.
+  const { rows: rmRows } = await pool.query(`SELECT 1 FROM _migrations WHERE name = 'remove_kaia_learned_flights'`);
+  if (rmRows.length === 0) {
+    const { rowCount } = await pool.query(`DELETE FROM flights_custom WHERE source = 'kaia'`);
+    await pool.query(`INSERT INTO _migrations (name, applied_at) VALUES ('remove_kaia_learned_flights', $1)`, [jeddahNowStr()]);
+    console.log(`Migration applied: removed ${rowCount} flight(s) copied from the live schedule`);
   }
 
   console.log('Database ready (PostgreSQL)');
