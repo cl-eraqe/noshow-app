@@ -1,10 +1,9 @@
 const express = require('express');
 const router  = express.Router();
 const flights = require('../flights.json');
-const { getDb, jeddahNowStr, logAudit } = require('../db');
+const { getDb, jeddahNowStr } = require('../db');
 const { requireRole } = require('../middleware/auth');
-const { normalizeFlightNumber } = require('../kaia');
-const { resolveFlight } = require('../flight-lookup');
+const { normalizeFlightNumber, resolveFlight } = require('../flight-lookup');
 
 // GET /api/flights/terminals — { flightNumber: terminal } map sourced from flights.json
 router.get('/terminals', async (_req, res) => {
@@ -52,177 +51,16 @@ router.get('/', async (_req, res) => {
   }
 });
 
-// ── Airline review queue (supervisor only) — must precede /:flightNumber ──
-// KAIA's own airline names are never used directly: a spelling it does not
-// share with us would split one airline into two bars in analytics and break
-// its logo lookup. A new IATA code waits here until a supervisor names it.
-
-router.get('/airlines/pending', requireRole('supervisor'), async (_req, res) => {
-  try {
-    const pool = getDb();
-    const { rows } = await pool.query(
-      `SELECT code, kaia_name, seen_count, samples, first_seen
-         FROM airlines WHERE status = 'pending' ORDER BY seen_count DESC, code`
-    );
-    res.json(rows.map(r => ({ ...r, samples: safeParse(r.samples) })));
-  } catch (e) {
-    console.error('[GET /flights/airlines/pending]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PATCH /api/flights/airlines/:code — { name, status:'ignored', backfill }
-router.patch('/airlines/:code', requireRole('supervisor'), express.json(), async (req, res) => {
-  try {
-    const code = String(req.params.code || '').toUpperCase().trim();
-    if (!code) return res.status(400).json({ error: 'code required' });
-    const { name, status, backfill } = req.body || {};
-    const pool = getDb();
-
-    if (status === 'ignored') {
-      await pool.query(`UPDATE airlines SET status = 'ignored', updated_at = $1 WHERE code = $2`,
-        [jeddahNowStr(), code]);
-      return res.json({ success: true, code, status: 'ignored' });
-    }
-
-    const finalName = String(name || '').trim();
-    if (!finalName) return res.status(400).json({ error: 'name required to approve' });
-
-    await pool.query(
-      `UPDATE airlines SET name = $1, status = 'approved', updated_at = $2 WHERE code = $3`,
-      [finalName, jeddahNowStr(), code]
-    );
-
-    // Optional: fill the airline in on reports saved while the code was still
-    // unknown, which therefore have an empty airline.
-    let backfilled = 0;
-    if (backfill) {
-      const like = `${code}%`;
-      const r1 = await pool.query(
-        `UPDATE reports SET prev_airline = $1
-          WHERE (prev_airline IS NULL OR prev_airline = '') AND upper(prev_flight) LIKE $2`, [finalName, like]);
-      const r2 = await pool.query(
-        `UPDATE reports SET new_airline = $1
-          WHERE (new_airline IS NULL OR new_airline = '') AND upper(new_flight) LIKE $2`, [finalName, like]);
-      backfilled = (r1.rowCount || 0) + (r2.rowCount || 0);
-    }
-
-    await logAudit({
-      user: req.username || req.role, action: 'airline_approve',
-      changes: JSON.stringify({ code, name: finalName, backfilled }),
-    });
-    res.json({ success: true, code, name: finalName, backfilled });
-  } catch (e) {
-    console.error('[PATCH /flights/airlines/:code]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// ── Unknown airports (supervisor only) ────────────────────────────────────
-// Nationality is resolved from the destination airport, so a code we have no
-// facts for leaves that field blank for every flight to it. These surface here
-// rather than being discoverable only by scanning the flight list by eye.
-
-router.get('/airports/pending', requireRole('supervisor'), async (_req, res) => {
-  try {
-    const pool = getDb();
-    const { rows } = await pool.query(
-      `SELECT code, kaia_city, seen_count, samples, first_seen
-         FROM airports_custom WHERE status = 'pending' ORDER BY seen_count DESC, code`
-    );
-    res.json(rows.map(r => ({ ...r, samples: safeParse(r.samples) })));
-  } catch (e) {
-    console.error('[GET /flights/airports/pending]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PATCH /api/flights/airports/:code — { city, country, nationality, status, backfill }
-router.patch('/airports/:code', requireRole('supervisor'), express.json(), async (req, res) => {
-  try {
-    const code = String(req.params.code || '').toUpperCase().trim();
-    if (!/^[A-Z]{3}$/.test(code)) return res.status(400).json({ error: 'valid IATA code required' });
-    const { city, country, nationality, status, backfill } = req.body || {};
-    const pool = getDb();
-
-    if (status === 'ignored') {
-      await pool.query(`UPDATE airports_custom SET status = 'ignored', updated_at = $1 WHERE code = $2`,
-        [jeddahNowStr(), code]);
-      return res.json({ success: true, code, status: 'ignored' });
-    }
-
-    const nat = String(nationality || '').trim();
-    if (!nat) return res.status(400).json({ error: 'nationality required' });
-
-    await pool.query(
-      `INSERT INTO airports_custom (code, city, country, nationality, status, first_seen, updated_at)
-       VALUES ($1,$2,$3,$4,'filled',$5,$5)
-       ON CONFLICT (code) DO UPDATE SET
-         city = EXCLUDED.city, country = EXCLUDED.country,
-         nationality = EXCLUDED.nationality, status = 'filled', updated_at = EXCLUDED.updated_at`,
-      [code, String(city || '').trim(), String(country || '').trim(), nat, jeddahNowStr()]
-    );
-
-    // Flights already learned for this airport carry the blanks; fill them so
-    // the next lookup is complete without waiting for another sync.
-    await pool.query(
-      `UPDATE flights_custom SET city = $1, country = $2, nationality = $3
-        WHERE destination = $4 AND source = 'kaia'`,
-      [String(city || '').trim(), String(country || '').trim(), nat, code]);
-
-    let backfilled = 0;
-    if (backfill) {
-      const like = `%(${code})`;
-      const r = await pool.query(
-        `UPDATE reports SET nationality = $1
-          WHERE (nationality IS NULL OR nationality = '') AND prev_destination LIKE $2`,
-        [nat, like]);
-      backfilled = r.rowCount || 0;
-    }
-
-    await logAudit({
-      user: req.username || req.role, action: 'airport_fill',
-      changes: JSON.stringify({ code, city, country, nationality: nat, backfilled }),
-    });
-    res.json({ success: true, code, backfilled });
-  } catch (e) {
-    console.error('[PATCH /flights/airports/:code]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /api/flights/kaia/status — when the local copy was last refreshed
-router.get('/kaia/status', async (_req, res) => {
-  try {
-    const pool = getDb();
-    const [{ rows: log }, { rows: cnt }] = await Promise.all([
-      pool.query(`SELECT started_at, finished_at, ok, days_ok, days_failed, rows_synced
-                    FROM kaia_sync_log ORDER BY id DESC LIMIT 1`),
-      pool.query(`SELECT count(*)::int AS n FROM kaia_flights`),
-    ]);
-    res.json({ last: log[0] || null, flights: cnt[0]?.n || 0 });
-  } catch (e) {
-    console.error('[GET /flights/kaia/status]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-function safeParse(s) {
-  try { return JSON.parse(s || '[]'); } catch { return []; }
-}
-
-// GET /api/flights/:flightNumber[?direction=past|future][&on=YYYY-MM-DD]
+// GET /api/flights/:flightNumber[?direction=past|future]
 //
-// Answers from KAIA's local copy when it holds the flight, and falls through
-// to the timetable otherwise. Every field the old contract returned is still
-// present, so a caller that ignores the new ones behaves exactly as before.
+// direction picks which occurrence of the recurring departure time is meant:
+// the most recent one already gone, or the next one still to come.
 router.get('/:flightNumber', async (req, res) => {
   try {
     const key = normalizeFlightNumber(req.params.flightNumber);
     const direction = req.query.direction === 'future' ? 'future' : 'past';
-    const on = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.on || '')) ? req.query.on : null;
 
-    const hit = await resolveFlight(key, direction, on);
+    const hit = await resolveFlight(key, direction);
     if (!hit) return res.status(404).json({ error: `Flight ${key} not found` });
     res.json(hit);
   } catch (e) {
