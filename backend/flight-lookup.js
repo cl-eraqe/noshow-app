@@ -1,16 +1,11 @@
 // Flight lookup.
 //
-// Two sources, each answering only what it is authoritative for:
-//
-//   flights_custom / flights.json → flight number, departure time, destination
-//   airports.json                 → city, country and nationality, by IATA code
-//
-// Nationality is resolved from the destination airport rather than from the
-// flight number: the same number can serve a different destination on a
-// different day, and the airport is what actually determines the answer.
+// One source: flights_custom, then flights.json. Each row already carries its
+// own city, country and nationality, so the separate airport table that used
+// to supply those was a second copy of the same facts — derived from this file
+// in the first place — and has been removed.
 
 const { getDb } = require('./db');
-const airports = require('./airports.json');
 const timetableJson = require('./flights.json');
 
 // Jeddah is UTC+3 year-round (no DST).
@@ -67,15 +62,6 @@ function resolveTimetableDate(time, direction) {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
-// Everything about the destination comes from one table keyed by IATA code, so
-// the same airport always yields the same city, country and nationality.
-function destinationFacts(code) {
-  const a = airports[String(code || '').toUpperCase()];
-  return a
-    ? { city: a.city, country: a.country, nationality: a.nationality }
-    : { city: '', country: '', nationality: '' };
-}
-
 // flights_custom is read ahead of flights.json: it holds supervisor additions
 // and overrides, and a row marked deleted hides a flights.json entry.
 async function timetableEntry(flightNumber) {
@@ -122,7 +108,6 @@ async function resolveFlight(rawNumber, direction = 'past') {
   if (!entry) return null;
 
   const date = resolveTimetableDate(entry.std, direction);
-  const dest = destinationFacts(entry.destination);
 
   return {
     flight_number: flightNumber,
@@ -131,11 +116,9 @@ async function resolveFlight(rawNumber, direction = 'past') {
     std:           entry.std,
     datetime:      date && entry.std ? `${date}T${entry.std}` : null,
     destination:   entry.destination,
-    // The airport table wins; the row's own values are the fallback for an
-    // airport it does not list.
-    city:          dest.city || entry.city || '',
-    country:       dest.country || entry.country || '',
-    nationality:   dest.nationality || entry.nationality || '',
+    city:          entry.city || '',
+    country:       entry.country || '',
+    nationality:   entry.nationality || '',
     terminal:      entry.terminal,
   };
 }
@@ -143,7 +126,6 @@ async function resolveFlight(rawNumber, direction = 'past') {
 module.exports = {
   resolveFlight,
   resolveTimetableDate,
-  destinationFacts,
   normalizeFlightNumber,
   jeddahNow,
   JEDDAH_OFFSET_MS,
