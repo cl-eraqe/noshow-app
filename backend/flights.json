@@ -373,15 +373,15 @@
     "city": "Mineralnye Vody",
     "country": "Russia",
     "nationality": "Russian",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "A49003": {
     "destination": "GRV",
     "std": "01:45",
-    "city": "Gronzy",
+    "city": "Grozny",
     "country": "Russia",
     "nationality": "Russian",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "AH4323": {
     "destination": "ALG",
@@ -6725,7 +6725,7 @@
     "city": "Benghazi",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "NB1512": {
     "destination": "BEN",
@@ -6749,7 +6749,7 @@
     "city": "Benghazi",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "NB1531": {
     "destination": "MJI",
@@ -6765,7 +6765,7 @@
     "city": "Mitiga (Tripoli)",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "NB1536": {
     "destination": "MJI",
@@ -6773,7 +6773,7 @@
     "city": "Mitiga (Tripoli)",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "NB1541": {
     "destination": "MJI",
@@ -6789,7 +6789,7 @@
     "city": "Mitiga (Tripoli)",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "NB1553": {
     "destination": "MJI",
@@ -6797,7 +6797,7 @@
     "city": "Mitiga (Tripoli)",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "NB1562": {
     "destination": "MRA",
@@ -6813,7 +6813,7 @@
     "city": "AL Abraq",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "NE171": {
     "destination": "CAI",
@@ -12757,7 +12757,7 @@
     "city": "Rome",
     "country": "Italy",
     "nationality": "Italian",
-    "terminal": "UNKNOWN"
+    "terminal": "North"
   },
   "W46392": {
     "destination": "MXP",
@@ -12773,7 +12773,7 @@
     "city": "Rome",
     "country": "Italy",
     "nationality": "Italian",
-    "terminal": "UNKNOWN"
+    "terminal": "North"
   },
   "W95608": {
     "destination": "LGW",
@@ -14533,7 +14533,7 @@
     "city": "Mitiga (Tripoli)",
     "country": "Libya",
     "nationality": "Libyan",
-    "terminal": "UNKNOWN"
+    "terminal": "Hajj"
   },
   "YI5531": {
     "destination": "NIM",

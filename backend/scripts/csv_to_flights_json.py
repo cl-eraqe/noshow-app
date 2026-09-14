@@ -87,6 +87,10 @@ TERMINAL_MAP = {
     "J9": "North",
     "ER": "Hajj",
     "DH": "Hajj",
+    "A4": "Hajj",
+    "NB": "Hajj",
+    "YI": "Hajj",
+    "W4": "North",
 }
 
 
