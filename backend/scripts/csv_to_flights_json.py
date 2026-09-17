@@ -1,8 +1,16 @@
 """
-Rebuilds backend/flights.json from a schedule export.
+Merges a schedule export into backend/flights.json.
 
 Usage: python csv_to_flights_json.py <input.csv|.xlsx> [output.json]
-Default output: ../flights.json  (overwrites the existing file)
+Default output: ../flights.json
+
+The export is a partial picture — one day's departures, a few hundred flights
+out of the ~1,800 the app knows. So it is merged, not substituted: a flight in
+the file overwrites the entry it matches, one that is new is added, and one the
+file does not mention is left alone. Replacing wholesale would delete every
+flight that happened not to fly that day.
+
+Pass --replace to rebuild from scratch instead, for a genuinely complete export.
 
 Input columns — Arabic or English headers, in any order:
 
@@ -174,9 +182,12 @@ def main():
         print("Usage: python csv_to_flights_json.py <input.csv|.xlsx> [output.json]")
         sys.exit(1)
 
-    input_path = Path(sys.argv[1])
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    replace = "--replace" in sys.argv
+
+    input_path = Path(args[0])
     base_dir = Path(__file__).parent.parent
-    output_path = Path(sys.argv[2]) if len(sys.argv) >= 3 else base_dir / "flights.json"
+    output_path = Path(args[1]) if len(args) >= 2 else base_dir / "flights.json"
     airports_path = base_dir / "airports.json"
 
     header, rows = read_rows(input_path)
@@ -189,7 +200,13 @@ def main():
 
     airports = json.loads(airports_path.read_text(encoding="utf-8")) if airports_path.exists() else {}
 
-    flights = {}
+    # Start from what we already have, unless a full rebuild was asked for.
+    existing = {}
+    if output_path.exists() and not replace:
+        existing = json.loads(output_path.read_text(encoding="utf-8"))
+    flights = dict(existing)
+
+    added, updated, unchanged = [], [], 0
     unknown_terminal, unknown_airport = [], {}
     for row in rows:
         fn = normalize_flight_number(row[cols["flight"]])
@@ -205,17 +222,41 @@ def main():
         if dest and dest not in airports:
             unknown_airport.setdefault(dest, []).append(fn)
 
-        flights[fn] = {
+        entry = {
             "destination": dest,
             "std": format_std(row[cols["std"]]),
             "terminal": terminal,
         }
+        before = flights.get(fn)
+        if before is None:
+            added.append(fn)
+        elif before != entry:
+            updated.append((fn, before, entry))
+        else:
+            unchanged += 1
+        flights[fn] = entry
 
     output_path.write_text(
         json.dumps(dict(sorted(flights.items())), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    print(f"Written {len(flights)} flights -> {output_path}")
+
+    kept = len(flights) - len(added) - len(updated) - unchanged
+    print(f"{len(rows)} row(s) in the file -> {output_path}")
+    print(f"  added     {len(added):>5}")
+    print(f"  updated   {len(updated):>5}")
+    print(f"  unchanged {unchanged:>5}")
+    if not replace:
+        print(f"  untouched {kept:>5}   (not in this file, left as they were)")
+    print(f"  total     {len(flights):>5} flights")
+
+    if updated:
+        print(f"\nCHANGED — the file disagreed with what we had:")
+        for fn, b, a_ in updated[:30]:
+            diffs = [f"{k}: {b.get(k)} -> {a_[k]}" for k in a_ if b.get(k) != a_[k]]
+            print(f"  {fn:<9} {'; '.join(diffs)}")
+        if len(updated) > 30:
+            print(f"  ... and {len(updated) - 30} more")
 
     if unknown_terminal:
         print(f"\nWARNING: {len(unknown_terminal)} flight(s) with an unrecognised airline prefix "

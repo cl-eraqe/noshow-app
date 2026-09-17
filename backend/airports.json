@@ -59,6 +59,11 @@
     "country": "Syria",
     "nationality": "Syrian"
   },
+  "ALY": {
+    "city": "Alexandria",
+    "country": "Egypt",
+    "nationality": "Egyptian"
+  },
   "AMD": {
     "city": "Ahmedabad",
     "country": "India",
@@ -535,7 +540,7 @@
     "nationality": "Chinese"
   },
   "HBE": {
-    "city": "Alexandria (Borg El Arab)",
+    "city": "Alexandria",
     "country": "Egypt",
     "nationality": "Egyptian"
   },
