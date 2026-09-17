@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { lookupFlight, getCustomFlights, saveFlight, deleteFlight } from '../utils/api';
 
-const EMPTY = { flight_number: '', destination: '', std: '', city: '', country: '', nationality: '' };
+const EMPTY = { flight_number: '', destination: '', std: '' };
 
 export default function FlightManager() {
   const navigate = useNavigate();
@@ -35,9 +35,6 @@ export default function FlightManager() {
         flight_number: key,
         destination: data.destination || f.destination,
         std: data.std || f.std,
-        city: data.city || f.city,
-        country: data.country || f.country,
-        nationality: data.nationality || f.nationality,
       }));
       setLookupStatus('found');
     } catch {
@@ -51,9 +48,6 @@ export default function FlightManager() {
       flight_number: row.flight_number,
       destination:   row.destination || '',
       std:           row.std || '',
-      city:          row.city || '',
-      country:       row.country || '',
-      nationality:   row.nationality || '',
     });
     setLookupStatus('idle');
     setError('');
@@ -104,9 +98,9 @@ export default function FlightManager() {
   // into the source that builds flights.json instead of living only here.
   function exportCsv() {
     const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const rows = [['Flight Number', 'Destination', 'STD', 'City', 'Country', 'Nationality', 'Source']];
+    const rows = [['Flight Number', 'Destination', 'STD']];
     filtered.filter(r => !r.deleted).forEach(r => rows.push(
-      [r.flight_number, r.destination, r.std, r.city, r.country, r.nationality, r.source || 'manual']));
+      [r.flight_number, r.destination, r.std]));
     const blob = new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\r\n')],
       { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -161,21 +155,6 @@ export default function FlightManager() {
               <input type="text" className="field-input" placeholder="e.g. CAI"
                 value={form.destination} onChange={e => setForm(f => ({ ...f, destination: e.target.value.toUpperCase() }))} />
             </div>
-            <div className="field">
-              <label className="field-label">City</label>
-              <input type="text" className="field-input" placeholder="e.g. Cairo"
-                value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} />
-            </div>
-            <div className="field">
-              <label className="field-label">Country</label>
-              <input type="text" className="field-input" placeholder="e.g. Egypt"
-                value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))} />
-            </div>
-            <div className="field">
-              <label className="field-label">Nationality (suggested)</label>
-              <input type="text" className="field-input" placeholder="e.g. Egyptian"
-                value={form.nationality} onChange={e => setForm(f => ({ ...f, nationality: e.target.value }))} />
-            </div>
           </div>
 
           {error && <p style={{ color: 'var(--danger)', marginTop: 8 }}>{error}</p>}
@@ -225,7 +204,7 @@ export default function FlightManager() {
             <table className="reports-table" style={{ fontSize: '0.88rem' }}>
               <thead>
                 <tr>
-                  <th>Flight</th><th>Dest</th><th>STD</th><th>City</th><th>Status</th><th></th>
+                  <th>Flight</th><th>Dest</th><th>STD</th><th>Status</th><th></th>
                 </tr>
               </thead>
               <tbody>
@@ -234,7 +213,6 @@ export default function FlightManager() {
                     <td><strong>{r.flight_number}</strong></td>
                     <td>{r.destination || '—'}</td>
                     <td>{r.std || '—'}</td>
-                    <td>{r.city || '—'}</td>
                     <td>
                       {r.deleted
                         ? <span style={{ color: 'var(--danger)' }}>Deleted</span>

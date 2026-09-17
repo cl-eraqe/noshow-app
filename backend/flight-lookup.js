@@ -1,12 +1,19 @@
 // Flight lookup.
 //
-// One source: flights_custom, then flights.json. Each row already carries its
-// own city, country and nationality, so the separate airport table that used
-// to supply those was a second copy of the same facts — derived from this file
-// in the first place — and has been removed.
+// Two files, split by what each fact actually belongs to:
+//
+//   flights.json  → the flight: destination code, departure time, terminal
+//   airports.json → the airport: city, country, nationality
+//
+// City, country and nationality depend only on the destination code, never on
+// which flight goes there, so they live once per airport (248 rows) instead of
+// once per flight (1,821). Cairo's facts were written out 101 times before;
+// now correcting them is one line, and two flights to the same airport cannot
+// disagree.
 
 const { getDb } = require('./db');
 const timetableJson = require('./flights.json');
+const airports = require('./airports.json');
 
 // Jeddah is UTC+3 year-round (no DST).
 const JEDDAH_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -62,6 +69,15 @@ function resolveTimetableDate(time, direction) {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
+// Everything the destination code implies. An airport we have no entry for
+// leaves these blank and the employee picks the nationality by hand.
+function destinationFacts(code) {
+  const a = airports[String(code || '').toUpperCase()];
+  return a
+    ? { city: a.city, country: a.country, nationality: a.nationality }
+    : { city: '', country: '', nationality: '' };
+}
+
 // flights_custom is read ahead of flights.json: it holds supervisor additions
 // and overrides, and a row marked deleted hides a flights.json entry.
 async function timetableEntry(flightNumber) {
@@ -74,6 +90,8 @@ async function timetableEntry(flightNumber) {
     return {
       std: custom.std,
       destination: (custom.destination || '').toUpperCase(),
+      // Kept only as a fallback for rows added before the split, whose airport
+      // may not be in airports.json yet. New rows do not carry these.
       city: custom.city,
       country: custom.country,
       nationality: custom.nationality,
@@ -88,9 +106,6 @@ async function timetableEntry(flightNumber) {
   return {
     std: base.std,
     destination: (base.destination || '').toUpperCase(),
-    city: base.city,
-    country: base.country,
-    nationality: base.nationality,
     terminal: base.terminal || null,
     source: 'timetable',
   };
@@ -108,6 +123,7 @@ async function resolveFlight(rawNumber, direction = 'past') {
   if (!entry) return null;
 
   const date = resolveTimetableDate(entry.std, direction);
+  const dest = destinationFacts(entry.destination);
 
   return {
     flight_number: flightNumber,
@@ -116,15 +132,18 @@ async function resolveFlight(rawNumber, direction = 'past') {
     std:           entry.std,
     datetime:      date && entry.std ? `${date}T${entry.std}` : null,
     destination:   entry.destination,
-    city:          entry.city || '',
-    country:       entry.country || '',
-    nationality:   entry.nationality || '',
+    // The airport table is the source; a pre-split custom row's own values are
+    // the fallback for an airport not listed there.
+    city:          dest.city || entry.city || '',
+    country:       dest.country || entry.country || '',
+    nationality:   dest.nationality || entry.nationality || '',
     terminal:      entry.terminal,
   };
 }
 
 module.exports = {
   resolveFlight,
+  destinationFacts,
   resolveTimetableDate,
   normalizeFlightNumber,
   jeddahNow,
