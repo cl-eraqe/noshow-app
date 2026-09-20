@@ -66,6 +66,17 @@ TERMINAL_ALIASES = {
     "T4": "T4", "4": "T4",
 }
 
+# Terminal 4 is not in scheduled operation yet. It appears in exports with
+# provisional-looking numbers (999, 1234, 2222, 5555, 7777, 8888) across many
+# airlines, which reads as the terminal being exercised in the source system
+# rather than flown. Importing them would send staff — and a bus badge — to a
+# terminal that is not running, so they are skipped and reported.
+#
+# DELETE THIS WHEN TERMINAL 4 OPENS. It is a temporary hold, not a rule: the
+# count reported each run is the signal, because real flight numbers will
+# replace the placeholder ones.
+SKIP_TERMINAL = "T4"
+
 # Header synonyms, so an Arabic or English export both work unchanged.
 HEADERS = {
     "flight":      ("رقم الرحلة", "flight number", "flight", "flight_number", "flightnumber"),
@@ -207,7 +218,7 @@ def main():
     flights = dict(existing)
 
     added, updated, unchanged = [], [], 0
-    unknown_terminal, unknown_airport = [], {}
+    unknown_terminal, unknown_airport, skipped = [], {}, []
     for row in rows:
         fn = normalize_flight_number(row[cols["flight"]])
         if not fn:
@@ -221,6 +232,10 @@ def main():
             unknown_terminal.append(fn)
         if dest and dest not in airports:
             unknown_airport.setdefault(dest, []).append(fn)
+
+        if terminal == SKIP_TERMINAL:
+            skipped.append(fn)
+            continue
 
         entry = {
             "destination": dest,
@@ -257,6 +272,12 @@ def main():
             print(f"  {fn:<9} {'; '.join(diffs)}")
         if len(updated) > 30:
             print(f"  ... and {len(updated) - 30} more")
+
+    if skipped:
+        print(f"\nSKIPPED {len(skipped)} flight(s) in {SKIP_TERMINAL} — that terminal is not in "
+              f"scheduled operation yet:")
+        print(f"  {', '.join(skipped)}")
+        print(f"  (remove SKIP_TERMINAL in this script once it opens)")
 
     if unknown_terminal:
         print(f"\nWARNING: {len(unknown_terminal)} flight(s) with an unrecognised airline prefix "
