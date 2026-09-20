@@ -219,11 +219,6 @@
     "std": "20:30",
     "terminal": "Hajj"
   },
-  "9P5551": {
-    "destination": "KHI",
-    "std": "13:00",
-    "terminal": "T4"
-  },
   "9P587": {
     "destination": "LHE",
     "std": "00:50",
@@ -893,11 +888,6 @@
     "destination": "GGR",
     "std": "05:45",
     "terminal": "Hajj"
-  },
-  "D32222": {
-    "destination": "MGQ",
-    "std": "12:30",
-    "terminal": "T4"
   },
   "D7701": {
     "destination": "KUL",
@@ -4439,11 +4429,6 @@
     "std": "07:40",
     "terminal": "Hajj"
   },
-  "OV997": {
-    "destination": "MCT",
-    "std": "12:00",
-    "terminal": "T4"
-  },
   "P47901": {
     "destination": "LOS",
     "std": "15:00",
@@ -4824,11 +4809,6 @@
     "std": "13:00",
     "terminal": "Hajj"
   },
-  "QP542": {
-    "destination": "BOM",
-    "std": "12:00",
-    "terminal": "T4"
-  },
   "QP551": {
     "destination": "COK",
     "std": "22:55",
@@ -5199,11 +5179,6 @@
     "std": "20:00",
     "terminal": "North"
   },
-  "RB5555": {
-    "destination": "DAM",
-    "std": "12:30",
-    "terminal": "T4"
-  },
   "RJ2207": {
     "destination": "AMM",
     "std": "20:15",
@@ -5359,11 +5334,6 @@
     "std": "19:40",
     "terminal": "North"
   },
-  "SM2222": {
-    "destination": "CAI",
-    "std": "11:00",
-    "terminal": "T4"
-  },
   "SM452": {
     "destination": "ALY",
     "std": "23:00",
@@ -5448,16 +5418,6 @@
     "destination": "HRG",
     "std": "07:40",
     "terminal": "North"
-  },
-  "SM7777": {
-    "destination": "ALY",
-    "std": "16:50",
-    "terminal": "T4"
-  },
-  "SM8888": {
-    "destination": "CAI",
-    "std": "16:50",
-    "terminal": "T4"
   },
   "SM944": {
     "destination": "CAI",
@@ -5568,11 +5528,6 @@
     "destination": "ALY",
     "std": "19:45",
     "terminal": "North"
-  },
-  "SM999": {
-    "destination": "CAI",
-    "std": "12:00",
-    "terminal": "T4"
   },
   "SV117": {
     "destination": "LHR",
@@ -7919,11 +7874,6 @@
     "std": "22:00",
     "terminal": "T1"
   },
-  "VF1580": {
-    "destination": "ESB",
-    "std": "12:15",
-    "terminal": "T4"
-  },
   "VF190": {
     "destination": "SAW",
     "std": "03:05",
@@ -8073,11 +8023,6 @@
     "destination": "YOL",
     "std": "07:00",
     "terminal": "Hajj"
-  },
-  "W41234": {
-    "destination": "MXP",
-    "std": "12:15",
-    "terminal": "T4"
   },
   "W46230": {
     "destination": "FCO",
