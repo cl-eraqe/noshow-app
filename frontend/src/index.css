@@ -1957,6 +1957,9 @@ html, body, #root {
   /* Stronger shadow keeps the label readable over flag images and bright brand colors */
   text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.55);
   white-space: nowrap;
+  /* Never squeezed by the bar: a shrunken label measured too small, so short
+     bars kept a label they could not fit and clipped it ("03 pax"). */
+  flex-shrink: 0;
 }
 /* Label pushed outside the bar — sits to the right, fully legible on dark bg */
 .xbarlist-val-out {

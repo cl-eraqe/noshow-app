@@ -245,14 +245,25 @@ function BarRow({ d, pct, mode, onClick }) {
               : null;
   const flag  = isNationality ? flagUrl(d.name)  : null;
 
+  // The value sits in the empty track to the right of the bar, where it reads
+  // on plain dark background. Only a bar long enough to leave no room there —
+  // in practice the top row — keeps it inside.
   useLayoutEffect(() => {
     const fillEl = fillRef.current;
-    const labelEl = labelRef.current;
-    if (!fillEl || !labelEl) return;
+    if (!fillEl) return;
     const measure = () => {
-      // 16px breathing room (padding) — label width is stable wherever it sits
-      const fits = labelEl.scrollWidth + 16 <= fillEl.offsetWidth;
-      setOutside(prev => (prev === !fits ? prev : !fits));
+      // Read the label ref on every call. Moving the label between inside and
+      // outside mounts a new element, and one captured up front goes detached
+      // and measures zero — which is what pinned short bars' labels inside
+      // the bar and clipped them.
+      const labelEl = labelRef.current;
+      if (!labelEl) return;
+      // The outside label carries its own left padding; take it off so the
+      // text width is the same whichever side it is currently rendered on.
+      const textWidth = labelEl.offsetWidth - parseFloat(getComputedStyle(labelEl).paddingLeft);
+      const room = fillEl.parentElement.clientWidth - fillEl.offsetWidth;
+      const fitsOutside = textWidth + 12 <= room;
+      setOutside(prev => (prev === fitsOutside ? prev : fitsOutside));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -290,10 +301,10 @@ function BarRow({ d, pct, mode, onClick }) {
           className={`xbarlist-fill xbarlist-fill-${mode}`}
           style={{ width: `${pct}%`, background: fillBg }}
         >
-          {/* Nationality: value label inside the fill if it fits */}
+          {/* Inside only when the track has no room left beside the bar */}
           {!isAirline && !outside && label}
         </div>
-        {/* Nationality: value label outside the fill if it doesn't fit */}
+        {/* Normally here: in the empty track, right after the bar */}
         {!isAirline && outside && label}
         {/* Airline: logo + value pinned to the middle of the FULL track so they
             stay visible regardless of how small the airline's bar is. */}
