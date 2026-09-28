@@ -5,7 +5,7 @@ const path   = require('path');
 const fs     = require('fs');
 const { uploadFile, deleteFile } = require('../storage');
 const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
-const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
+const { getAirlineCode, getTerminal, needsBus } = require('./_terminal-helper');
 const { requireRole } = require('../middleware/auth');
 
 // ── Jeddah time helpers ────────────────────────────────────────────────
@@ -31,20 +31,12 @@ const AUDIT_FIELDS = [
   'status', 'comment', 'nusuk_received',
 ];
 
-function getTerminal(flight) {
-  return TERMINAL_MAP[getAirlineCode(flight)] || 'T1';
-}
-function needsBus(flight) {
-  const t = getTerminal(flight);
-  return t === 'North' || t === 'Hajj';
-}
-
 // ── Multi-terminal scoping ──────────────────────────────────────────────
 // owner_terminal ('T1' | 'North') records which terminal's queue a report
 // belongs to — it comes from the REPORTING USER, never from the flight. This
-// is a completely separate concept from getTerminal()/needsBus() above, which
-// derive a terminal from the flight's airline purely to decide whether a bus
-// transfer badge is needed; that logic is untouched by anything below.
+// is a completely separate concept from getTerminal()/needsBus() (in
+// _terminal-helper), which derive a terminal from the flight purely to decide
+// whether a bus transfer is needed; that logic is untouched by anything below.
 
 // Returns the owner_terminal value a list/aggregate query should filter by,
 // or null for "no filter" (supervisor viewing All Terminals).
