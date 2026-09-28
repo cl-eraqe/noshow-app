@@ -59,6 +59,13 @@ TERMINAL_MAP = {
     "XY": "T1",   "YI": "Hajj",
 }
 
+# Airlines moved wholesale to Terminal 4. Every flight of theirs is T4, and
+# this wins over the export's own Terminal column: exports have listed some
+# of these flights under their old terminal (NE585 as North) after the move,
+# and a merge would otherwise flip them back. Disagreements are reported, so
+# a genuine move away from T4 is still visible.
+FORCED_TERMINAL = {"OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4"}
+
 TERMINAL_ALIASES = {
     "H": "Hajj", "HAJJ": "Hajj",
     "N": "North", "NORTH": "North",
@@ -207,7 +214,7 @@ def main():
     flights = dict(existing)
 
     added, updated, unchanged = [], [], 0
-    unknown_terminal, unknown_airport = [], {}
+    unknown_terminal, unknown_airport, overridden = [], {}, []
     for row in rows:
         fn = normalize_flight_number(row[cols["flight"]])
         if not fn:
@@ -217,6 +224,10 @@ def main():
         terminal = normalize_terminal(row[cols["terminal"]]) if "terminal" in cols else None
         if terminal is None:
             terminal = assign_terminal(fn)
+        forced = FORCED_TERMINAL.get(iata_prefix(fn))
+        if forced and terminal != forced:
+            overridden.append((fn, terminal))
+            terminal = forced
         if terminal == "UNKNOWN":
             unknown_terminal.append(fn)
         if dest and dest not in airports:
@@ -257,6 +268,12 @@ def main():
             print(f"  {fn:<9} {'; '.join(diffs)}")
         if len(updated) > 30:
             print(f"  ... and {len(updated) - 30} more")
+
+    if overridden:
+        print(f"\nFORCED {len(overridden)} flight(s) to their airline's fixed terminal "
+              f"(FORCED_TERMINAL) — the file said otherwise:")
+        for fn, said in overridden:
+            print(f"  {fn:<9} file: {said} -> {FORCED_TERMINAL[iata_prefix(fn)]}")
 
     if unknown_terminal:
         print(f"\nWARNING: {len(unknown_terminal)} flight(s) with an unrecognised airline prefix "

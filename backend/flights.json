@@ -232,7 +232,7 @@
   "9P587": {
     "destination": "LHE",
     "std": "00:50",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "9P601": {
     "destination": "KHI",
@@ -4327,7 +4327,7 @@
   "NE173": {
     "destination": "CAI",
     "std": "23:10",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE175": {
     "destination": "CAI",
@@ -4337,52 +4337,52 @@
   "NE177": {
     "destination": "CAI",
     "std": "09:00",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE179": {
     "destination": "CAI",
     "std": "12:40",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE351": {
     "destination": "LXR",
     "std": "00:45",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE4126": {
     "destination": "RTM",
     "std": "13:05",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "NE501": {
     "destination": "LXR",
     "std": "00:45",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE503": {
     "destination": "LXR",
     "std": "04:10",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE581": {
     "destination": "SPX",
     "std": "21:40",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE583": {
     "destination": "SPX",
     "std": "05:30",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE585": {
     "destination": "SPX",
     "std": "06:40",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NE589": {
     "destination": "SPX",
     "std": "06:45",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "NP128": {
     "destination": "CAI",
@@ -4437,17 +4437,17 @@
   "OV4282": {
     "destination": "MCT",
     "std": "20:10",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "OV4284": {
     "destination": "SLL",
     "std": "14:05",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "OV4286": {
     "destination": "SLL",
     "std": "07:40",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "P47901": {
     "destination": "LOS",
@@ -8057,7 +8057,7 @@
   "W47477": {
     "destination": "FCO",
     "std": "13:00",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "W95608": {
     "destination": "LGW",
