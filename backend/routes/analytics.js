@@ -102,7 +102,7 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
     );
 
     const { shift, status, airline, nationality, destination, terminal, pax_type, daysBucket, resBucket, scope } = req.query;
-    const { TERMINAL_MAP, getAirlineCode } = require('./_terminal-helper');
+    const { TERMINAL_MAP, getAirlineCode, needsBus } = require('./_terminal-helper');
 
     // scope ('T1' | 'North' | 'All'/absent) narrows to a single terminal's OWN
     // reports before any other filter runs. This is the report-ownership
@@ -228,10 +228,7 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
     const daysAtAirport = filtered.map(r => r.days_at_airport).filter(d => d != null && !isNaN(d));
     const avgDaysAtAirport = daysAtAirport.length ? daysAtAirport.reduce((a,b)=>a+b,0) / daysAtAirport.length : null;
 
-    const busCount = filtered.filter(r => {
-      const t = TERMINAL_MAP[getAirlineCode(r.new_flight)] || 'T1';
-      return t === 'North' || t === 'Hajj';
-    }).length;
+    const busCount = filtered.filter(r => needsBus(r.new_flight)).length;
     const busPct = totalCases > 0 ? (busCount / totalCases) * 100 : 0;
 
     function groupCount(key, extractor, sortBy = 'value') {

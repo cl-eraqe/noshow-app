@@ -17,22 +17,18 @@ Input columns — Arabic or English headers, in any order:
     رقم الرحلة / Flight Number      required
     الرمز / Destination / IATA      required, the 3-letter airport code
     المجدول / STD                   required, HH:MM
-    الصالة / Terminal               optional (H/N/T1/T4 or Hajj/North/...)
+    الصالة / Terminal               required (H/N/T1/T4 or Hajj/North/...)
 
 City, country and nationality are NOT read from here. They depend only on the
 airport code, so they live once per airport in airports.json rather than being
 repeated on every flight to it. A code missing from that file is reported at
 the end so it can be added once.
 
-Terminal assignment: the file's own column wins when present and recognised.
-Otherwise it falls back to the airline-code map below, with flight-number
-patterns for the airlines that split across terminals:
-    SV: SV2xxx -> Hajj, rest -> T1
-    TK: TK5xxx -> Hajj, rest -> T1
-    VF: VF61xx -> Hajj, rest -> T1
-    F3: F39xxx -> Hajj, rest -> T1
-    PC: 4-digit -> Hajj, 3-digit -> North
-    AT: 4-digit -> Hajj, 3-digit -> T1
+Terminal: taken from the file's own column, except for the airlines in
+FORCED_TERMINAL below. There is deliberately no guess from the airline code
+here any more — one airline can fly from two terminals, and every export
+carries the column. A row with a blank or unrecognised terminal is imported as
+UNKNOWN and listed at the end.
 """
 
 import csv
@@ -41,23 +37,12 @@ import re
 import sys
 from pathlib import Path
 
-# Base terminal per IATA prefix (airlines that use a single terminal)
-TERMINAL_MAP = {
-    "2S": "Hajj", "3T": "North", "6E": "North", "7Q": "Hajj", "9P": "Hajj",
-    "A3": "T1",   "A4": "Hajj",  "AH": "Hajj",  "AI": "North", "BA": "T1",
-    "BG": "Hajj", "BJ": "Hajj",  "BM": "Hajj",  "BS": "Hajj",  "C6": "Hajj",
-    "D3": "North","D7": "Hajj",  "DH": "Hajj",  "DV": "North", "E5": "North",
-    "EK": "T1",   "ER": "Hajj",  "ET": "North", "EW": "T1",    "EY": "T1",
-    "FG": "Hajj", "FH": "Hajj",  "FZ": "T1",    "G9": "North", "GA": "Hajj",
-    "GF": "T1",   "HU": "T1",    "HY": "North", "IX": "North", "IY": "North",
-    "J2": "North","J4": "North", "J9": "North", "JT": "Hajj",  "KU": "T1",
-    "ME": "T1",   "MH": "T1",    "MS": "T1",    "NB": "Hajj",  "NE": "North",
-    "NP": "North","OV": "North", "PA": "Hajj",  "PF": "Hajj",  "PK": "Hajj",
-    "QP": "Hajj", "QR": "T1",    "R5": "Hajj",  "RB": "North", "RJ": "T1",
-    "RQ": "Hajj", "SD": "North", "SM": "North", "SZ": "North", "TU": "North",
-    "UZ": "Hajj", "W4": "North", "W9": "North", "WY": "T1",    "XC": "Hajj",
-    "XY": "T1",   "YI": "Hajj",
-}
+# Airlines moved wholesale to Terminal 4. Every flight of theirs is T4, and
+# this wins over the export's own Terminal column: exports have listed some
+# of these flights under their old terminal (NE585 as North) after the move,
+# and a merge would otherwise flip them back. Disagreements are reported, so
+# a genuine move away from T4 is still visible.
+FORCED_TERMINAL = {"OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4"}
 
 TERMINAL_ALIASES = {
     "H": "Hajj", "HAJJ": "Hajj",
@@ -65,17 +50,6 @@ TERMINAL_ALIASES = {
     "T1": "T1", "T": "T1", "1": "T1",
     "T4": "T4", "4": "T4",
 }
-
-# Terminal 4 is not in scheduled operation yet. It appears in exports with
-# provisional-looking numbers (999, 1234, 2222, 5555, 7777, 8888) across many
-# airlines, which reads as the terminal being exercised in the source system
-# rather than flown. Importing them would send staff — and a bus badge — to a
-# terminal that is not running, so they are skipped and reported.
-#
-# DELETE THIS WHEN TERMINAL 4 OPENS. It is a temporary hold, not a rule: the
-# count reported each run is the signal, because real flight numbers will
-# replace the placeholder ones.
-SKIP_TERMINAL = "T4"
 
 # Header synonyms, so an Arabic or English export both work unchanged.
 HEADERS = {
@@ -89,32 +63,6 @@ HEADERS = {
 def iata_prefix(flight_number):
     m = re.match(r"^([A-Z0-9]{2})", flight_number.upper())
     return m.group(1) if m else ""
-
-
-def flight_number_digits(flight_number):
-    m = re.search(r"(\d+)", flight_number)
-    return int(m.group(1)) if m else 0
-
-
-def assign_terminal(flight_number):
-    prefix = iata_prefix(flight_number)
-    digits = flight_number_digits(flight_number)
-
-    if prefix == "SV":
-        return "Hajj" if 2000 <= digits <= 2999 else "T1"
-    if prefix == "TK":
-        return "Hajj" if 5000 <= digits <= 5999 else "T1"
-    if prefix == "VF":
-        return "Hajj" if 6100 <= digits <= 6199 else "T1"
-    if prefix == "F3":
-        num = re.search(r"\d+", flight_number)
-        return "Hajj" if num and num.group().startswith("39") else "T1"
-    if prefix == "PC":
-        return "Hajj" if digits >= 1000 else "North"
-    if prefix == "AT":
-        return "Hajj" if digits >= 1000 else "T1"
-
-    return TERMINAL_MAP.get(prefix, "UNKNOWN")
 
 
 def normalize_flight_number(value):
@@ -203,7 +151,7 @@ def main():
 
     header, rows = read_rows(input_path)
     cols = _match_headers(header)
-    missing = [f for f in ("flight", "destination", "std") if f not in cols]
+    missing = [f for f in ("flight", "destination", "std", "terminal") if f not in cols]
     if missing:
         print(f"ERROR: could not find column(s) for {', '.join(missing)}")
         print(f"       file headers: {header}")
@@ -218,24 +166,22 @@ def main():
     flights = dict(existing)
 
     added, updated, unchanged = [], [], 0
-    unknown_terminal, unknown_airport, skipped = [], {}, []
+    unknown_terminal, unknown_airport, overridden = [], {}, []
     for row in rows:
         fn = normalize_flight_number(row[cols["flight"]])
         if not fn:
             continue
 
         dest = str(row[cols["destination"]] or "").strip().upper()
-        terminal = normalize_terminal(row[cols["terminal"]]) if "terminal" in cols else None
-        if terminal is None:
-            terminal = assign_terminal(fn)
+        terminal = normalize_terminal(row[cols["terminal"]]) or "UNKNOWN"
+        forced = FORCED_TERMINAL.get(iata_prefix(fn))
+        if forced and terminal != forced:
+            overridden.append((fn, terminal))
+            terminal = forced
         if terminal == "UNKNOWN":
-            unknown_terminal.append(fn)
+            unknown_terminal.append((fn, row[cols["terminal"]]))
         if dest and dest not in airports:
             unknown_airport.setdefault(dest, []).append(fn)
-
-        if terminal == SKIP_TERMINAL:
-            skipped.append(fn)
-            continue
 
         entry = {
             "destination": dest,
@@ -273,17 +219,17 @@ def main():
         if len(updated) > 30:
             print(f"  ... and {len(updated) - 30} more")
 
-    if skipped:
-        print(f"\nSKIPPED {len(skipped)} flight(s) in {SKIP_TERMINAL} — that terminal is not in "
-              f"scheduled operation yet:")
-        print(f"  {', '.join(skipped)}")
-        print(f"  (remove SKIP_TERMINAL in this script once it opens)")
+    if overridden:
+        print(f"\nFORCED {len(overridden)} flight(s) to their airline's fixed terminal "
+              f"(FORCED_TERMINAL) — the file said otherwise:")
+        for fn, said in overridden:
+            print(f"  {fn:<9} file: {said} -> {FORCED_TERMINAL[iata_prefix(fn)]}")
 
     if unknown_terminal:
-        print(f"\nWARNING: {len(unknown_terminal)} flight(s) with an unrecognised airline prefix "
-              f"(terminal left UNKNOWN):")
-        for fn in unknown_terminal:
-            print(f"  {fn}")
+        print(f"\nWARNING: {len(unknown_terminal)} flight(s) with no recognised terminal "
+              f"(imported as UNKNOWN):")
+        for fn, raw in unknown_terminal:
+            print(f"  {fn:<9} file: {raw!r}")
 
     if unknown_airport:
         print(f"\nWARNING: {len(unknown_airport)} airport code(s) missing from airports.json — "

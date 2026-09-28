@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
 import { jsPDF } from 'jspdf';
-import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles } from '../utils/api';
+import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles, terminalName } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import { getRole, getUsername, isSupervisor } from '../utils/auth';
 import { toLatinDigits } from '../utils/digits';
@@ -626,7 +626,7 @@ export default function NewReport({ editMode }) {
               {prevStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
               {prevTerminal && (
                 <span className={`badge badge-terminal ${prevTerminal !== 'T1' ? 'badge-terminal-bus' : 'badge-terminal-t1'}`}>
-                  {prevTerminal === 'T1' ? 'Terminal 1' : prevTerminal === 'Hajj' ? '🚌 Hajj Terminal' : '🚌 North Terminal'}
+                  {prevTerminal === 'T1' ? '' : '🚌 '}{terminalName(prevTerminal)}
                 </span>
               )}
             </div>
@@ -748,7 +748,7 @@ export default function NewReport({ editMode }) {
                 {newLookupStatus === 'notfound' && <span className="badge badge-notfound">Not found</span>}
                 {newTerminal && (
                   <span className={`badge badge-terminal ${newTerminal !== 'T1' ? 'badge-terminal-bus' : 'badge-terminal-t1'}`}>
-                    {newTerminal === 'T1' ? 'Terminal 1' : newTerminal === 'Hajj' ? '🚌 Hajj Terminal' : '🚌 North Terminal'}
+                    {newTerminal === 'T1' ? '' : '🚌 '}{terminalName(newTerminal)}
                   </span>
                 )}
               </div>
