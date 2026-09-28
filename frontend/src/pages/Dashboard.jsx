@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ExcelJS from 'exceljs';
-import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getHandoverReport, needsBus, getTerminal, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile, apiLogout, loadTerminalsCache } from '../utils/api';
+import { getReports, deleteReport, updateReport, lookupFlight, airlineFromFlightNumber, getHandoverReport, needsBus, getTerminal, terminalName, confirmNusuk, getFilterOptions, deleteReportFile, getFileObjectUrl, downloadFile, apiLogout, loadTerminalsCache } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 
 import { getRole, isSupervisor, logout as clearLocalAuth } from '../utils/auth';
@@ -92,11 +92,7 @@ function paxTypeColumn(visa) {
   return (visa === 'Umrah' || visa === 'Hajj Group') ? 'Umrah / Hajj Grp' : 'Normal Pax';
 }
 function terminalLabel(prevFlight) {
-  const t = getTerminal(prevFlight);
-  if (t === 'T1') return 'Terminal 1';
-  if (t === 'Hajj') return 'Hajj Terminal';
-  if (t === 'North') return 'North Terminal';
-  return t || '';
+  return terminalName(getTerminal(prevFlight));
 }
 
 const STATUS_LABELS = {
@@ -990,7 +986,7 @@ export default function Dashboard() {
                           <td data-label="New Flight" className="col-flight">
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                               <span className="flight-badge">{r.new_flight || '—'}</span>
-                              {bus && <span className="bus-badge" title={`Bus to ${getTerminal(r.new_flight)} Terminal`}>🚌 {getTerminal(r.new_flight)}</span>}
+                              {bus && <span className="bus-badge" title={`Bus to ${terminalName(getTerminal(r.new_flight))}`}>🚌 {getTerminal(r.new_flight)}</span>}
                               {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtInline(r.new_datetime)}</span>}
                             </span>
                           </td>

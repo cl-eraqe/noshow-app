@@ -494,6 +494,15 @@ const VALID_TERMINALS = new Set(['T1', 'Hajj', 'North', 'T4']);
 // Terminals a passenger has to be bussed to.
 const BUS_TERMINALS = new Set(['North', 'Hajj', 'T4']);
 
+// Display name for a flight's departure terminal. Kept here, next to the
+// sets above, so a terminal added to them gets its name in the same place —
+// the badges used to name anything that was not T1 or Hajj "North Terminal",
+// which would have sent a T4 passenger to North.
+const TERMINAL_NAMES = { T1: 'Terminal 1', Hajj: 'Hajj Terminal', North: 'North Terminal', T4: 'Terminal 4' };
+export function terminalName(t) {
+  return TERMINAL_NAMES[t] || t || '';
+}
+
 export async function loadTerminalsCache(force = false) {
   if (_terminalCache && !force) return _terminalCache;
   if (_terminalCachePromise) return _terminalCachePromise;
