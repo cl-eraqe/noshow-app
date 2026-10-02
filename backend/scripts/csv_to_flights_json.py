@@ -24,11 +24,11 @@ airport code, so they live once per airport in airports.json rather than being
 repeated on every flight to it. A code missing from that file is reported at
 the end so it can be added once.
 
-Terminal: taken from the file's own column, except for the airlines in
-FORCED_TERMINAL below. There is deliberately no guess from the airline code
-here any more — one airline can fly from two terminals, and every export
-carries the column. A row with a blank or unrecognised terminal is imported as
-UNKNOWN and listed at the end.
+Terminal: always taken from the file's own column, flight by flight. The
+same airline can fly from two terminals — most of all in Hajj season — so
+nothing here decides a terminal by airline, and nothing overrides the file.
+A row with a blank or unrecognised terminal is imported as UNKNOWN and
+listed at the end.
 """
 
 import csv
@@ -36,22 +36,6 @@ import json
 import re
 import sys
 from pathlib import Path
-
-# Airlines placed in one terminal as a whole, by operational decision. Every
-# flight of theirs goes there, and this wins over the export's own Terminal
-# column: exports have listed some of these flights under their old terminal
-# (NE585 as North) after the move, and a merge would otherwise flip them back.
-# Disagreements are reported, so a genuine move is still visible.
-#
-#   OV, NE, W4, 9P     -> T4    SalamAir, Nesma, Wizz Air, Fly Jinnah (Sep 2026)
-#   VF, TU, J2, PC, QP -> T4    AJet, Tunisair, Azerbaijan Airlines, Pegasus,
-#   RB                          Akasa, SyrianAir — charters included (Oct 2026)
-#   3T                 -> Hajj  Tarco Aviation (Oct 2026)
-FORCED_TERMINAL = {
-    "OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4",
-    "VF": "T4", "TU": "T4", "J2": "T4", "PC": "T4", "QP": "T4", "RB": "T4",
-    "3T": "Hajj",
-}
 
 TERMINAL_ALIASES = {
     "H": "Hajj", "HAJJ": "Hajj",
@@ -67,11 +51,6 @@ HEADERS = {
     "std":         ("المجدول", "std", "scheduled", "time"),
     "terminal":    ("الصالة", "terminal"),
 }
-
-
-def iata_prefix(flight_number):
-    m = re.match(r"^([A-Z0-9]{2})", flight_number.upper())
-    return m.group(1) if m else ""
 
 
 def normalize_flight_number(value):
@@ -175,7 +154,7 @@ def main():
     flights = dict(existing)
 
     added, updated, unchanged = [], [], 0
-    unknown_terminal, unknown_airport, overridden = [], {}, []
+    unknown_terminal, unknown_airport = [], {}
     for row in rows:
         fn = normalize_flight_number(row[cols["flight"]])
         if not fn:
@@ -183,10 +162,6 @@ def main():
 
         dest = str(row[cols["destination"]] or "").strip().upper()
         terminal = normalize_terminal(row[cols["terminal"]]) or "UNKNOWN"
-        forced = FORCED_TERMINAL.get(iata_prefix(fn))
-        if forced and terminal != forced:
-            overridden.append((fn, terminal))
-            terminal = forced
         if terminal == "UNKNOWN":
             unknown_terminal.append((fn, row[cols["terminal"]]))
         if dest and dest not in airports:
@@ -227,12 +202,6 @@ def main():
             print(f"  {fn:<9} {'; '.join(diffs)}")
         if len(updated) > 30:
             print(f"  ... and {len(updated) - 30} more")
-
-    if overridden:
-        print(f"\nFORCED {len(overridden)} flight(s) to their airline's fixed terminal "
-              f"(FORCED_TERMINAL) — the file said otherwise:")
-        for fn, said in overridden:
-            print(f"  {fn:<9} file: {said} -> {FORCED_TERMINAL[iata_prefix(fn)]}")
 
     if unknown_terminal:
         print(f"\nWARNING: {len(unknown_terminal)} flight(s) with no recognised terminal "
