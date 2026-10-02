@@ -37,12 +37,15 @@ import re
 import sys
 from pathlib import Path
 
-# Airlines moved wholesale to Terminal 4. Every flight of theirs is T4, and
-# this wins over the export's own Terminal column: exports have listed some
-# of these flights under their old terminal (NE585 as North) after the move,
-# and a merge would otherwise flip them back. Disagreements are reported, so
-# a genuine move away from T4 is still visible.
-FORCED_TERMINAL = {"OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4"}
+# Airlines placed in one terminal as a whole, by operational decision. Every
+# flight of theirs goes there, and this wins over the export's own Terminal
+# column: exports have listed some of these flights under their old terminal
+# (NE585 as North) after the move, and a merge would otherwise flip them back.
+# Disagreements are reported, so a genuine move is still visible.
+#
+#   OV, NE, W4, 9P -> T4    SalamAir, Nesma, Wizz Air, Fly Jinnah (Sep 2026)
+#   3T             -> Hajj  Tarco Aviation (Oct 2026)
+FORCED_TERMINAL = {"OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4", "3T": "Hajj"}
 
 TERMINAL_ALIASES = {
     "H": "Hajj", "HAJJ": "Hajj",

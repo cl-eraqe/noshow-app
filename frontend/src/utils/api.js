@@ -477,7 +477,7 @@ const TERMINAL_MAP = {
   MS: 'T1', HU: 'T1', TK: 'T1',
   // North Terminal — bus needed 🚌
   G9: 'North', IY: 'North', '6E': 'North', PC: 'North',
-  '3T': 'North', SM: 'North', J4: 'North', AI: 'North', ET: 'North',
+  SM: 'North', J4: 'North', AI: 'North', ET: 'North',
   NP: 'North', HY: 'North', SZ: 'North', RB: 'North', D3: 'North',
   SD: 'North', DV: 'North', IX: 'North', TU: 'North',
   W9: 'North', E5: 'North', J9: 'North',
@@ -486,9 +486,10 @@ const TERMINAL_MAP = {
   // (FORCED_TERMINAL). VF and QP moved their regular flights, and keep their
   // Hajj charters in flights.json.
   OV: 'T4', NE: 'T4', W4: 'T4', '9P': 'T4', VF: 'T4', QP: 'T4',
-  // Hajj Terminal — bus needed 🚌
+  // Hajj Terminal — bus needed 🚌. 3T (Tarco) moved here as a whole airline
+  // in Oct 2026; the importer forces it (FORCED_TERMINAL).
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
-  GA: 'Hajj', FG: 'Hajj', BS: 'Hajj',
+  GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '3T': 'Hajj',
   JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', D7: 'Hajj',
   '2S': 'Hajj', '7Q': 'Hajj', BJ: 'Hajj', BM: 'Hajj', FH: 'Hajj',
   UZ: 'Hajj', XC: 'Hajj', ER: 'Hajj', DH: 'Hajj',
