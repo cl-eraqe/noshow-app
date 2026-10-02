@@ -476,16 +476,15 @@ const TERMINAL_MAP = {
   AT: 'T1', EW: 'T1', A3: 'T1', MH: 'T1', BA: 'T1',
   MS: 'T1', HU: 'T1', TK: 'T1',
   // North Terminal — bus needed 🚌
-  G9: 'North', IY: 'North', '6E': 'North', PC: 'North',
+  G9: 'North', IY: 'North', '6E': 'North',
   SM: 'North', J4: 'North', AI: 'North', ET: 'North',
   NP: 'North', HY: 'North', SZ: 'North', RB: 'North', D3: 'North',
-  SD: 'North', DV: 'North', IX: 'North', TU: 'North',
+  SD: 'North', DV: 'North', IX: 'North',
   W9: 'North', E5: 'North', J9: 'North',
-  // Terminal 4 — bus needed 🚌 (from the 28–29 Sep 2026 exports).
-  // OV, NE, W4 and 9P moved as whole airlines; the importer forces them
-  // (FORCED_TERMINAL). VF and QP moved their regular flights, and keep their
-  // Hajj charters in flights.json.
-  OV: 'T4', NE: 'T4', W4: 'T4', '9P': 'T4', VF: 'T4', QP: 'T4',
+  // Terminal 4 — bus needed 🚌. Every flight of these airlines, by decision
+  // (Sep–Oct 2026); the importer forces the same list (FORCED_TERMINAL).
+  OV: 'T4', NE: 'T4', W4: 'T4', '9P': 'T4',
+  VF: 'T4', TU: 'T4', J2: 'T4', PC: 'T4', QP: 'T4',
   // Hajj Terminal — bus needed 🚌. 3T (Tarco) moved here as a whole airline
   // in Oct 2026; the importer forces it (FORCED_TERMINAL).
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',

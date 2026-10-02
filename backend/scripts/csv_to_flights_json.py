@@ -43,9 +43,15 @@ from pathlib import Path
 # (NE585 as North) after the move, and a merge would otherwise flip them back.
 # Disagreements are reported, so a genuine move is still visible.
 #
-#   OV, NE, W4, 9P -> T4    SalamAir, Nesma, Wizz Air, Fly Jinnah (Sep 2026)
-#   3T             -> Hajj  Tarco Aviation (Oct 2026)
-FORCED_TERMINAL = {"OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4", "3T": "Hajj"}
+#   OV, NE, W4, 9P     -> T4    SalamAir, Nesma, Wizz Air, Fly Jinnah (Sep 2026)
+#   VF, TU, J2, PC, QP -> T4    AJet, Tunisair, Azerbaijan Airlines, Pegasus,
+#                               Akasa — charters included (Oct 2026)
+#   3T                 -> Hajj  Tarco Aviation (Oct 2026)
+FORCED_TERMINAL = {
+    "OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4",
+    "VF": "T4", "TU": "T4", "J2": "T4", "PC": "T4", "QP": "T4",
+    "3T": "Hajj",
+}
 
 TERMINAL_ALIASES = {
     "H": "Hajj", "HAJJ": "Hajj",
