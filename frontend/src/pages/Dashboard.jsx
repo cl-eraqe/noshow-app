@@ -15,24 +15,15 @@ function fmt(dt) {
 
 const MONTHS_TITLE = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+// Closed cases shown at first, and added per "Show more" tap.
+const CLOSED_PAGE = 50;
+
 // "2026-08-31T01:05" or "2026-08-31 01:05:00" → "31 Aug, 01:05". No year.
 // Read straight off the string rather than through Date, so the stored Jeddah
 // wall-clock is reproduced exactly whatever timezone the device is set to.
 function fmtDayTime(dt) {
   const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(dt || '').trim());
   return m ? `${m[3]} ${MONTHS_TITLE[+m[2] - 1]}, ${m[4]}:${m[5]}` : '';
-}
-
-function fmtInline(dt) {
-  if (!dt) return '';
-  try {
-    const d = new Date(dt);
-    const day = d.getDate();
-    const mon = d.toLocaleString('en-GB', { month: 'short' });
-    const h   = String(d.getHours()).padStart(2, '0');
-    const m   = String(d.getMinutes()).padStart(2, '0');
-    return `${day} ${mon}, ${h}:${m}`;
-  } catch { return ''; }
 }
 
 function stdToDatetime(std) {
@@ -729,6 +720,13 @@ export default function Dashboard() {
 
   useEffect(() => { setSelected(new Set()); }, [activeTab]);
 
+  // Closed cases are never removed, so that tab only grows; drawing all of
+  // them took seconds per thousand on a phone. It shows the newest page and
+  // adds a page per tap. Search and the airline filter still run over every
+  // closed case, since they act on `filtered` before this cut.
+  const [closedShown, setClosedShown] = useState(CLOSED_PAGE);
+  useEffect(() => { setClosedShown(CLOSED_PAGE); }, [activeTab, search, airlineFilter]);
+
   // Sort flight_confirmed: bus transfers first, then by new_datetime
   const sorted = [...filtered].sort((a, b) => {
     if (activeTab === 'flight_confirmed') {
@@ -738,6 +736,7 @@ export default function Dashboard() {
     }
     return 0;
   });
+  const visible = activeTab === 'closed' ? sorted.slice(0, closedShown) : sorted;
 
   const counts = {
     under_process: reports.filter(r => (r.status || 'under_process') === 'under_process').length,
@@ -883,7 +882,7 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map(r => {
+                  {visible.map(r => {
                     const days = liveDays(r.prev_datetime);
                     const urgent = days !== null && days >= 1;
                     const bus = needsBus(r.new_flight);
@@ -942,7 +941,7 @@ export default function Dashboard() {
                         <td data-label="Prev Flight" className="col-flight">
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <span className="flight-badge">{r.prev_flight || '—'}</span>
-                            {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtInline(r.prev_datetime)}</span>}
+                            {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtDayTime(r.prev_datetime)}</span>}
                           </span>
                         </td>
                         <td data-label="Destination">{r.prev_destination || '—'}</td>
@@ -987,7 +986,7 @@ export default function Dashboard() {
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                               <span className="flight-badge">{r.new_flight || '—'}</span>
                               {bus && <span className="bus-badge" title={`Bus to ${terminalName(getTerminal(r.new_flight))}`}>🚌 {getTerminal(r.new_flight)}</span>}
-                              {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtInline(r.new_datetime)}</span>}
+                              {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtDayTime(r.new_datetime)}</span>}
                             </span>
                           </td>
                         )}
@@ -1050,6 +1049,14 @@ export default function Dashboard() {
                   })}
                 </tbody>
               </table>
+              {visible.length < sorted.length && (
+                <div style={{ textAlign: 'center', padding: '14px 0' }}>
+                  <button className="btn btn-secondary btn-sm"
+                    onClick={() => setClosedShown(n => n + CLOSED_PAGE)}>
+                    Show more · {visible.length} of {sorted.length}
+                  </button>
+                </div>
+              )}
             </div>
           )
       )}
