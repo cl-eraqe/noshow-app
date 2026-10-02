@@ -39,6 +39,11 @@
     "country": "Turkey",
     "nationality": "Turkish"
   },
+  "ADJ": {
+    "city": "Amman (Marka)",
+    "country": "Jordan",
+    "nationality": "Jordanian"
+  },
   "AGA": {
     "city": "Agadir",
     "country": "Morocco",
@@ -112,7 +117,7 @@
   "AUH": {
     "city": "Abu Dhabi",
     "country": "United Arab Emirates",
-    "nationality": "Emirati"
+    "nationality": ""
   },
   "AYT": {
     "city": "Antalya",
@@ -132,7 +137,7 @@
   "BAH": {
     "city": "Bahrain",
     "country": "Bahrain",
-    "nationality": "Bahraini"
+    "nationality": ""
   },
   "BCN": {
     "city": "Barcelona",
@@ -387,7 +392,7 @@
   "DOH": {
     "city": "Doha",
     "country": "Qatar",
-    "nationality": "Qatari"
+    "nationality": ""
   },
   "DPS": {
     "city": "Bali (Denpasar)",
@@ -402,7 +407,7 @@
   "DXB": {
     "city": "Dubai",
     "country": "United Arab Emirates",
-    "nationality": "Emirati"
+    "nationality": ""
   },
   "DYU": {
     "city": "Dushanbe",
@@ -777,7 +782,7 @@
   "MCT": {
     "city": "Muscat",
     "country": "Oman",
-    "nationality": "Omani"
+    "nationality": ""
   },
   "MCX": {
     "city": "Makhachkala",
@@ -1012,7 +1017,7 @@
   "RKT": {
     "city": "Ras Al Khaimah",
     "country": "United Arab Emirates",
-    "nationality": "Emirati"
+    "nationality": ""
   },
   "ROB": {
     "city": "Monrovia (Roberts)",
@@ -1047,7 +1052,7 @@
   "SHJ": {
     "city": "Sharjah",
     "country": "United Arab Emirates",
-    "nationality": "Emirati"
+    "nationality": ""
   },
   "SIN": {
     "city": "Singapore",
@@ -1077,7 +1082,7 @@
   "SLL": {
     "city": "Salalah",
     "country": "Oman",
-    "nationality": "Omani"
+    "nationality": ""
   },
   "SOC": {
     "city": "Solo (Surakarta)",

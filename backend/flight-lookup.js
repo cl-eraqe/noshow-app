@@ -69,13 +69,13 @@ function resolveTimetableDate(time, direction) {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
-// Everything the destination code implies. An airport we have no entry for
-// leaves these blank and the employee picks the nationality by hand.
+// Everything the destination code implies, or null for an airport we have no
+// entry for. A listed airport may carry a deliberately empty nationality —
+// the Gulf hubs, whose passengers are mostly not their nationals — and that
+// blank has to reach the form rather than be filled from elsewhere.
 function destinationFacts(code) {
   const a = airports[String(code || '').toUpperCase()];
-  return a
-    ? { city: a.city, country: a.country, nationality: a.nationality }
-    : { city: '', country: '', nationality: '' };
+  return a ? { city: a.city, country: a.country, nationality: a.nationality } : null;
 }
 
 // flights_custom is read ahead of flights.json: it holds supervisor additions
@@ -133,10 +133,10 @@ async function resolveFlight(rawNumber, direction = 'past') {
     datetime:      date && entry.std ? `${date}T${entry.std}` : null,
     destination:   entry.destination,
     // The airport table is the source; a pre-split custom row's own values are
-    // the fallback for an airport not listed there.
-    city:          dest.city || entry.city || '',
-    country:       dest.country || entry.country || '',
-    nationality:   dest.nationality || entry.nationality || '',
+    // the fallback only for an airport not listed there.
+    city:          dest ? dest.city        : (entry.city || ''),
+    country:       dest ? dest.country     : (entry.country || ''),
+    nationality:   dest ? dest.nationality : (entry.nationality || ''),
     terminal:      entry.terminal,
   };
 }

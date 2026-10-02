@@ -17,16 +17,15 @@ const TERMINAL_MAP = {
   RJ:'T1',ME:'T1',GF:'T1',EY:'T1',AT:'T1',EW:'T1',A3:'T1',MH:'T1',
   BA:'T1',MS:'T1',HU:'T1',TK:'T1',
   // North Terminal — bus
-  G9:'North',IY:'North','6E':'North',PC:'North','3T':'North',
+  G9:'North',IY:'North','6E':'North',
   SM:'North',J4:'North',AI:'North',ET:'North',NP:'North',HY:'North',
-  SZ:'North',RB:'North',D3:'North',SD:'North',DV:'North',
-  IX:'North',TU:'North',W9:'North',E5:'North',J9:'North',
-  // Terminal 4 — bus (from the 28–29 Sep 2026 exports). OV, NE, W4 and 9P
-  // moved as whole airlines; VF and QP moved their regular flights and keep
-  // their Hajj charters in flights.json.
-  OV:'T4',NE:'T4',W4:'T4','9P':'T4',VF:'T4',QP:'T4',
-  // Hajj Terminal — bus
-  PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',AH:'Hajj',
+  SZ:'North',D3:'North',SD:'North',DV:'North',
+  IX:'North',W9:'North',E5:'North',J9:'North',
+  // Terminal 4 — bus (airlines moved there, Sep–Oct 2026)
+  OV:'T4',NE:'T4',W4:'T4','9P':'T4',
+  VF:'T4',TU:'T4',J2:'T4',PC:'T4',QP:'T4',RB:'T4',
+  // Hajj Terminal — bus. 3T (Tarco) moved here as a whole airline, Oct 2026.
+  PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',AH:'Hajj','3T':'Hajj',
   GA:'Hajj',FG:'Hajj',BS:'Hajj',JT:'Hajj',RQ:'Hajj',C6:'Hajj',D7:'Hajj',
   '2S':'Hajj','7Q':'Hajj',BJ:'Hajj',BM:'Hajj',FH:'Hajj',
   UZ:'Hajj',XC:'Hajj',ER:'Hajj',DH:'Hajj',
