@@ -5142,62 +5142,62 @@
   "RB1902": {
     "destination": "DAM",
     "std": "10:15",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1904": {
     "destination": "DAM",
     "std": "07:45",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1906": {
     "destination": "DAM",
     "std": "09:45",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1908": {
     "destination": "DAM",
     "std": "17:55",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1910": {
     "destination": "DAM",
     "std": "09:45",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1912": {
     "destination": "DAM",
     "std": "17:40",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1914": {
     "destination": "DAM",
     "std": "09:50",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1916": {
     "destination": "ALP",
     "std": "18:10",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1918": {
     "destination": "DAM",
     "std": "09:45",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB1920": {
     "destination": "DAM",
     "std": "17:55",
-    "terminal": "Hajj"
+    "terminal": "T4"
   },
   "RB382": {
     "destination": "DAM",
     "std": "20:00",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "RB384": {
     "destination": "DAM",
     "std": "20:00",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "RJ2207": {
     "destination": "AMM",

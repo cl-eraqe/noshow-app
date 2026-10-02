@@ -45,11 +45,11 @@ from pathlib import Path
 #
 #   OV, NE, W4, 9P     -> T4    SalamAir, Nesma, Wizz Air, Fly Jinnah (Sep 2026)
 #   VF, TU, J2, PC, QP -> T4    AJet, Tunisair, Azerbaijan Airlines, Pegasus,
-#                               Akasa — charters included (Oct 2026)
+#   RB                          Akasa, SyrianAir — charters included (Oct 2026)
 #   3T                 -> Hajj  Tarco Aviation (Oct 2026)
 FORCED_TERMINAL = {
     "OV": "T4", "NE": "T4", "W4": "T4", "9P": "T4",
-    "VF": "T4", "TU": "T4", "J2": "T4", "PC": "T4", "QP": "T4",
+    "VF": "T4", "TU": "T4", "J2": "T4", "PC": "T4", "QP": "T4", "RB": "T4",
     "3T": "Hajj",
 }
 
