@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from 'react';
 // saved, and a cut photo is re-encoded through a canvas, which also drops its
 // EXIF data (GPS position included).
 
-const DETECT_SIDE = 640;     // detection does not need more, and runs faster
+const DETECT_SIDE = 1280;    // handed to the worker, which shrinks it to 640 by area averaging
 const WARP_SIDE   = 2000;    // input to the final cut
 const DEFAULT_CORNERS = [[0.08, 0.08], [0.92, 0.08], [0.92, 0.92], [0.08, 0.92]];
 
@@ -60,6 +60,7 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
   const [current, setCurrent] = useState(null);        // { img, url }
   const [corners, setCorners] = useState(DEFAULT_CORNERS);
   const [found, setFound] = useState(true);
+  const [detecting, setDetecting] = useState(false);  // no handles until they can be placed
   const [busy, setBusy] = useState('');                // '' or what is happening
   const [scannerState, setScannerState] = useState('loading');  // loading | ready | failed
   const [error, setError] = useState('');
@@ -98,14 +99,16 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
       setCurrent(shown);
       setCorners(DEFAULT_CORNERS);
       setFound(true);
+      setDetecting(true);
       try {
         await scanner.ready;
         const c = await scanner.detect(toImageData(shown.img, DETECT_SIDE));
         if (!alive) return;
         setCorners(c || DEFAULT_CORNERS);
         setFound(!!c);
+        setDetecting(false);
       } catch {
-        if (alive) setFound(false);
+        if (alive) { setFound(false); setDetecting(false); }
       }
     })();
     return () => { alive = false; };
@@ -229,13 +232,15 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
           <p className="scanner-note">Preparing scanner… (first time only)</p>
         ) : (
           <p className="scanner-hint">
-            {found ? 'Drag the corners if they are not on the document.' : 'Edges not found — drag the four corners onto the document, or keep the photo as it is.'}
+            {detecting ? 'Finding the edges…'
+              : found ? 'Drag the corners if they are not on the document.'
+              : 'Edges not found — drag the four corners onto the document, or keep the photo as it is.'}
           </p>
         )}
 
         {current && (
           <CornerEditor img={current.img} url={current.url} corners={corners} onChange={setCorners}
-            disabled={!ready || !!busy} />
+            disabled={!ready || detecting || !!busy} outline={!detecting} />
         )}
 
         {busy ? (
@@ -244,7 +249,7 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
           <>
             <div className="scanner-actions">
               {scannerState !== 'failed' && (
-                <button type="button" className="btn btn-primary" disabled={!ready || !current} onClick={crop}>✓ Crop</button>
+                <button type="button" className="btn btn-primary" disabled={!ready || !current || detecting} onClick={crop}>✓ Crop</button>
               )}
               <button type="button" className="btn btn-secondary" onClick={() => next(queue[index])}>Keep as it is</button>
               <button type="button" className="btn btn-danger" onClick={() => next(null)} title="Remove this photo">🗑</button>
@@ -270,7 +275,7 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
 }
 
 // The photo with four draggable corner handles over it.
-function CornerEditor({ img, url, corners, onChange, disabled }) {
+function CornerEditor({ img, url, corners, onChange, disabled, outline = true }) {
   const svgRef = useRef(null);
   const dragRef = useRef(null);
   const maxW = Math.min(window.innerWidth - 48, 560);
@@ -297,7 +302,7 @@ function CornerEditor({ img, url, corners, onChange, disabled }) {
         onPointerMove={move}
         onPointerUp={() => { dragRef.current = null; }}
         onPointerCancel={() => { dragRef.current = null; }}>
-        <polygon points={pts.map(p => p.join(',')).join(' ')} className="scanner-poly" />
+        {outline && <polygon points={pts.map(p => p.join(',')).join(' ')} className="scanner-poly" />}
         {!disabled && pts.map(([x, y], i) => (
           <g key={i}
             onPointerDown={e => {

@@ -16,6 +16,7 @@
 // Corners are normalised to 0..1 and ordered TL, TR, BR, BL.
 
 import cvModule from '@techstark/opencv-js';
+import { detectCorners } from './detect.js';
 
 const MAX_SIDE = 4096;          // refuse anything larger: a malformed or huge
 const MIN_SIDE = 16;            // image must not exhaust the phone's memory
@@ -38,7 +39,7 @@ self.onmessage = async ({ data }) => {
     const { cv } = await cvReady;
     const image = checkImage(data.image);
     if (type === 'detect') {
-      self.postMessage({ id, ok: true, corners: detect(cv, image) });
+      self.postMessage({ id, ok: true, corners: detectCorners(cv, image) });
     } else if (type === 'warp') {
       const out = warp(cv, image, checkCorners(data.corners));
       self.postMessage({ id, ok: true, image: out }, [out.data.buffer]);
@@ -67,92 +68,6 @@ function checkCorners(c) {
   return c;
 }
 
-// TL, TR, BR, BL — by the sum and difference of the coordinates.
-function order(pts) {
-  const bySum  = [...pts].sort((a, b) => (a[0] + a[1]) - (b[0] + b[1]));
-  const byDiff = [...pts].sort((a, b) => (a[1] - a[0]) - (b[1] - b[0]));
-  return [bySum[0], byDiff[0], bySum[3], byDiff[3]];
-}
-
-function polygonArea(p) {
-  let a = 0;
-  for (let i = 0; i < p.length; i++) {
-    const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % p.length];
-    a += x1 * y2 - x2 * y1;
-  }
-  return Math.abs(a) / 2;
-}
-
-// Run each edge strategy and keep the largest convex four-sided shape that
-// covers a believable share of the frame. Several strategies, because a white
-// A4 on a dark counter and a passport on a light desk fail in different ways.
-// Whatever comes back is only a starting point — the employee drags the
-// corners into place before anything is cut.
-function detect(cv, image) {
-  const w = image.width, h = image.height, frame = w * h;
-  const minArea = frame * 0.15, maxArea = frame * 0.98;
-  const mats = [];
-  const keep = m => (mats.push(m), m);
-  let best = null, bestArea = 0, fallback = null, fallbackArea = 0;
-
-  try {
-    const src  = keep(cv.matFromImageData(image));
-    const gray = keep(new cv.Mat());
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-    const blur = keep(new cv.Mat());
-    cv.GaussianBlur(gray, blur, new cv.Size(5, 5), 0);
-    const kernel = keep(cv.Mat.ones(5, 5, cv.CV_8U));
-
-    const masks = [];
-    for (const [lo, hi] of [[50, 150], [20, 80]]) {
-      const edges = keep(new cv.Mat());
-      cv.Canny(blur, edges, lo, hi);
-      cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel);
-      cv.dilate(edges, edges, kernel);
-      masks.push(edges);
-    }
-    const otsu = keep(new cv.Mat());
-    cv.threshold(blur, otsu, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-    masks.push(otsu);
-
-    for (const mask of masks) {
-      const contours = keep(new cv.MatVector());
-      const hierarchy = keep(new cv.Mat());
-      cv.findContours(mask, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-      for (let i = 0; i < contours.size(); i++) {
-        const c = contours.get(i);
-        try {
-          const area = cv.contourArea(c);
-          if (area < minArea || area > maxArea) continue;
-          const approx = new cv.Mat();
-          try {
-            cv.approxPolyDP(c, approx, 0.02 * cv.arcLength(c, true), true);
-            if (approx.rows === 4 && cv.isContourConvex(approx)) {
-              const pts = [];
-              for (let k = 0; k < 4; k++) pts.push([approx.data32S[k * 2], approx.data32S[k * 2 + 1]]);
-              const a = polygonArea(pts);
-              if (a > bestArea) { bestArea = a; best = pts; }
-            } else if (area > fallbackArea) {
-              // Not a clean quadrilateral (a rounded passport corner, a thumb
-              // over an edge): remember its tightest rotated rectangle.
-              const rect = cv.minAreaRect(c);
-              fallback = cv.RotatedRect.points(rect).map(p => [p.x, p.y]);
-              fallbackArea = area;
-            }
-          } finally { approx.delete(); }
-        } finally { c.delete(); }
-      }
-    }
-  } finally {
-    mats.forEach(m => m.delete());
-  }
-
-  const pts = best || fallback;
-  if (!pts) return null;
-  return order(pts).map(([x, y]) => [clamp01(x / w), clamp01(y / h)]);
-}
-
-const clamp01 = v => Math.min(1, Math.max(0, v));
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 // Cut the document out along the four corners, square it up as if photographed
