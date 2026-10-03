@@ -38,7 +38,8 @@ export function createScanner() {
 
   return {
     ready,
-    detect: image => call({ type: 'detect', image }).then(r => r.corners),
+    // { corners, confident }, or null when no document was found
+    detect: image => call({ type: 'detect', image }).then(r => r.corners ? { corners: r.corners, confident: r.confident } : null),
     warp: (image, corners) => call({ type: 'warp', image, corners }).then(r => r.image),
     close: () => {
       worker.terminate();

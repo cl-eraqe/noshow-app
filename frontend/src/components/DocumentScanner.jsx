@@ -102,10 +102,10 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
       setDetecting(true);
       try {
         await scanner.ready;
-        const c = await scanner.detect(toImageData(shown.img, DETECT_SIDE));
+        const found = await scanner.detect(toImageData(shown.img, DETECT_SIDE));
         if (!alive) return;
-        setCorners(c || DEFAULT_CORNERS);
-        setFound(!!c);
+        setCorners(found ? found.corners : DEFAULT_CORNERS);
+        setFound(!!found);
         setDetecting(false);
       } catch {
         if (alive) { setFound(false); setDetecting(false); }
@@ -139,17 +139,22 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
     for (let j = index; j < queue.length; j++) {
       setBusy(`Cropping ${j - index + 1} of ${queue.length - index}…`);
       const original = queue[j];
-      let cropped = null;
+      let cropped = null, confident = false;
       try {
         const { img, url } = await loadImage(original);
         try {
-          const c = await scanner.detect(toImageData(img, DETECT_SIDE));
-          if (c) cropped = await imageDataToFile(await scanner.warp(toImageData(img, WARP_SIDE), c), croppedName(original));
+          const found = await scanner.detect(toImageData(img, DETECT_SIDE));
+          if (found) {
+            cropped = await imageDataToFile(await scanner.warp(toImageData(img, WARP_SIDE), found.corners), croppedName(original));
+            confident = found.confident;
+          }
         } finally { URL.revokeObjectURL(url); }
       } catch { /* left without a cropped version */ }
       const urls = { original: URL.createObjectURL(original), cropped: cropped && URL.createObjectURL(cropped) };
       pickUrls.current.push(...Object.values(urls).filter(Boolean));
-      out.push({ original, cropped, urls, choice: cropped ? 'cropped' : 'original' });
+      // A crop the detector is unsure of starts on the original: it is only
+      // used if the employee looks at it and picks it.
+      out.push({ original, cropped, confident, urls, choice: cropped && confident ? 'cropped' : 'original' });
     }
     setBusy('');
     setPicks(out);
@@ -182,38 +187,7 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
   const ready = scannerState === 'ready';
 
   if (picks) {
-    const count = picks.filter(p => p.choice !== 'removed').length;
-    return (
-      <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label="Choose photos">
-        <div className="scanner-panel">
-          <div className="scanner-head">
-            <strong>Choose for each photo</strong>
-            <button type="button" className="btn btn-xs btn-secondary" onClick={cancel}>✕</button>
-          </div>
-          <div className="scanner-grid">
-            {picks.map((p, i) => (
-              <div key={i} className={`scanner-pick ${p.choice === 'removed' ? 'scanner-pick-removed' : ''}`}>
-                <img src={p.choice === 'cropped' ? p.urls.cropped : p.urls.original} alt={`Photo ${i + 1}`} />
-                <div className="scanner-pick-buttons">
-                  <button type="button" className={`btn btn-xs ${p.choice === 'cropped' ? 'btn-primary' : 'btn-secondary'}`}
-                    disabled={!p.cropped} onClick={() => setChoice(i, 'cropped')}>Cropped</button>
-                  <button type="button" className={`btn btn-xs ${p.choice === 'original' ? 'btn-primary' : 'btn-secondary'}`}
-                    onClick={() => setChoice(i, 'original')}>Original</button>
-                  <button type="button" className={`btn btn-xs ${p.choice === 'removed' ? 'btn-danger' : 'btn-secondary'}`}
-                    title="Leave this photo out" onClick={() => setChoice(i, 'removed')}>🗑</button>
-                </div>
-                {!p.cropped && <p className="scanner-pick-note">Edges not found</p>}
-              </div>
-            ))}
-          </div>
-          <div className="scanner-actions">
-            <button type="button" className="btn btn-success" disabled={count === 0} onClick={addPicks}>
-              ✓ Add {count} photo{count === 1 ? '' : 's'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <PageBrowser picks={picks} onChoice={setChoice} onAdd={addPicks} onCancel={cancel} />;
   }
 
   return (
@@ -269,6 +243,85 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
         {/* Straight to the camera — no menu. The photo joins the end of this review. */}
         <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden
           onChange={e => { const f = e.target.files[0]; if (f) setQueue(q => [...q, f]); e.target.value = ''; }} />
+      </div>
+    </div>
+  );
+}
+
+// The results of "Crop all", one page at a time, in the manner of a scanner
+// app's page view: swipe (or use the arrows) between pages, with the next and
+// previous ones peeking in at the sides, and choose for the page on screen.
+// A removed page stays in place, dimmed, so the numbering does not shift
+// under the employee's finger, and can be restored.
+function PageBrowser({ picks, onChoice, onAdd, onCancel }) {
+  const trackRef = useRef(null);
+  const [current, setCurrent] = useState(0);
+  const count = picks.filter(p => p.choice !== 'removed').length;
+  const page = picks[current];
+
+  // The page on screen is the slide whose centre is nearest the track's centre.
+  function onScroll() {
+    const track = trackRef.current;
+    if (!track) return;
+    const mid = track.scrollLeft + track.clientWidth / 2;
+    let best = 0, bestDist = Infinity;
+    [...track.children].forEach((el, i) => {
+      const d = Math.abs(el.offsetLeft + el.offsetWidth / 2 - mid);
+      if (d < bestDist) { bestDist = d; best = i; }
+    });
+    setCurrent(best);
+  }
+
+  function go(i) {
+    const el = trackRef.current?.children[i];
+    if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+
+  return (
+    <div className="pb" role="dialog" aria-modal="true" aria-label="Review pages">
+      <div className="pb-head">
+        <button type="button" className="pb-icon" onClick={onCancel} aria-label="Cancel">✕</button>
+        <strong>Review</strong>
+        <span className="pb-icon-spacer" />
+      </div>
+
+      <div className="pb-track" ref={trackRef} onScroll={onScroll}>
+        {picks.map((p, i) => (
+          <div key={i} className={`pb-slide ${p.choice === 'removed' ? 'pb-slide-removed' : ''}`} onClick={() => go(i)}>
+            <img src={p.choice === 'cropped' ? p.urls.cropped : p.urls.original} alt={`Page ${i + 1}`} draggable={false} />
+            {p.choice === 'removed' && <span className="pb-badge">Removed</span>}
+          </div>
+        ))}
+      </div>
+
+      <div className="pb-counter">
+        <button type="button" onClick={() => go(current - 1)} disabled={current === 0} aria-label="Previous page">◀</button>
+        <span>{current + 1}/{picks.length}</span>
+        <button type="button" onClick={() => go(current + 1)} disabled={current === picks.length - 1} aria-label="Next page">▶</button>
+      </div>
+
+      <div className="pb-controls">
+        <div className="pb-options">
+          {page.choice === 'removed' ? (
+            <button type="button" className="pb-opt" onClick={() => onChoice(current, page.cropped && page.confident ? 'cropped' : 'original')}>↺ Restore</button>
+          ) : (
+            <>
+              <button type="button" className={`pb-opt ${page.choice === 'cropped' ? 'pb-opt-on' : ''}`}
+                disabled={!page.cropped} onClick={() => onChoice(current, 'cropped')}>Cropped</button>
+              <button type="button" className={`pb-opt ${page.choice === 'original' ? 'pb-opt-on' : ''}`}
+                onClick={() => onChoice(current, 'original')}>Original</button>
+              <button type="button" className="pb-opt pb-opt-danger" onClick={() => onChoice(current, 'removed')}
+                aria-label="Remove this page">🗑</button>
+            </>
+          )}
+          {page.choice !== 'removed' && !page.cropped && <span className="pb-note">Edges not found</span>}
+          {page.choice !== 'removed' && page.cropped && !page.confident && (
+            <span className="pb-note">Not sure about the edges — check the cropped version before choosing it.</span>
+          )}
+        </div>
+        <button type="button" className="pb-add" disabled={count === 0} onClick={onAdd}>
+          ✓ Add {count} photo{count === 1 ? '' : 's'}
+        </button>
       </div>
     </div>
   );

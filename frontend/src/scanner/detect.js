@@ -1,9 +1,11 @@
 // Finding a document's four corners in a photo. Kept apart from the worker
 // so it can be measured against real photos outside the browser.
 //
-// `image` is an ImageData (or { data, width, height }). Returns four corners
-// normalised to 0..1, ordered TL, TR, BR, BL — or null when no document is
-// found, so the screen says so instead of offering a wrong outline.
+// `image` is an ImageData (or { data, width, height }). Returns
+// { corners, confident } — four corners normalised to 0..1, ordered TL, TR,
+// BR, BL — or null when no document is found, so the screen says so instead
+// of offering a wrong outline. `confident` is false when the crop should be
+// looked at before it is used.
 //
 // Real photos are hard in ways clean test images are not: a document held in
 // the hand with a thumb over one edge, white paper on light granite or a white
@@ -12,7 +14,17 @@
 // survive a thumb breaking one edge) — and each is scored by how much of its
 // outline lies on real edges in the photo, side by side, with at most one
 // weak side allowed. A shape stuck to the frame is never reported as found.
-// Tuned on seven real airport photos: passports, boarding passes, visas.
+//
+// A passport's data page is found from its machine-readable zone instead
+// (the two "<<<" lines), since its top edge — the fold between two pale
+// pages — barely registers as an edge, and the strong lines inside the page
+// (the zone itself, a barcode, printed frames) otherwise win and the crop
+// cuts off the name and number. Every result is then widened by a small
+// margin: a crop slightly too loose is harmless, one slightly too tight
+// loses data.
+//
+// Measured on eleven real airport photos (passports, boarding passes, visas)
+// for coverage of the document and how loose the crop is.
 
 const MIN_AREA = 0.08;      // of the frame
 const MIN_SUPPORT = 0.45;   // share of the outline that must lie on real edges
@@ -148,15 +160,84 @@ function downscale(cv, image) {
   } finally { src.delete(); dst.delete(); }
 }
 
+// Push each side out by a share of the document's size. A crop a little too
+// loose shows a strip of counter; a crop a little too tight cuts off a name or
+// a passport number. Only the first is harmless.
+const MARGIN = 0.03;
+function expand(q, w, h) {
+  if (!q || !MARGIN) return q;
+  const P = q.map(([x, y]) => [x * w, y * h]);
+  const cx = P.reduce((s, p) => s + p[0], 0) / 4, cy = P.reduce((s, p) => s + p[1], 0) / 4;
+  const side = (Math.hypot(P[1][0] - P[0][0], P[1][1] - P[0][1]) + Math.hypot(P[2][0] - P[1][0], P[2][1] - P[1][1])
+              + Math.hypot(P[3][0] - P[2][0], P[3][1] - P[2][1]) + Math.hypot(P[0][0] - P[3][0], P[0][1] - P[3][1])) / 4;
+  const off = side * MARGIN;
+  const lines = [];
+  for (let i = 0; i < 4; i++) {
+    const A = P[i], B = P[(i + 1) % 4], len = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
+    let nx = -(B[1] - A[1]) / len, ny = (B[0] - A[0]) / len;
+    if (((A[0] + B[0]) / 2 - cx) * nx + ((A[1] + B[1]) / 2 - cy) * ny < 0) { nx = -nx; ny = -ny; }
+    lines.push([A[0] + nx * off, A[1] + ny * off, B[0] + nx * off, B[1] + ny * off]);
+  }
+  const out = [intersect(lines[3], lines[0]), intersect(lines[0], lines[1]), intersect(lines[1], lines[2]), intersect(lines[2], lines[3])];
+  if (out.some(p => !p)) return q;
+  return out.map(([x, y]) => [Math.min(1, Math.max(0, x / w)), Math.min(1, Math.max(0, y / h))]);
+}
+
+// Passport data page, from its machine-readable zone. ICAO 9303 (TD3): the
+// page is 125 x 88 mm and the zone's two lines ~112 mm long, near the bottom.
+// Measured on real photos, in units of the zone's length from its centre:
+// left -0.58, right +0.57, top -0.67, bottom +0.125 (ICAO gives a 0.787-long
+// page height; the photos give 0.78).
+const PAGE = { left: -0.58, right: 0.57, top: -0.67, bottom: 0.125 };
+function mrzPage(m, w, h) {
+  const a = m.angle * Math.PI / 180, ux = [Math.cos(a), Math.sin(a)], uy = [-Math.sin(a), Math.cos(a)];
+  const at = (u, v) => [(m.cx + (u * ux[0] + v * uy[0]) * m.len) / w, (m.cy + (u * ux[1] + v * uy[1]) * m.len) / h];
+  return [at(PAGE.left, PAGE.top), at(PAGE.right, PAGE.top), at(PAGE.right, PAGE.bottom), at(PAGE.left, PAGE.bottom)];
+}
+function mrzBox(m, w, h) {
+  const a = m.angle * Math.PI / 180, ux = [Math.cos(a), Math.sin(a)], uy = [-Math.sin(a), Math.cos(a)];
+  const at = (u, v) => [(m.cx + u * ux[0] + v * uy[0]) / w, (m.cy + u * ux[1] + v * uy[1]) / h];
+  const hu = m.len / 2, hv = m.pitch;
+  return [at(-hu, -hv), at(hu, -hv), at(hu, hv), at(-hu, hv)];
+}
+function inside(q, p) {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const A = q[i], B = q[(i + 1) % 4], c = (B[0] - A[0]) * (p[1] - A[1]) - (B[1] - A[1]) * (p[0] - A[0]);
+    if (c === 0) continue; if (!sign) sign = Math.sign(c); else if (Math.sign(c) !== sign) return false;
+  }
+  return true;
+}
+
 export function detectCorners(cv, input) {
   const image = downscale(cv, input);
-  const found = edgeDetect(cv, image);
-  if (found) return found;
+  const r = findCorners(cv, image);
+  return r && { corners: expand(r.corners, image.width, image.height), confident: r.confident };
+}
+
+const CONFIDENT = 0.08;   // edge score from which a crop is trusted without a look
+const LARGER_DOC = 1.5;   // an outline this much bigger than the passport page is another document
+
+function findCorners(cv, image) {
+  const w = image.width, h = image.height;
+  const edge = edgeDetect(cv, image);
+  const mrz = findMRZ(cv, image);
+  if (mrz) {
+    const page = mrzPage(mrz, w, h);
+    // The page the zone implies is the more reliable answer for a passport:
+    // its top edge is the fold between two pale pages, which edge finding
+    // misses. The one exception is a clearly larger document that holds the
+    // whole zone — an e-visa on A4 — which must not be cut down to passport
+    // size.
+    if (edge && mrzBox(mrz, w, h).every(p => inside(edge.q, p)) && polygonArea(edge.q) >= LARGER_DOC * polygonArea(page))
+      return { corners: edge.q, confident: true };
+    return { corners: page, confident: true };
+  }
+  if (edge) return { corners: edge.q, confident: edge.score >= CONFIDENT };
   const fallback = outlineDetect(cv, image);
-  // Never the frame itself: that is "not found" wearing a disguise.
   if (!fallback) return null;
   const onBorder = fallback.filter(([x, y]) => x < 0.012 || x > 0.988 || y < 0.012 || y > 0.988).length;
-  return onBorder >= 3 ? null : fallback;
+  return onBorder >= 3 ? null : { corners: fallback, confident: false };
 }
 
 function edgeDetect(cv, image) {
@@ -271,7 +352,7 @@ function edgeDetect(cv, image) {
     const scored = candidates.map(evaluate);
     for (const c of scored) if (c.score > bestScore) { bestScore = c.score; best = c.q; }
     if (!best || bestScore < MIN_SCORE) return null;
-    return best.map(([x, y]) => [Math.min(1, Math.max(0, x / w)), Math.min(1, Math.max(0, y / h))]);
+    return { q: best.map(([x, y]) => [Math.min(1, Math.max(0, x / w)), Math.min(1, Math.max(0, y / h))]), score: bestScore };
   } finally {
     mats.forEach(mm => { try { mm.delete(); } catch { /* already freed */ } });
   }
@@ -345,3 +426,55 @@ function outlineDetect(cv, image) {
 }
 
 const clamp01 = v => Math.min(1, Math.max(0, v));
+
+// Finding a passport's machine-readable zone: two lines of OCR-B with "<"
+// fillers along the bottom of the data page — equal in length, parallel, one
+// line-pitch apart. Each text line is found on its own (a long thin strip);
+// merging more aggressively fuses the zone with the 2D barcode printed just
+// above it on many passports.
+function findMRZ(cv, image, debug) {
+  const w = image.width, h = image.height, k = Math.max(w, h) / 640;
+  const mats = []; const keep = m => (mats.push(m), m);
+  try {
+    const src = keep(cv.matFromImageData(image));
+    const gray = keep(new cv.Mat()); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+    const bhK = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(Math.round(15 * k), Math.round(7 * k))));
+    const bh = keep(new cv.Mat()); cv.morphologyEx(gray, bh, cv.MORPH_BLACKHAT, bhK);      // dark strokes on light
+    const th = keep(new cv.Mat()); cv.threshold(bh, th, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+    // Join characters along a line, not across lines.
+    const lineK = keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(Math.round(LINE_JOIN * k), 1)));
+    cv.morphologyEx(th, th, cv.MORPH_CLOSE, lineK);
+    cv.morphologyEx(th, th, cv.MORPH_OPEN, keep(cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(Math.round(9 * k), Math.max(1, Math.round(2 * k))))));
+    const contours = keep(new cv.MatVector()); const hier = keep(new cv.Mat());
+    cv.findContours(th, contours, hier, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+    const lines = [];
+    for (let i = 0; i < contours.size(); i++) {
+      const c = contours.get(i);
+      const r = cv.minAreaRect(c); const area = cv.contourArea(c); c.delete();
+      let { width: rw, height: rh } = r.size, angle = r.angle;
+      if (rh > rw) { [rw, rh] = [rh, rw]; angle += 90; }
+      while (angle > 45) angle -= 180; while (angle < -45) angle += 180;
+      const fill = area / (rw * rh || 1);
+      if (rw > w * 0.3 && rw / Math.max(rh, 1) > 12 && Math.abs(angle) < 25 && fill > 0.45)
+        lines.push({ cx: r.center.x, cy: r.center.y, rw, rh, angle });
+    }
+    if (debug) debug.lines = lines;
+    // The zone: a pair of near-equal, parallel lines about one line-pitch apart.
+    let best = null;
+    for (const a of lines) for (const b of lines) {
+      if (b === a || b.cy <= a.cy) continue;
+      const gap = b.cy - a.cy, len = (a.rw + b.rw) / 2;
+      if (Math.abs(a.rw - b.rw) / len > 0.12) continue;           // same length
+      if (Math.abs(a.angle - b.angle) > 4) continue;              // parallel
+      if (gap < len * 0.02 || gap > len * 0.08) continue;         // one line-pitch apart
+      const dx = Math.abs(a.cx - b.cx); if (dx > len * 0.06) continue;   // aligned
+      // The zone is the last text on the page: no other long line below it.
+      if (lines.some(l => l !== a && l !== b && l.cy > b.cy + gap * 0.5 && l.rw > len * 0.5)) continue;
+      const score = len + b.cy * 0.1;                              // longest, then lowest
+      if (!best || score > best.score) best = { score, top: a, bottom: b, len, angle: (a.angle + b.angle) / 2,
+        cx: (a.cx + b.cx) / 2, cy: (a.cy + b.cy) / 2, pitch: gap };
+    }
+    return best;
+  } finally { mats.forEach(m => m.delete()); }
+}
+const LINE_JOIN = 15;

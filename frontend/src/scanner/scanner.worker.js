@@ -11,7 +11,7 @@
 //     network connection, so it cannot send an image anywhere either.
 //
 // Protocol (each request carries an id, echoed in the reply):
-//   { type: 'detect', image: ImageData }            → { corners: [[x,y]×4] | null }
+//   { type: 'detect', image: ImageData }            → { corners: [[x,y]×4] | null, confident }
 //   { type: 'warp',   image: ImageData, corners }   → { image: ImageData }
 // Corners are normalised to 0..1 and ordered TL, TR, BR, BL.
 
@@ -39,7 +39,8 @@ self.onmessage = async ({ data }) => {
     const { cv } = await cvReady;
     const image = checkImage(data.image);
     if (type === 'detect') {
-      self.postMessage({ id, ok: true, corners: detectCorners(cv, image) });
+      const found = detectCorners(cv, image);
+      self.postMessage({ id, ok: true, corners: found ? found.corners : null, confident: !!(found && found.confident) });
     } else if (type === 'warp') {
       const out = warp(cv, image, checkCorners(data.corners));
       self.postMessage({ id, ok: true, image: out }, [out.data.buffer]);
