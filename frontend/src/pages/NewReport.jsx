@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
 // The compressor runs in a worker it builds from this script. Left to itself
@@ -13,6 +13,7 @@ import { jsPDF } from 'jspdf';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles, terminalName } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
 import DocumentScanner from '../components/DocumentScanner';
+import { createScanner } from '../scanner/scannerClient';
 import { getRole, getUsername, isSupervisor } from '../utils/auth';
 import { toLatinDigits } from '../utils/digits';
 
@@ -55,34 +56,28 @@ async function mergeImagesToPdf(imageFiles) {
     else { pdf.addPage('a4', orientation); }
     pdf.addImage(jpegUrl, 'JPEG', 0, 0, pageW, pageH);
   }
-  const name = imageFiles[0]?.name.replace(/\.[^.]+$/, '') || 'merged';
-  return pdf ? new File([pdf.output('blob')], `${name}.pdf`, { type: 'application/pdf' }) : null;
+  // Named for what it holds, not after one of its pages.
+  return pdf ? new File([pdf.output('blob')], 'photos.pdf', { type: 'application/pdf' }) : null;
 }
 
-// Prepare files for upload. Every image becomes PDF, and images that were
-// added together — one pick of several photos, one paste, one scan of several
-// pages — are merged into a single PDF automatically. Images added at
-// different times stay separate documents. Non-image files pass through.
-async function prepareFilesForUpload(entries) {
-  const out = [];
-  const batches = new Map();   // batch id → images, in the order first seen
-  for (const { file, batch } of entries) {
-    if (!IMG_TYPES.test(file.type)) { out.push(file); continue; }
-    if (!batches.has(batch)) { batches.set(batch, []); out.push(batches.get(batch)); }
-    batches.get(batch).push(file);
-  }
+// Prepare files for upload. Every image added to the form before it is saved
+// — picked, photographed, pasted or shared, at any point and in any number of
+// goes — goes into ONE PDF, a page per image in the order they were added.
+// Files that are not images (a PDF from CamScanner, say) pass through as they
+// are. The merged PDF takes the place of the first image in the list.
+async function prepareFilesForUpload(files) {
+  const images = files.filter(f => IMG_TYPES.test(f.type));
+  if (images.length === 0) return files;
+  let pdf = images.length === 1 ? await compressImageToPdf(images[0]) : await mergeImagesToPdf(images);
   const result = [];
-  for (const item of out) {
-    if (!Array.isArray(item)) { result.push(item); continue; }
-    if (item.length === 1) { result.push(await compressImageToPdf(item[0])); continue; }
-    const merged = await mergeImagesToPdf(item);
-    if (merged) result.push(merged);
-    else result.push(...await Promise.all(item.map(compressImageToPdf)));
+  let placed = false;
+  for (const f of files) {
+    if (!IMG_TYPES.test(f.type)) { result.push(f); continue; }
+    if (!placed) { if (pdf) result.push(pdf); placed = true; }
   }
+  if (!pdf) result.push(...await Promise.all(images.map(compressImageToPdf)));
   return result;
 }
-
-let nextBatch = 1;
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 
@@ -324,10 +319,8 @@ export default function NewReport({ editMode }) {
     comment:          seed.comment          || '',
   });
 
-  // Each entry is { file, batch }: files added in one action share a batch,
-  // and a batch's images are merged into one PDF on upload.
   const [files, setFiles] = useState([]);
-  const [scanning, setScanning] = useState(false);
+  const [reviewing, setReviewing] = useState(null);   // photos waiting in the scanner review
   const [converting, setConverting] = useState(false);
   const [pasteStatus, setPasteStatus] = useState('idle'); // idle | pasting | done | error
   const [existingFiles, setExistingFiles] = useState([]);
@@ -359,8 +352,29 @@ export default function NewReport({ editMode }) {
   // Pick up files passed in via Web Share Target (?shared=1)
   function addFiles(incoming) {
     if (!incoming.length) return;
-    const batch = nextBatch++;
-    setFiles(prev => [...prev, ...incoming.map(file => ({ file, batch }))]);
+    setFiles(prev => [...prev, ...incoming]);
+  }
+
+  // The scanner (and the OpenCV it carries) starts loading the moment
+  // "Choose File" is tapped, so it is usually ready by the time the photos
+  // are picked. It is released when the review ends, and when the form closes.
+  const scannerRef = useRef(null);
+  const getScanner = () => (scannerRef.current ||= createScanner());
+  const releaseScanner = () => { scannerRef.current?.close(); scannerRef.current = null; };
+  useEffect(() => releaseScanner, []);
+
+  // Photos picked with "Choose File" go through the scanner review first;
+  // anything else (a PDF, say) is added straight away.
+  function chooseFiles(picked) {
+    const photos = picked.filter(f => IMG_TYPES.test(f.type));
+    addFiles(picked.filter(f => !IMG_TYPES.test(f.type)));
+    if (photos.length) { getScanner(); setReviewing(photos); }
+    else releaseScanner();   // loaded on the tap, but no photo came of it
+  }
+  function endReview(result) {
+    if (result) addFiles(result);
+    setReviewing(null);
+    releaseScanner();
   }
 
   useEffect(() => {
@@ -551,10 +565,10 @@ export default function NewReport({ editMode }) {
         fd.append('new_airline', form.new_airline || '');
         fd.append('days_at_airport', daysAtAirport);
       }
-      const hasImages = files.some(e => IMG_TYPES.test(e.file.type));
+      const hasImages = files.some(f => IMG_TYPES.test(f.type));
       const uploadFiles = hasImages
         ? await (setConverting(true), prepareFilesForUpload(files).finally(() => setConverting(false)))
-        : files.map(e => e.file);
+        : files;
       uploadFiles.forEach(f => fd.append('files', f));
 
       let report;
@@ -857,7 +871,8 @@ export default function NewReport({ editMode }) {
             <label className="field-label">{isEdit ? 'Add More Files' : 'File Attachments'}</label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
               <input type="file" className="field-input" multiple style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
-                onChange={e => { addFiles(Array.from(e.target.files)); e.target.value = ''; }} />
+                onClick={getScanner}
+                onChange={e => { chooseFiles(Array.from(e.target.files)); e.target.value = ''; }} />
               <button
                 type="button"
                 className={`btn btn-sm ${pasteStatus === 'done' ? 'btn-success' : pasteStatus === 'error' ? 'btn-danger' : 'btn-secondary'}`}
@@ -868,30 +883,29 @@ export default function NewReport({ editMode }) {
               >
                 {pasteStatus === 'pasting' ? '…' : pasteStatus === 'done' ? '✓ Pasted' : pasteStatus === 'error' ? 'Nothing to paste' : '📋 Paste'}
               </button>
-              <button type="button" className="btn btn-sm btn-primary" onClick={() => setScanning(true)}
-                title="Photograph a document and crop it to its edges" style={{ whiteSpace: 'nowrap' }}>
-                📷 Scan
-              </button>
             </div>
-            {scanning && <DocumentScanner onDone={addFiles} onClose={() => setScanning(false)} />}
+            {reviewing && (
+              <DocumentScanner files={reviewing} scanner={getScanner()}
+                onDone={endReview} onCancel={() => endReview(null)} />
+            )}
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 6px' }}>
               Tip: Copy a scan in CamScanner, then tap Paste here — no need to save the file first.
             </p>
             {files.length > 0 && (() => {
-              // How many images each batch holds, to show which become one PDF.
-              const perBatch = {};
-              files.forEach(e => { if (IMG_TYPES.test(e.file.type)) perBatch[e.batch] = (perBatch[e.batch] || 0) + 1; });
+              // Every image becomes a page of one PDF; show which page.
+              const imageCount = files.filter(f => IMG_TYPES.test(f.type)).length;
+              let page = 0;
               return (
                 <ul className="file-list">
-                  {files.map(({ file: f, batch }, i) => {
+                  {files.map((f, i) => {
                     const isImg = IMG_TYPES.test(f.type);
-                    const n = perBatch[batch];
+                    if (isImg) page++;
                     return (
                       <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ flex: 1 }}>
                           {isImg ? '📷' : '📄'} {f.name}
                           <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: 4 }}>
-                            ({(f.size / 1024).toFixed(0)} KB{isImg ? (n > 1 ? ` → one PDF with ${n - 1} other${n > 2 ? 's' : ''}` : ' → PDF') : ''})
+                            ({(f.size / 1024).toFixed(0)} KB{isImg ? (imageCount > 1 ? ` → PDF page ${page} of ${imageCount}` : ' → PDF') : ''})
                           </span>
                         </span>
                         <button type="button" className="btn btn-xs btn-danger"
