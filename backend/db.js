@@ -47,6 +47,10 @@ async function initDb() {
     )
   `);
 
+  // flights_custom held Flight Manager's additions and overrides. Nothing reads
+  // or writes it since Flight Manager was removed; the table is kept rather
+  // than dropped so its rows are not lost, and so the migrations below still
+  // run on a fresh database.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS flights_custom (
       flight_number TEXT PRIMARY KEY,

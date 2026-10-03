@@ -5,7 +5,6 @@ import Dashboard   from './pages/Dashboard';
 import NewReport   from './pages/NewReport';
 import Analytics   from './pages/Analytics';
 import AccessManagement from './pages/AccessManagement';
-import FlightManager from './pages/FlightManager';
 import SharePicker from './pages/SharePicker';
 import UsersPage   from './pages/UsersPage';
 import PrivateRoute from './components/PrivateRoute';
@@ -35,10 +34,6 @@ export default function App() {
 
         <Route path="/access-management" element={
           <PrivateRoute supervisorOnly><AccessManagement /></PrivateRoute>
-        } />
-
-        <Route path="/flight-manager" element={
-          <PrivateRoute supervisorOnly><FlightManager /></PrivateRoute>
         } />
 
         <Route path="/users" element={

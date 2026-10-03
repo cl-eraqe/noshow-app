@@ -229,18 +229,6 @@ export async function getFilterOptions(scope) {
   return request(`/api/analytics/filter-options${q}`);
 }
 
-// ── Flight Manager (supervisor)
-export async function getCustomFlights() {
-  return request('/api/flights/custom/list');
-}
-
-export async function saveFlight(data) {
-  return request('/api/flights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-}
-export async function deleteFlight(flightNumber) {
-  return request(`/api/flights/${flightNumber}`, { method: 'DELETE' });
-}
-
 export async function getAuditLog(reportId) {
   const q = reportId ? `?report_id=${reportId}` : '';
   return request(`/api/analytics/audit-log${q}`);
