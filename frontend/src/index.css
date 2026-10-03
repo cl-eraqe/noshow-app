@@ -2453,9 +2453,68 @@ html, body, #root {
 .scanner-poly { fill: rgba(46, 204, 113, 0.18); stroke: #2ecc71; stroke-width: 2; }
 .scanner-hit { fill: transparent; cursor: grab; }
 .scanner-handle { fill: #fff; stroke: #2ecc71; stroke-width: 3; pointer-events: none; }
-.scanner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
-.scanner-pick { border: 1px solid #dde3ea; border-radius: 8px; padding: 6px; }
-.scanner-pick img { width: 100%; height: 150px; object-fit: contain; background: #f4f6f8; border-radius: 4px; display: block; }
-.scanner-pick-buttons { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-.scanner-pick-removed img { opacity: 0.3; }
-.scanner-pick-note { font-size: 0.75rem; color: var(--text-muted); margin: 4px 0 0; }
+
+/* "Crop all" results: one page at a time, swiped like a scanner app's page view. */
+.pb {
+  position: fixed; inset: 0; z-index: 1000;
+  background: #1c1c1e; color: #fff;
+  display: flex; flex-direction: column;
+}
+.pb-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top));
+  border-bottom: 1px solid #2e2e31;
+}
+.pb-icon { background: none; border: 0; color: #fff; font-size: 1.3rem; width: 36px; cursor: pointer; }
+.pb-icon-spacer { width: 36px; }
+.pb-track {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; gap: 14px;
+  overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+  padding: 16px calc(50% - min(39vw, 230px));
+  scrollbar-width: none;
+}
+.pb-track::-webkit-scrollbar { display: none; }
+.pb-slide {
+  flex: 0 0 min(78vw, 460px); height: 100%;
+  scroll-snap-align: center;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.pb-slide img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+  background: #fff; border-radius: 3px; box-shadow: 0 4px 18px rgba(0,0,0,0.5);
+  user-select: none; -webkit-user-drag: none;
+}
+.pb-slide-removed img { opacity: 0.25; }
+.pb-badge {
+  position: absolute; background: #c0392b; color: #fff;
+  padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 0.85rem;
+}
+.pb-counter {
+  align-self: center; display: flex; align-items: center; gap: 22px;
+  background: #2c2c2f; border-radius: 10px; padding: 6px 16px; margin: 4px 0 12px;
+  font-weight: 600;
+}
+.pb-counter button { background: none; border: 0; color: #fff; font-size: 1rem; cursor: pointer; }
+.pb-counter button:disabled { opacity: 0.3; }
+.pb-controls {
+  background: #2a2a2d; border-radius: 16px 16px 0 0;
+  padding: 14px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 12px;
+}
+.pb-options { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pb-opt {
+  background: #3a3a3e; color: #fff; border: 2px solid transparent;
+  border-radius: 10px; padding: 9px 16px; font-weight: 600; cursor: pointer;
+}
+.pb-opt:disabled { opacity: 0.35; }
+.pb-opt-on { background: #1f8f5f; border-color: #3ccf8e; }
+.pb-opt-danger { margin-left: auto; }
+.pb-note { font-size: 0.8rem; color: #aaa; width: 100%; }
+.pb-add {
+  background: #1f9d60; color: #fff; border: 0; border-radius: 12px;
+  padding: 13px; font-size: 1rem; font-weight: 700; cursor: pointer;
+}
+.pb-add:disabled { opacity: 0.4; }
