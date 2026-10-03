@@ -11,7 +11,6 @@
 // now correcting them is one line, and two flights to the same airport cannot
 // disagree.
 
-const { getDb } = require('./db');
 const timetableJson = require('./flights.json');
 const airports = require('./airports.json');
 
@@ -69,46 +68,14 @@ function resolveTimetableDate(time, direction) {
   return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
 }
 
-// Everything the destination code implies, or null for an airport we have no
-// entry for. A listed airport may carry a deliberately empty nationality —
-// the Gulf hubs, whose passengers are mostly not their nationals — and that
-// blank has to reach the form rather than be filled from elsewhere.
+// Everything the destination code implies. An airport not in the file leaves
+// these blank, and so does a listed airport whose nationality is deliberately
+// empty — the Gulf hubs, whose passengers are mostly not their nationals.
 function destinationFacts(code) {
   const a = airports[String(code || '').toUpperCase()];
-  return a ? { city: a.city, country: a.country, nationality: a.nationality } : null;
-}
-
-// flights_custom is read ahead of flights.json: it holds supervisor additions
-// and overrides, and a row marked deleted hides a flights.json entry.
-async function timetableEntry(flightNumber) {
-  const { rows } = await getDb().query(
-    `SELECT * FROM flights_custom WHERE flight_number = $1`, [flightNumber]
-  );
-  const custom = rows[0];
-  if (custom) {
-    if (custom.deleted) return null;
-    return {
-      std: custom.std,
-      destination: (custom.destination || '').toUpperCase(),
-      // Kept only as a fallback for rows added before the split, whose airport
-      // may not be in airports.json yet. New rows do not carry these.
-      city: custom.city,
-      country: custom.country,
-      nationality: custom.nationality,
-      // flights_custom has no terminal column; the client's flights.json cache
-      // and airline-code map fill that in.
-      terminal: null,
-      source: 'custom',
-    };
-  }
-  const base = timetableJson[flightNumber];
-  if (!base) return null;
-  return {
-    std: base.std,
-    destination: (base.destination || '').toUpperCase(),
-    terminal: base.terminal || null,
-    source: 'timetable',
-  };
+  return a
+    ? { city: a.city, country: a.country, nationality: a.nationality }
+    : { city: '', country: '', nationality: '' };
 }
 
 /**
@@ -119,25 +86,24 @@ async function resolveFlight(rawNumber, direction = 'past') {
   const flightNumber = normalizeFlightNumber(rawNumber);
   if (!flightNumber) return null;
 
-  const entry = await timetableEntry(flightNumber);
+  const entry = timetableJson[flightNumber];
   if (!entry) return null;
 
+  const destination = (entry.destination || '').toUpperCase();
   const date = resolveTimetableDate(entry.std, direction);
-  const dest = destinationFacts(entry.destination);
+  const dest = destinationFacts(destination);
 
   return {
     flight_number: flightNumber,
-    source:        entry.source,
+    source:        'timetable',
     date,
     std:           entry.std,
     datetime:      date && entry.std ? `${date}T${entry.std}` : null,
-    destination:   entry.destination,
-    // The airport table is the source; a pre-split custom row's own values are
-    // the fallback only for an airport not listed there.
-    city:          dest ? dest.city        : (entry.city || ''),
-    country:       dest ? dest.country     : (entry.country || ''),
-    nationality:   dest ? dest.nationality : (entry.nationality || ''),
-    terminal:      entry.terminal,
+    destination,
+    city:          dest.city,
+    country:       dest.country,
+    nationality:   dest.nationality,
+    terminal:      entry.terminal || null,
   };
 }
 

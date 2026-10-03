@@ -1,54 +1,21 @@
 const express = require('express');
 const router  = express.Router();
 const flights = require('../flights.json');
-const { getDb, jeddahNowStr } = require('../db');
-const { requireRole } = require('../middleware/auth');
 const { normalizeFlightNumber, resolveFlight } = require('../flight-lookup');
 
-// GET /api/flights/terminals — { flightNumber: terminal } map sourced from flights.json
-router.get('/terminals', async (_req, res) => {
-  try {
-    const pool = getDb();
-    const { rows: customs } = await pool.query('SELECT flight_number, deleted FROM flights_custom');
-    const deletedSet = new Set(customs.filter(c => c.deleted).map(c => c.flight_number));
-    const map = {};
-    for (const k of Object.keys(flights)) {
-      if (!deletedSet.has(k)) map[k] = flights[k].terminal;
-    }
-    res.json(map);
-  } catch (e) {
-    console.error('[GET /flights/terminals]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// flights.json is the only source. It is updated by merging the schedule
+// exports (scripts/csv_to_flights_json.py); there is no in-app editing.
 
-// GET /api/flights/custom/list — must be before /:flightNumber
-router.get('/custom/list', async (_req, res) => {
-  try {
-    const pool = getDb();
-    const { rows } = await pool.query('SELECT * FROM flights_custom ORDER BY flight_number ASC');
-    const enriched = rows.map(r => ({ ...r, isOverride: !!flights[r.flight_number] }));
-    res.json(enriched);
-  } catch (e) {
-    console.error('[GET /flights/custom/list]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+// GET /api/flights/terminals — { flightNumber: terminal }
+router.get('/terminals', (_req, res) => {
+  const map = {};
+  for (const k of Object.keys(flights)) map[k] = flights[k].terminal;
+  res.json(map);
 });
 
 // GET /api/flights — all known flight numbers
-router.get('/', async (_req, res) => {
-  try {
-    const pool = getDb();
-    const { rows: customs } = await pool.query('SELECT * FROM flights_custom');
-    const customMap = {};
-    customs.forEach(c => { customMap[c.flight_number] = c; });
-    const jsonKeys = Object.keys(flights).filter(k => !customMap[k]?.deleted);
-    const customAdditions = customs.filter(c => !c.deleted && !flights[c.flight_number]).map(c => c.flight_number);
-    res.json([...jsonKeys, ...customAdditions].sort());
-  } catch (e) {
-    console.error('[GET /flights]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+router.get('/', (_req, res) => {
+  res.json(Object.keys(flights).sort());
 });
 
 // GET /api/flights/:flightNumber[?direction=past|future]
@@ -65,47 +32,6 @@ router.get('/:flightNumber', async (req, res) => {
     res.json(hit);
   } catch (e) {
     console.error('[GET /flights/:flightNumber]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// POST /api/flights — add or update a flight (supervisor only)
-router.post('/', requireRole('supervisor'), express.json(), async (req, res) => {
-  try {
-    const { flight_number, destination, std, city, country, nationality } = req.body;
-    if (!flight_number) return res.status(400).json({ error: 'flight_number required' });
-    const key = flight_number.toUpperCase().trim();
-    const pool = getDb();
-    await pool.query(
-      `INSERT INTO flights_custom (flight_number, destination, std, city, country, nationality, deleted, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
-       ON CONFLICT (flight_number) DO UPDATE SET
-         destination = EXCLUDED.destination, std = EXCLUDED.std, city = EXCLUDED.city,
-         country = EXCLUDED.country, nationality = EXCLUDED.nationality,
-         deleted = 0, updated_at = EXCLUDED.updated_at`,
-      [key, destination || '', std || '', city || '', country || '', nationality || '', jeddahNowStr()]
-    );
-    res.json({ success: true, flight_number: key });
-  } catch (e) {
-    console.error('[POST /flights]', e);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// DELETE /api/flights/:flightNumber — soft-delete (supervisor only)
-router.delete('/:flightNumber', requireRole('supervisor'), async (req, res) => {
-  try {
-    const key = req.params.flightNumber.toUpperCase().trim();
-    const pool = getDb();
-    await pool.query(
-      `INSERT INTO flights_custom (flight_number, deleted, updated_at)
-       VALUES ($1, 1, $2)
-       ON CONFLICT (flight_number) DO UPDATE SET deleted = 1, updated_at = EXCLUDED.updated_at`,
-      [key, jeddahNowStr()]
-    );
-    res.json({ success: true });
-  } catch (e) {
-    console.error('[DELETE /flights/:flightNumber]', e);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
