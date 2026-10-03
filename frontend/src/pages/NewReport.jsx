@@ -1,9 +1,18 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
+// The compressor runs in a worker it builds from this script. Left to itself
+// it fetches the script from cdn.jsdelivr.net on every compression — third-
+// party code handed passport photos. This serves the installed copy from our
+// own origin instead.
+import compressionLibPath from 'browser-image-compression/dist/browser-image-compression.js?url';
+// Absolute: the compressor's worker is built from a blob: URL, against which
+// a root-relative path does not resolve.
+const compressionLibUrl = new URL(compressionLibPath, window.location.href).href;
 import { jsPDF } from 'jspdf';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles, terminalName } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
+import DocumentScanner from '../components/DocumentScanner';
 import { getRole, getUsername, isSupervisor } from '../utils/auth';
 import { toLatinDigits } from '../utils/digits';
 
@@ -25,7 +34,7 @@ function imageToA4DataUrl(img) {
 }
 
 async function compressImageToPdf(file) {
-  const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 2480, useWebWorker: true });
+  const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 2480, useWebWorker: true, libURL: compressionLibUrl });
   const dataUrl = await imageCompression.getDataUrlFromFile(compressed);
   const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = dataUrl; });
   const { dataUrl: jpegUrl, pageW, pageH } = imageToA4DataUrl(img);
@@ -37,7 +46,7 @@ async function compressImageToPdf(file) {
 async function mergeImagesToPdf(imageFiles) {
   let pdf = null;
   for (const file of imageFiles) {
-    const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 2480, useWebWorker: true });
+    const compressed = await imageCompression(file, { maxSizeMB: 1, maxWidthOrHeight: 2480, useWebWorker: true, libURL: compressionLibUrl });
     const dataUrl = await imageCompression.getDataUrlFromFile(compressed);
     const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = dataUrl; });
     const { dataUrl: jpegUrl, pageW, pageH } = imageToA4DataUrl(img);
@@ -46,20 +55,34 @@ async function mergeImagesToPdf(imageFiles) {
     else { pdf.addPage('a4', orientation); }
     pdf.addImage(jpegUrl, 'JPEG', 0, 0, pageW, pageH);
   }
-  return pdf ? new File([pdf.output('blob')], 'merged.pdf', { type: 'application/pdf' }) : null;
+  const name = imageFiles[0]?.name.replace(/\.[^.]+$/, '') || 'merged';
+  return pdf ? new File([pdf.output('blob')], `${name}.pdf`, { type: 'application/pdf' }) : null;
 }
 
-// Prepare files for upload: convert images to PDF (merged or individual)
-async function prepareFilesForUpload(files, merge) {
-  const images = files.filter(f => IMG_TYPES.test(f.type));
-  const pdfs   = files.filter(f => !IMG_TYPES.test(f.type));
-  if (images.length === 0) return files;
-  if (merge && images.length >= 2) {
-    const merged = await mergeImagesToPdf(images);
-    return merged ? [...pdfs, merged] : [...pdfs, ...await Promise.all(images.map(compressImageToPdf))];
+// Prepare files for upload. Every image becomes PDF, and images that were
+// added together — one pick of several photos, one paste, one scan of several
+// pages — are merged into a single PDF automatically. Images added at
+// different times stay separate documents. Non-image files pass through.
+async function prepareFilesForUpload(entries) {
+  const out = [];
+  const batches = new Map();   // batch id → images, in the order first seen
+  for (const { file, batch } of entries) {
+    if (!IMG_TYPES.test(file.type)) { out.push(file); continue; }
+    if (!batches.has(batch)) { batches.set(batch, []); out.push(batches.get(batch)); }
+    batches.get(batch).push(file);
   }
-  return [...pdfs, ...await Promise.all(images.map(compressImageToPdf))];
+  const result = [];
+  for (const item of out) {
+    if (!Array.isArray(item)) { result.push(item); continue; }
+    if (item.length === 1) { result.push(await compressImageToPdf(item[0])); continue; }
+    const merged = await mergeImagesToPdf(item);
+    if (merged) result.push(merged);
+    else result.push(...await Promise.all(item.map(compressImageToPdf)));
+  }
+  return result;
 }
+
+let nextBatch = 1;
 
 const AIRLINE_NAMES = Object.values(AIRLINE_CODES).sort();
 
@@ -301,8 +324,10 @@ export default function NewReport({ editMode }) {
     comment:          seed.comment          || '',
   });
 
+  // Each entry is { file, batch }: files added in one action share a batch,
+  // and a batch's images are merged into one PDF on upload.
   const [files, setFiles] = useState([]);
-  const [mergeImages, setMergeImages] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [converting, setConverting] = useState(false);
   const [pasteStatus, setPasteStatus] = useState('idle'); // idle | pasting | done | error
   const [existingFiles, setExistingFiles] = useState([]);
@@ -334,7 +359,8 @@ export default function NewReport({ editMode }) {
   // Pick up files passed in via Web Share Target (?shared=1)
   function addFiles(incoming) {
     if (!incoming.length) return;
-    setFiles(prev => [...prev, ...incoming]);
+    const batch = nextBatch++;
+    setFiles(prev => [...prev, ...incoming.map(file => ({ file, batch }))]);
   }
 
   useEffect(() => {
@@ -525,8 +551,10 @@ export default function NewReport({ editMode }) {
         fd.append('new_airline', form.new_airline || '');
         fd.append('days_at_airport', daysAtAirport);
       }
-      const hasImages = files.some(f => IMG_TYPES.test(f.type));
-      const uploadFiles = hasImages ? await (setConverting(true), prepareFilesForUpload(files, mergeImages).finally(() => setConverting(false))) : files;
+      const hasImages = files.some(e => IMG_TYPES.test(e.file.type));
+      const uploadFiles = hasImages
+        ? await (setConverting(true), prepareFilesForUpload(files).finally(() => setConverting(false)))
+        : files.map(e => e.file);
       uploadFiles.forEach(f => fd.append('files', f));
 
       let report;
@@ -840,36 +868,40 @@ export default function NewReport({ editMode }) {
               >
                 {pasteStatus === 'pasting' ? '…' : pasteStatus === 'done' ? '✓ Pasted' : pasteStatus === 'error' ? 'Nothing to paste' : '📋 Paste'}
               </button>
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => setScanning(true)}
+                title="Photograph a document and crop it to its edges" style={{ whiteSpace: 'nowrap' }}>
+                📷 Scan
+              </button>
             </div>
+            {scanning && <DocumentScanner onDone={addFiles} onClose={() => setScanning(false)} />}
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 6px' }}>
               Tip: Copy a scan in CamScanner, then tap Paste here — no need to save the file first.
             </p>
-            {files.length > 0 && (
-              <>
+            {files.length > 0 && (() => {
+              // How many images each batch holds, to show which become one PDF.
+              const perBatch = {};
+              files.forEach(e => { if (IMG_TYPES.test(e.file.type)) perBatch[e.batch] = (perBatch[e.batch] || 0) + 1; });
+              return (
                 <ul className="file-list">
-                  {files.map((f, i) => (
-                    <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ flex: 1 }}>
-                        {IMG_TYPES.test(f.type) ? '📷' : '📄'} {f.name}
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: 4 }}>
-                          ({(f.size / 1024).toFixed(0)} KB{IMG_TYPES.test(f.type) ? ' → PDF' : ''})
+                  {files.map(({ file: f, batch }, i) => {
+                    const isImg = IMG_TYPES.test(f.type);
+                    const n = perBatch[batch];
+                    return (
+                      <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ flex: 1 }}>
+                          {isImg ? '📷' : '📄'} {f.name}
+                          <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginLeft: 4 }}>
+                            ({(f.size / 1024).toFixed(0)} KB{isImg ? (n > 1 ? ` → one PDF with ${n - 1} other${n > 2 ? 's' : ''}` : ' → PDF') : ''})
+                          </span>
                         </span>
-                      </span>
-                      <button type="button" className="btn btn-xs btn-danger"
-                        onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}>✕</button>
-                    </li>
-                  ))}
+                        <button type="button" className="btn btn-xs btn-danger"
+                          onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}>✕</button>
+                      </li>
+                    );
+                  })}
                 </ul>
-                {files.filter(f => IMG_TYPES.test(f.type)).length >= 2 && (
-                  <button type="button"
-                    className={`btn btn-sm ${mergeImages ? 'btn-primary' : 'btn-secondary'}`}
-                    style={{ marginTop: 8 }}
-                    onClick={() => setMergeImages(m => !m)}>
-                    🗂 {mergeImages ? 'Merge ON — all photos → one PDF ✓' : 'Merge photos into one PDF'}
-                  </button>
-                )}
-              </>
-            )}
+              );
+            })()}
           </div>
         </div>
 

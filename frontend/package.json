@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@techstark/opencv-js": "4.10.0-release.1",
     "browser-image-compression": "^2.0.2",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",

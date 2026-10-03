@@ -27,7 +27,22 @@ export default defineConfig({
         // and staff do not close tabs — a fix can sit undelivered for days.
         skipWaiting: true,
         clientsClaim: true,
+        // The document scanner's worker carries OpenCV (~10 MB). Precaching
+        // would make every phone download it on install, scanner used or not;
+        // it is cached on first use instead (below).
+        globIgnores: ['**/scanner.worker-*.js'],
         runtimeCaching: [
+          {
+            // Content-hashed, so a cached copy is never stale: a new OpenCV
+            // gets a new file name. Kept to the current version only.
+            urlPattern: ({ url }) => url.pathname.startsWith('/assets/scanner.worker-'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'scanner-cache',
+              expiration: { maxEntries: 1 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
           {
             // Flight data, still cached so a lookup works offline — but the
             // network is asked first.
