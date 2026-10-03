@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 // four handles already placed on the document's corners, the employee drags
 // any that are off, and the document is cut out, squared up and evened out.
 // A photo can also be kept as it is (a screenshot, an earlier scan) or
-// removed, and "Crop all automatically" processes the rest without review.
+// removed, and "Crop all automatically" processes the rest in one go and then
+// shows the results side by side, so the employee picks, per photo, the
+// cropped version, the original, or neither.
 //
 // Everything happens on the phone. Nothing is uploaded until the report is
 // saved, and a cut photo is re-encoded through a canvas, which also drops its
@@ -61,6 +63,7 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
   const [busy, setBusy] = useState('');                // '' or what is happening
   const [scannerState, setScannerState] = useState('loading');  // loading | ready | failed
   const [error, setError] = useState('');
+  const [picks, setPicks] = useState(null);           // after "Crop all": [{ original, cropped, choice, ... }]
   const cameraRef = useRef(null);
   const doneRef = useRef(false);
 
@@ -70,8 +73,10 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
     return () => { alive = false; };
   }, [scanner]);
 
-  // Revoke the shown photo's object URL whenever it is replaced or unmounted.
+  // Revoke object URLs whenever what they show is replaced or unmounted.
   useEffect(() => () => { if (current) URL.revokeObjectURL(current.url); }, [current]);
+  const pickUrls = useRef([]);
+  useEffect(() => () => pickUrls.current.forEach(u => URL.revokeObjectURL(u)), []);
 
   // Show and analyse the current photo; past the end, hand the results back.
   // Keyed on the photo itself, not the queue, so adding a page with
@@ -123,24 +128,38 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
     }
   }
 
-  // Detect and cut every remaining photo with no review. A photo whose edges
-  // are not found is kept as it is rather than cut along a guess.
+  // Detect and cut every remaining photo, then show the results so the
+  // employee chooses for each. A photo whose edges are not found has no
+  // cropped version and starts on "Original".
   async function cropAll() {
     const out = [];
     for (let j = index; j < queue.length; j++) {
       setBusy(`Cropping ${j - index + 1} of ${queue.length - index}…`);
+      const original = queue[j];
+      let cropped = null;
       try {
-        const { img, url } = await loadImage(queue[j]);
+        const { img, url } = await loadImage(original);
         try {
           const c = await scanner.detect(toImageData(img, DETECT_SIDE));
-          out.push(c ? await imageDataToFile(await scanner.warp(toImageData(img, WARP_SIDE), c), croppedName(queue[j])) : queue[j]);
+          if (c) cropped = await imageDataToFile(await scanner.warp(toImageData(img, WARP_SIDE), c), croppedName(original));
         } finally { URL.revokeObjectURL(url); }
-      } catch {
-        out.push(queue[j]);
-      }
+      } catch { /* left without a cropped version */ }
+      const urls = { original: URL.createObjectURL(original), cropped: cropped && URL.createObjectURL(cropped) };
+      pickUrls.current.push(...Object.values(urls).filter(Boolean));
+      out.push({ original, cropped, urls, choice: cropped ? 'cropped' : 'original' });
     }
     setBusy('');
-    setResults(r => [...r, ...out]);
+    setPicks(out);
+  }
+
+  function setChoice(i, choice) {
+    setPicks(ps => ps.map((p, j) => j === i ? { ...p, choice } : p));
+  }
+
+  function addPicks() {
+    const chosen = picks.filter(p => p.choice !== 'removed').map(p => p.choice === 'cropped' ? p.cropped : p.original);
+    setResults(r => [...r, ...chosen]);
+    setPicks(null);
     setIndex(queue.length);
   }
 
@@ -150,7 +169,7 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
   }
 
   function cancel() {
-    if (index > 0 && !window.confirm('Discard these photos?')) return;
+    if ((index > 0 || picks) && !window.confirm('Discard these photos?')) return;
     doneRef.current = true;
     onCancel();
   }
@@ -158,6 +177,41 @@ export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
   if (index >= queue.length) return null;
   const remaining = queue.length - index;
   const ready = scannerState === 'ready';
+
+  if (picks) {
+    const count = picks.filter(p => p.choice !== 'removed').length;
+    return (
+      <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label="Choose photos">
+        <div className="scanner-panel">
+          <div className="scanner-head">
+            <strong>Choose for each photo</strong>
+            <button type="button" className="btn btn-xs btn-secondary" onClick={cancel}>✕</button>
+          </div>
+          <div className="scanner-grid">
+            {picks.map((p, i) => (
+              <div key={i} className={`scanner-pick ${p.choice === 'removed' ? 'scanner-pick-removed' : ''}`}>
+                <img src={p.choice === 'cropped' ? p.urls.cropped : p.urls.original} alt={`Photo ${i + 1}`} />
+                <div className="scanner-pick-buttons">
+                  <button type="button" className={`btn btn-xs ${p.choice === 'cropped' ? 'btn-primary' : 'btn-secondary'}`}
+                    disabled={!p.cropped} onClick={() => setChoice(i, 'cropped')}>Cropped</button>
+                  <button type="button" className={`btn btn-xs ${p.choice === 'original' ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setChoice(i, 'original')}>Original</button>
+                  <button type="button" className={`btn btn-xs ${p.choice === 'removed' ? 'btn-danger' : 'btn-secondary'}`}
+                    title="Leave this photo out" onClick={() => setChoice(i, 'removed')}>🗑</button>
+                </div>
+                {!p.cropped && <p className="scanner-pick-note">Edges not found</p>}
+              </div>
+            ))}
+          </div>
+          <div className="scanner-actions">
+            <button type="button" className="btn btn-success" disabled={count === 0} onClick={addPicks}>
+              ✓ Add {count} photo{count === 1 ? '' : 's'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label="Review photos">
