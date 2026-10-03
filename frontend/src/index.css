@@ -2449,3 +2449,50 @@ html, body, #root {
 @media (max-width: 640px) {
   .airport-fill-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Document scanner ─────────────────────────────────────────────────── */
+
+.scanner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(10, 18, 36, 0.92);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: 16px;
+}
+.scanner-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  width: 100%;
+  max-width: 600px;
+}
+.scanner-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.scanner-hint { font-size: 0.9rem; margin: 8px 0; }
+.scanner-note { font-size: 0.85rem; color: var(--text-muted); margin: 8px 0; }
+.scanner-error { font-size: 0.85rem; color: var(--danger); margin: 6px 0; }
+.scanner-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.scanner-pages { display: flex; gap: 8px; flex-wrap: wrap; }
+.scanner-thumb { position: relative; }
+.scanner-thumb img {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border: 1px solid #ccd;
+  border-radius: 6px;
+}
+.scanner-thumb button { position: absolute; top: -6px; right: -6px; }
+.scanner-stage { position: relative; margin: 0 auto; touch-action: none; user-select: none; }
+.scanner-stage img { display: block; border-radius: 4px; }
+.scanner-svg { position: absolute; inset: 0; touch-action: none; }
+.scanner-poly { fill: rgba(46, 204, 113, 0.18); stroke: #2ecc71; stroke-width: 2; }
+.scanner-hit { fill: transparent; cursor: grab; }
+.scanner-handle { fill: #fff; stroke: #2ecc71; stroke-width: 3; pointer-events: none; }
