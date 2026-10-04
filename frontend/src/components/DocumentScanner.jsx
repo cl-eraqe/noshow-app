@@ -1,20 +1,60 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Review queue for photos picked with "Choose File": each photo is shown with
-// four handles already placed on the document's corners, the employee drags
-// any that are off, and the document is cut out, squared up and evened out.
-// A photo can also be kept as it is (a screenshot, an earlier scan) or
-// removed, and "Crop all automatically" processes the rest in one go and then
-// shows the results side by side, so the employee picks, per photo, the
-// cropped version, the original, or neither.
+// Photos picked with "Choose File" are all cropped automatically, then shown
+// one page at a time, in the manner of a scanner app's page view:
 //
-// Everything happens on the phone. Nothing is uploaded until the report is
-// saved, and a cut photo is re-encoded through a canvas, which also drops its
+//   ✕                               + Add      add a photo (camera or library)
+//   [page, with 🗑 at its top left]           swipe between pages
+//              ◀ 3/7 ▶
+//   Retake        Left        Crop            per page
+//   [            ✓ Attach 7 pages           ]
+//
+// Crop opens the page's corners — with a handle in the middle of each side
+// that moves the whole side, and a magnifier under the finger — plus Left,
+// Right, Auto Crop (back to the detected edges) and All (no crop).
+//
+// A page whose edges the detector is not sure of starts uncropped. Everything
+// happens on the phone; nothing is uploaded until the report is saved, and
+// every page is re-encoded through a canvas, which also drops the photo's
 // EXIF data (GPS position included).
 
-const DETECT_SIDE = 1280;    // handed to the worker, which shrinks it to 640 by area averaging
-const WARP_SIDE   = 2000;    // input to the final cut
-const DEFAULT_CORNERS = [[0.08, 0.08], [0.92, 0.08], [0.92, 0.92], [0.08, 0.92]];
+const DETECT_SIDE = 1280;   // handed to the worker, which shrinks it to 640 by area averaging
+const WARP_SIDE   = 2000;   // input to the final cut
+const OUT_SIDE    = 1800;   // an uncropped page is scaled to this; the PDF page needs less
+const READY_TIMEOUT = 30000;
+const FULL = [[0, 0], [1, 0], [1, 1], [0, 1]];
+
+const isFull = c => c.every((p, i) => Math.abs(p[0] - FULL[i][0]) < 1e-6 && Math.abs(p[1] - FULL[i][1]) < 1e-6);
+const clamp01 = v => Math.min(1, Math.max(0, v));
+
+// TL, TR, BR, BL — by the sum and difference of the coordinates.
+function order(pts) {
+  const bySum  = [...pts].sort((a, b) => (a[0] + a[1]) - (b[0] + b[1]));
+  const byDiff = [...pts].sort((a, b) => (a[1] - a[0]) - (b[1] - b[0]));
+  return [bySum[0], byDiff[0], bySum[3], byDiff[3]];
+}
+
+// A point in the photo, seen on the photo turned clockwise by `rot` degrees.
+function rotPt([x, y], rot) {
+  if (rot === 90)  return [1 - y, x];
+  if (rot === 180) return [1 - x, 1 - y];
+  if (rot === 270) return [y, 1 - x];
+  return [x, y];
+}
+function unrotPt([x, y], rot) {
+  if (rot === 90)  return [y, 1 - x];
+  if (rot === 180) return [1 - x, 1 - y];
+  if (rot === 270) return [1 - y, x];
+  return [x, y];
+}
+
+async function loadImage(blob) {
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.src = url;
+  try { await img.decode(); } catch (e) { URL.revokeObjectURL(url); throw e; }
+  return { img, url };
+}
 
 function toImageData(img, maxSide) {
   const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
@@ -27,346 +67,424 @@ function toImageData(img, maxSide) {
   return ctx.getImageData(0, 0, w, h);
 }
 
-function imageDataToFile(data, name) {
+// `src` (an image or canvas) drawn turned clockwise by `rot`, at most `maxSide`.
+function rotatedCanvas(src, rot, maxSide = Infinity) {
+  const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+  const scale = Math.min(1, maxSide / Math.max(sw, sh));
+  const w = Math.round(sw * scale), h = Math.round(sh * scale);
+  const turned = rot === 90 || rot === 270;
   const canvas = document.createElement('canvas');
-  canvas.width = data.width; canvas.height = data.height;
-  canvas.getContext('2d').putImageData(data, 0, 0);
+  canvas.width = turned ? h : w; canvas.height = turned ? w : h;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(rot * Math.PI / 180);
+  ctx.drawImage(src, -w / 2, -h / 2, w, h);
+  return canvas;
+}
+
+function canvasToFile(canvas, name) {
   return new Promise((resolve, reject) => canvas.toBlob(
     b => b ? resolve(new File([b], name, { type: 'image/jpeg' })) : reject(new Error('encode failed')),
     'image/jpeg', 0.9));
 }
 
-async function loadImage(file) {
-  const url = URL.createObjectURL(file);
-  const img = new Image();
-  img.src = url;
-  try { await img.decode(); }
-  catch (e) { URL.revokeObjectURL(url); throw e; }
-  return { img, url };
-}
-
-const croppedName = file => `${file.name.replace(/\.[^.]+$/, '') || 'scan'}-cropped.jpg`;
+const pageName = file => `${file.name.replace(/\.[^.]+$/, '') || 'page'}-scan.jpg`;
 
 /**
- * @param {File[]}   files     the photos to review
+ * @param {File[]}   files     the photos picked
  * @param {object}   scanner   from createScanner(), already loading
- * @param {Function} onDone    receives the resulting files, in order
- * @param {Function} onCancel  nothing from this selection is added
+ * @param {Function} onDone    receives the finished pages, in order
+ * @param {Function} onCancel  nothing is added
  */
 export default function DocumentScanner({ files, scanner, onDone, onCancel }) {
-  const [queue, setQueue] = useState(files);
-  const [index, setIndex] = useState(0);
-  const [results, setResults] = useState([]);
-  const [current, setCurrent] = useState(null);        // { img, url }
-  const [corners, setCorners] = useState(DEFAULT_CORNERS);
-  const [found, setFound] = useState(true);
-  const [detecting, setDetecting] = useState(false);  // no handles until they can be placed
-  const [busy, setBusy] = useState('');                // '' or what is happening
-  const [scannerState, setScannerState] = useState('loading');  // loading | ready | failed
-  const [error, setError] = useState('');
-  const [picks, setPicks] = useState(null);           // after "Crop all": [{ original, cropped, choice, ... }]
-  const cameraRef = useRef(null);
-  const doneRef = useRef(false);
+  const [pages, setPages] = useState([]);
+  const [current, setCurrent] = useState(0);
+  const [busy, setBusy] = useState('Preparing…');
+  const [cropping, setCropping] = useState(null);    // the crop editor's state, or null
+  const trackRef = useRef(null);
+  const target = useRef(null);        // page a tap on ◀ ▶ is scrolling to
+  const targetTimer = useRef(null);
+  const retakeRef = useRef(null);
+  const addRef = useRef(null);
+  const urls = useRef(new Set());
+  const nextKey = useRef(1);
+  const scannerOk = useRef(true);
 
-  useEffect(() => {
-    let alive = true;
-    scanner.ready.then(() => alive && setScannerState('ready'), () => alive && setScannerState('failed'));
-    return () => { alive = false; };
-  }, [scanner]);
+  useEffect(() => () => urls.current.forEach(u => URL.revokeObjectURL(u)), []);
+  const track = url => (urls.current.add(url), url);
+  const drop = url => { if (url) { URL.revokeObjectURL(url); urls.current.delete(url); } };
 
-  // Revoke object URLs whenever what they show is replaced or unmounted.
-  useEffect(() => () => { if (current) URL.revokeObjectURL(current.url); }, [current]);
-  const pickUrls = useRef([]);
-  useEffect(() => () => pickUrls.current.forEach(u => URL.revokeObjectURL(u)), []);
-
-  // Show and analyse the current photo; past the end, hand the results back.
-  // Keyed on the photo itself, not the queue, so adding a page with
-  // "+ Page" does not reload the photo on screen and undo corner adjustments.
-  const currentFile = index < queue.length ? queue[index] : null;
-  useEffect(() => {
-    if (!currentFile) {
-      if (!doneRef.current) { doneRef.current = true; onDone(results); }
-      return;
-    }
-    let alive = true;
-    setError('');
-    setCurrent(null);
-    (async () => {
-      let shown;
-      try { shown = await loadImage(currentFile); }
-      catch { if (alive) { setError('Could not read this photo — it will be added as it is.'); setFound(false); } return; }
-      if (!alive) { URL.revokeObjectURL(shown.url); return; }
-      setCurrent(shown);
-      setCorners(DEFAULT_CORNERS);
-      setFound(true);
-      setDetecting(true);
-      try {
-        await scanner.ready;
-        const found = await scanner.detect(toImageData(shown.img, DETECT_SIDE));
-        if (!alive) return;
-        setCorners(found ? found.corners : DEFAULT_CORNERS);
-        setFound(!!found);
-        setDetecting(false);
-      } catch {
-        if (alive) { setFound(false); setDetecting(false); }
-      }
-    })();
-    return () => { alive = false; };
-  }, [currentFile]);   // eslint-disable-line react-hooks/exhaustive-deps
-
-  const next = add => {
-    if (add) setResults(r => [...r, add]);
-    setIndex(i => i + 1);
-  };
-
-  async function crop() {
-    setBusy('Cropping…');
+  async function ready() {
+    if (!scannerOk.current) return false;
     try {
-      const out = await scanner.warp(toImageData(current.img, WARP_SIDE), corners);
-      next(await imageDataToFile(out, croppedName(queue[index])));
-    } catch (e) {
-      setError(`Could not crop this photo: ${e.message}`);
-    } finally {
-      setBusy('');
-    }
+      await Promise.race([scanner.ready, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), READY_TIMEOUT))]);
+      return true;
+    } catch { scannerOk.current = false; return false; }
   }
 
-  // Detect and cut every remaining photo, then show the results so the
-  // employee chooses for each. A photo whose edges are not found has no
-  // cropped version and starts on "Original".
-  async function cropAll() {
-    const out = [];
-    for (let j = index; j < queue.length; j++) {
-      setBusy(`Cropping ${j - index + 1} of ${queue.length - index}…`);
-      const original = queue[j];
-      let cropped = null, confident = false;
+  // The page's final image: the photo cut along its corners (or whole), then turned.
+  async function render(page) {
+    const { img, url } = await loadImage(page.source);
+    try {
+      let flat = img;
+      if (!isFull(page.corners) && await ready()) {
+        const out = await scanner.warp(toImageData(img, WARP_SIDE), page.corners);
+        flat = document.createElement('canvas');
+        flat.width = out.width; flat.height = out.height;
+        flat.getContext('2d').putImageData(out, 0, 0);
+      }
+      const file = await canvasToFile(rotatedCanvas(flat, page.rotation, OUT_SIDE), pageName(page.source));
+      return { ...page, file, url: track(URL.createObjectURL(file)) };
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+  // A new photo: find its edges and crop it — or leave it whole when the
+  // detector is not sure.
+  async function makePage(source) {
+    let detected = null;
+    if (await ready()) {
       try {
-        const { img, url } = await loadImage(original);
-        try {
-          const found = await scanner.detect(toImageData(img, DETECT_SIDE));
-          if (found) {
-            cropped = await imageDataToFile(await scanner.warp(toImageData(img, WARP_SIDE), found.corners), croppedName(original));
-            confident = found.confident;
-          }
-        } finally { URL.revokeObjectURL(url); }
-      } catch { /* left without a cropped version */ }
-      const urls = { original: URL.createObjectURL(original), cropped: cropped && URL.createObjectURL(cropped) };
-      pickUrls.current.push(...Object.values(urls).filter(Boolean));
-      // A crop the detector is unsure of starts on the original: it is only
-      // used if the employee looks at it and picks it.
-      out.push({ original, cropped, confident, urls, choice: cropped && confident ? 'cropped' : 'original' });
+        const { img, url } = await loadImage(source);
+        try { detected = await scanner.detect(toImageData(img, DETECT_SIDE)); }
+        finally { URL.revokeObjectURL(url); }
+      } catch { /* no edges then */ }
+    }
+    const corners = detected && detected.confident ? detected.corners : FULL;
+    return render({ key: nextKey.current++, source, detected, corners, rotation: 0 });
+  }
+
+  async function makePages(list) {
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      setBusy(list.length > 1 ? `Cropping ${i + 1} of ${list.length}…` : 'Cropping…');
+      try { out.push(await makePage(list[i])); } catch { /* unreadable photo: left out */ }
     }
     setBusy('');
-    setPicks(out);
+    return out;
   }
 
-  function setChoice(i, choice) {
-    setPicks(ps => ps.map((p, j) => j === i ? { ...p, choice } : p));
-  }
-
-  function addPicks() {
-    const chosen = picks.filter(p => p.choice !== 'removed').map(p => p.choice === 'cropped' ? p.cropped : p.original);
-    setResults(r => [...r, ...chosen]);
-    setPicks(null);
-    setIndex(queue.length);
-  }
-
-  function keepAllAsTheyAre() {
-    setResults(r => [...r, ...queue.slice(index)]);
-    setIndex(queue.length);
-  }
-
-  function cancel() {
-    if ((index > 0 || picks) && !window.confirm('Discard these photos?')) return;
-    doneRef.current = true;
-    onCancel();
-  }
-
-  if (index >= queue.length) return null;
-  const remaining = queue.length - index;
-  const ready = scannerState === 'ready';
-
-  if (picks) {
-    return <PageBrowser picks={picks} onChoice={setChoice} onAdd={addPicks} onCancel={cancel} />;
-  }
-
-  return (
-    <div className="scanner-overlay" role="dialog" aria-modal="true" aria-label="Review photos">
-      <div className="scanner-panel">
-        <div className="scanner-head">
-          <strong>Photo {index + 1} of {queue.length}</strong>
-          <button type="button" className="btn btn-xs btn-secondary" onClick={cancel} disabled={!!busy}>✕</button>
-        </div>
-
-        {error && <p className="scanner-error">{error}</p>}
-
-        {scannerState === 'failed' ? (
-          <p className="scanner-note">The scanner could not load on this phone. Photos can be added as they are.</p>
-        ) : !ready ? (
-          <p className="scanner-note">Preparing scanner… (first time only)</p>
-        ) : (
-          <p className="scanner-hint">
-            {detecting ? 'Finding the edges…'
-              : found ? 'Drag the corners if they are not on the document.'
-              : 'Edges not found — drag the four corners onto the document, or keep the photo as it is.'}
-          </p>
-        )}
-
-        {current && (
-          <CornerEditor img={current.img} url={current.url} corners={corners} onChange={setCorners}
-            disabled={!ready || detecting || !!busy} outline={!detecting} />
-        )}
-
-        {busy ? (
-          <p className="scanner-note">{busy}</p>
-        ) : (
-          <>
-            <div className="scanner-actions">
-              {scannerState !== 'failed' && (
-                <button type="button" className="btn btn-primary" disabled={!ready || !current || detecting} onClick={crop}>✓ Crop</button>
-              )}
-              <button type="button" className="btn btn-secondary" onClick={() => next(queue[index])}>Keep as it is</button>
-              <button type="button" className="btn btn-danger" onClick={() => next(null)} title="Remove this photo">🗑</button>
-            </div>
-            <div className="scanner-actions">
-              <button type="button" className="btn btn-secondary" onClick={() => cameraRef.current.click()}>📷 + Page</button>
-              {remaining > 1 && ready && (
-                <button type="button" className="btn btn-secondary" onClick={cropAll}>Crop all automatically ({remaining})</button>
-              )}
-              {remaining > 1 && scannerState === 'failed' && (
-                <button type="button" className="btn btn-secondary" onClick={keepAllAsTheyAre}>Add all as they are ({remaining})</button>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* Straight to the camera — no menu. The photo joins the end of this review. */}
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden
-          onChange={e => { const f = e.target.files[0]; if (f) setQueue(q => [...q, f]); e.target.value = ''; }} />
-      </div>
-    </div>
-  );
-}
-
-// The results of "Crop all", one page at a time, in the manner of a scanner
-// app's page view: swipe (or use the arrows) between pages, with the next and
-// previous ones peeking in at the sides, and choose for the page on screen.
-// A removed page stays in place, dimmed, so the numbering does not shift
-// under the employee's finger, and can be restored.
-function PageBrowser({ picks, onChoice, onAdd, onCancel }) {
-  const trackRef = useRef(null);
-  const [current, setCurrent] = useState(0);
-  const count = picks.filter(p => p.choice !== 'removed').length;
-  const page = picks[current];
+  useEffect(() => {
+    let alive = true;
+    makePages(files).then(made => {
+      if (!alive) return;
+      if (!made.length) { onCancel(); return; }
+      setPages(made);
+    });
+    return () => { alive = false; };
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // The page on screen is the slide whose centre is nearest the track's centre.
   function onScroll() {
-    const track = trackRef.current;
-    if (!track) return;
-    const mid = track.scrollLeft + track.clientWidth / 2;
+    const t = trackRef.current;
+    if (!t) return;
+    const mid = t.scrollLeft + t.clientWidth / 2;
     let best = 0, bestDist = Infinity;
-    [...track.children].forEach((el, i) => {
+    [...t.children].forEach((el, i) => {
       const d = Math.abs(el.offsetLeft + el.offsetWidth / 2 - mid);
       if (d < bestDist) { bestDist = d; best = i; }
     });
+    // While a tap's smooth scroll is under way, the pages it passes are not
+    // "current" — otherwise a second quick tap would count from one of them.
+    if (target.current !== null) {
+      if (best !== target.current) return;
+      target.current = null;
+    }
     setCurrent(best);
   }
-
   function go(i) {
     const el = trackRef.current?.children[i];
-    if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    if (!el) return;
+    target.current = i;
+    setCurrent(i);
+    clearTimeout(targetTimer.current);
+    targetTimer.current = setTimeout(() => { target.current = null; }, 800);
+    el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+
+  function replace(i, page) {
+    setPages(ps => ps.map((p, j) => { if (j === i && p !== page) drop(p.url); return j === i ? page : p; }));
+  }
+
+  async function retake(file) {
+    if (!file) return;
+    const i = current;
+    setBusy('Cropping…');
+    try { replace(i, await makePage(file)); } catch { /* keep the old page */ }
+    setBusy('');
+  }
+
+  async function add(list) {
+    if (!list.length) return;
+    const made = await makePages(list);
+    if (!made.length) return;
+    const first = pages.length;
+    setPages(ps => [...ps, ...made]);
+    setTimeout(() => go(first), 50);
+  }
+
+  async function rotateLeft() {
+    const i = current, page = pages[i];
+    setBusy('Turning…');
+    try { replace(i, await render({ ...page, rotation: (page.rotation + 270) % 360 })); } finally { setBusy(''); }
+  }
+
+  function remove(i) {
+    const left = pages.filter((_, j) => j !== i);
+    drop(pages[i].url);
+    if (!left.length) { onCancel(); return; }
+    setPages(left);
+    setCurrent(c => Math.min(c, left.length - 1));
+  }
+
+  function cancel() {
+    if (window.confirm('Discard these photos?')) onCancel();
+  }
+
+  // ── Crop editor ──
+  async function openCrop() {
+    const page = pages[current];
+    const { img, url } = await loadImage(page.source);
+    try {
+      const view = rotatedCanvas(img, page.rotation, 1600);
+      const blob = await new Promise(r => view.toBlob(r, 'image/jpeg', 0.85));
+      setCropping({
+        index: current, source: page.source, detected: page.detected, rotation: page.rotation,
+        url: track(URL.createObjectURL(blob)), w: view.width, h: view.height,
+        corners: order(page.corners.map(p => rotPt(p, page.rotation))),
+      });
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+  async function turnCrop(dir) {          // -90 = left, +90 = right
+    const c = cropping;
+    const rotation = (c.rotation + dir + 360) % 360;
+    const { img, url } = await loadImage(c.source);
+    try {
+      const view = rotatedCanvas(img, rotation, 1600);
+      const blob = await new Promise(r => view.toBlob(r, 'image/jpeg', 0.85));
+      drop(c.url);
+      // The corners turn with the photo.
+      const corners = order(c.corners.map(([x, y]) => dir > 0 ? [1 - y, x] : [y, 1 - x]));
+      setCropping({ ...c, rotation, corners, url: track(URL.createObjectURL(blob)), w: view.width, h: view.height });
+    } finally { URL.revokeObjectURL(url); }
+  }
+
+  async function applyCrop() {
+    const c = cropping;
+    const page = pages[c.index];
+    const corners = order(c.corners.map(p => unrotPt(p, c.rotation)).map(([x, y]) => [clamp01(x), clamp01(y)]));
+    setBusy('Cropping…');
+    try {
+      replace(c.index, await render({ ...page, corners, rotation: c.rotation }));
+      drop(c.url);
+      setCropping(null);
+    } catch {
+      window.alert('Could not crop this page.');
+    } finally { setBusy(''); }
+  }
+
+  function closeCrop() {
+    drop(cropping.url);
+    setCropping(null);
+  }
+
+  // ── Screens ──
+  if (cropping) {
+    const c = cropping;
+    return (
+      <div className="pb" role="dialog" aria-modal="true" aria-label="Crop">
+        <div className="pb-head">
+          <button type="button" className="pb-icon" onClick={closeCrop} aria-label="Back">←</button>
+          <strong>Crop</strong>
+          <button type="button" className="pb-done" onClick={applyCrop} disabled={!!busy} aria-label="Done">✓</button>
+        </div>
+        <div className="pb-stage">
+          <CornerEditor url={c.url} w={c.w} h={c.h} corners={c.corners}
+            onChange={corners => setCropping(s => ({ ...s, corners }))} />
+        </div>
+        {busy && <p className="pb-busy">{busy}</p>}
+        <div className="pb-tools">
+          <Tool icon={<IconLeft />} label="Left" onClick={() => turnCrop(-90)} />
+          <Tool icon={<IconRight />} label="Right" onClick={() => turnCrop(90)} />
+          <Tool icon={<IconAuto />} label="Auto Crop" disabled={!c.detected}
+            onClick={() => setCropping(s => ({ ...s, corners: order(s.detected.corners.map(p => rotPt(p, s.rotation))) }))} />
+          <Tool icon={<IconAll />} label="All" onClick={() => setCropping(s => ({ ...s, corners: FULL }))} />
+        </div>
+      </div>
+    );
+  }
+
+  if (!pages.length) {
+    return (
+      <div className="pb" role="dialog" aria-modal="true" aria-label="Preparing pages">
+        <div className="pb-head"><span className="pb-icon-spacer" /><strong>Scan</strong><span className="pb-icon-spacer" /></div>
+        <p className="pb-busy pb-busy-center">{busy || 'Preparing…'}</p>
+      </div>
+    );
   }
 
   return (
     <div className="pb" role="dialog" aria-modal="true" aria-label="Review pages">
       <div className="pb-head">
-        <button type="button" className="pb-icon" onClick={onCancel} aria-label="Cancel">✕</button>
+        <button type="button" className="pb-icon" onClick={cancel} aria-label="Cancel">✕</button>
         <strong>Review</strong>
-        <span className="pb-icon-spacer" />
+        <button type="button" className="pb-text" onClick={() => addRef.current.click()} disabled={!!busy}>+ Add</button>
       </div>
 
       <div className="pb-track" ref={trackRef} onScroll={onScroll}>
-        {picks.map((p, i) => (
-          <div key={i} className={`pb-slide ${p.choice === 'removed' ? 'pb-slide-removed' : ''}`} onClick={() => go(i)}>
-            <img src={p.choice === 'cropped' ? p.urls.cropped : p.urls.original} alt={`Page ${i + 1}`} draggable={false} />
-            {p.choice === 'removed' && <span className="pb-badge">Removed</span>}
+        {pages.map((p, i) => (
+          <div key={p.key} className="pb-slide" onClick={() => go(i)}>
+            <span className="pb-page">
+              <img src={p.url} alt={`Page ${i + 1}`} draggable={false} />
+              <button type="button" className="pb-del" aria-label={`Delete page ${i + 1}`}
+                onClick={e => { e.stopPropagation(); remove(i); }}><IconTrash /></button>
+            </span>
           </div>
         ))}
       </div>
 
       <div className="pb-counter">
         <button type="button" onClick={() => go(current - 1)} disabled={current === 0} aria-label="Previous page">◀</button>
-        <span>{current + 1}/{picks.length}</span>
-        <button type="button" onClick={() => go(current + 1)} disabled={current === picks.length - 1} aria-label="Next page">▶</button>
+        <span>{current + 1}/{pages.length}</span>
+        <button type="button" onClick={() => go(current + 1)} disabled={current >= pages.length - 1} aria-label="Next page">▶</button>
       </div>
 
-      <div className="pb-controls">
-        <div className="pb-options">
-          {page.choice === 'removed' ? (
-            <button type="button" className="pb-opt" onClick={() => onChoice(current, page.cropped && page.confident ? 'cropped' : 'original')}>↺ Restore</button>
-          ) : (
-            <>
-              <button type="button" className={`pb-opt ${page.choice === 'cropped' ? 'pb-opt-on' : ''}`}
-                disabled={!page.cropped} onClick={() => onChoice(current, 'cropped')}>Cropped</button>
-              <button type="button" className={`pb-opt ${page.choice === 'original' ? 'pb-opt-on' : ''}`}
-                onClick={() => onChoice(current, 'original')}>Original</button>
-              <button type="button" className="pb-opt pb-opt-danger" onClick={() => onChoice(current, 'removed')}
-                aria-label="Remove this page">🗑</button>
-            </>
-          )}
-          {page.choice !== 'removed' && !page.cropped && <span className="pb-note">Edges not found</span>}
-          {page.choice !== 'removed' && page.cropped && !page.confident && (
-            <span className="pb-note">Not sure about the edges — check the cropped version before choosing it.</span>
-          )}
-        </div>
-        <button type="button" className="pb-add" disabled={count === 0} onClick={onAdd}>
-          ✓ Add {count} photo{count === 1 ? '' : 's'}
+      {busy && <p className="pb-busy">{busy}</p>}
+      <div className="pb-tools">
+        <Tool icon={<IconRetake />} label="Retake" disabled={!!busy} onClick={() => retakeRef.current.click()} />
+        <Tool icon={<IconLeft />} label="Left" disabled={!!busy} onClick={rotateLeft} />
+        <Tool icon={<IconCrop />} label="Crop" disabled={!!busy} onClick={openCrop} />
+      </div>
+      <div className="pb-bottom">
+        <button type="button" className="pb-attach" disabled={!!busy} onClick={() => onDone(pages.map(p => p.file))}>
+          ✓ Attach {pages.length} page{pages.length === 1 ? '' : 's'}
         </button>
       </div>
+
+      {/* Retake: straight to the camera. + Add: iOS offers camera or library. */}
+      <input ref={retakeRef} type="file" accept="image/*" capture="environment" hidden
+        onChange={e => { retake(e.target.files[0]); e.target.value = ''; }} />
+      <input ref={addRef} type="file" accept="image/*" multiple hidden
+        onChange={e => { add(Array.from(e.target.files)); e.target.value = ''; }} />
     </div>
   );
 }
 
-// The photo with four draggable corner handles over it.
-function CornerEditor({ img, url, corners, onChange, disabled, outline = true }) {
+function Tool({ icon, label, onClick, disabled }) {
+  return (
+    <button type="button" className="pb-tool" onClick={onClick} disabled={disabled}>
+      {icon}<span>{label}</span>
+    </button>
+  );
+}
+
+// The photo with draggable corners, a handle in the middle of each side that
+// moves the whole side, and a magnifier showing what is under the finger.
+function CornerEditor({ url, w: natW, h: natH, corners, onChange }) {
   const svgRef = useRef(null);
-  const dragRef = useRef(null);
-  const maxW = Math.min(window.innerWidth - 48, 560);
-  const maxH = Math.round(window.innerHeight * 0.55);
-  const scale = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
-  const w = Math.round(img.naturalWidth * scale);
-  const h = Math.round(img.naturalHeight * scale);
+  const drag = useRef(null);
+  const [lens, setLens] = useState(null);       // { x, y } in px, while dragging
+  const maxW = Math.min(window.innerWidth - 32, 560);
+  const maxH = Math.round(window.innerHeight * 0.58);
+  const scale = Math.min(maxW / natW, maxH / natH);
+  const w = Math.round(natW * scale), h = Math.round(natH * scale);
   const pts = corners.map(([x, y]) => [x * w, y * h]);
 
-  function move(e) {
-    if (dragRef.current === null) return;
+  const at = e => {
     const r = svgRef.current.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-    const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
-    const next = corners.map(p => [...p]);
-    next[dragRef.current] = [x, y];
+    return [clamp01((e.clientX - r.left) / r.width), clamp01((e.clientY - r.top) / r.height)];
+  };
+
+  function start(e, kind, i) {
+    drag.current = { kind, i, from: at(e), corners: corners.map(p => [...p]) };
+    svgRef.current.setPointerCapture(e.pointerId);
+    move(e);
+  }
+
+  function move(e) {
+    const d = drag.current;
+    if (!d) return;
+    const [x, y] = at(e);
+    const next = d.corners.map(p => [...p]);
+    if (d.kind === 'corner') {
+      next[d.i] = [x, y];
+      setLens({ x: x * w, y: y * h });
+    } else {
+      // Move both ends of side i along its normal by how far the finger moved across it.
+      const a = d.corners[d.i], b = d.corners[(d.i + 1) % 4];
+      const sx = (b[0] - a[0]) * w, sy = (b[1] - a[1]) * h, len = Math.hypot(sx, sy) || 1;
+      const nx = -sy / len, ny = sx / len;
+      const off = (x - d.from[0]) * w * nx + (y - d.from[1]) * h * ny;
+      next[d.i] = [clamp01(a[0] + nx * off / w), clamp01(a[1] + ny * off / h)];
+      next[(d.i + 1) % 4] = [clamp01(b[0] + nx * off / w), clamp01(b[1] + ny * off / h)];
+      setLens({ x: (next[d.i][0] + next[(d.i + 1) % 4][0]) / 2 * w, y: (next[d.i][1] + next[(d.i + 1) % 4][1]) / 2 * h });
+    }
     onChange(next);
   }
 
+  function end() { drag.current = null; setLens(null); }
+
+  const L = 110, Z = 2.2;
   return (
     <div className="scanner-stage" style={{ width: w, height: h }}>
       <img src={url} width={w} height={h} alt="" draggable={false} />
       <svg ref={svgRef} width={w} height={h} className="scanner-svg"
-        onPointerMove={move}
-        onPointerUp={() => { dragRef.current = null; }}
-        onPointerCancel={() => { dragRef.current = null; }}>
-        {outline && <polygon points={pts.map(p => p.join(',')).join(' ')} className="scanner-poly" />}
-        {!disabled && pts.map(([x, y], i) => (
-          <g key={i}
-            onPointerDown={e => {
-              dragRef.current = i;
-              svgRef.current.setPointerCapture(e.pointerId);
-            }}>
+        onPointerMove={move} onPointerUp={end} onPointerCancel={end}>
+        <polygon points={pts.map(p => p.join(',')).join(' ')} className="scanner-poly" />
+        {pts.map(([x1, y1], i) => {
+          const [x2, y2] = pts[(i + 1) % 4];
+          const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+          return (
+            <g key={`s${i}`} className="scanner-side" onPointerDown={e => start(e, 'side', i)}>
+              <circle cx={mx} cy={my} r={22} className="scanner-hit" />
+              <rect x={mx - 16} y={my - 6} width={32} height={12} rx={6}
+                transform={`rotate(${ang} ${mx} ${my})`} className="scanner-pill" />
+            </g>
+          );
+        })}
+        {pts.map(([x, y], i) => (
+          <g key={`c${i}`} onPointerDown={e => start(e, 'corner', i)}>
             <circle cx={x} cy={y} r={24} className="scanner-hit" />
-            <circle cx={x} cy={y} r={10} className="scanner-handle" />
+            <circle cx={x} cy={y} r={11} className="scanner-handle" />
           </g>
         ))}
       </svg>
+      {lens && (
+        <div className="scanner-lens" style={{
+          width: L, height: L,
+          left: lens.x < w / 2 ? w - L - 6 : 6, top: 6,
+          backgroundImage: `url(${url})`,
+          backgroundSize: `${w * Z}px ${h * Z}px`,
+          backgroundPosition: `${L / 2 - lens.x * Z}px ${L / 2 - lens.y * Z}px`,
+        }} />
+      )}
     </div>
   );
 }
+
+// ── Icons: plain white strokes ──
+const svg = (children, size = 28) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
+);
+const IconRetake = () => svg(<>
+  <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" /><path d="M15 12.5a3 3 0 1 0-.9 2.1" /><path d="M15 10.5v2h-2" />
+</>);
+const IconLeft = () => svg(<>
+  <rect x="4" y="11" width="10" height="9" rx="1.5" /><path d="M9 7h6a4 4 0 0 1 4 4v2" /><path d="M11 4.5 8.5 7 11 9.5" />
+</>);
+const IconRight = () => svg(<>
+  <rect x="10" y="11" width="10" height="9" rx="1.5" /><path d="M15 7H9a4 4 0 0 0-4 4v2" /><path d="M13 4.5 15.5 7 13 9.5" />
+</>);
+const IconCrop = () => svg(<>
+  <path d="M6 3v14h14" /><path d="M3 6h14v14" />
+</>);
+const IconAuto = () => svg(<>
+  <path d="M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4" /><path d="M9 15v-4a3 3 0 0 1 6 0v4" />
+</>);
+const IconAll = () => svg(<>
+  <path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /><path d="M4 4l5 5M20 4l-5 5M20 20l-5-5M4 20l5-5" />
+</>);
+const IconTrash = () => svg(<>
+  <path d="M5 7h14" /><path d="M9 7V5h6v2" /><path d="M7 7l1 12h8l1-12" /><path d="M10.5 10.5v5M13.5 10.5v5" />
+</>, 24);
