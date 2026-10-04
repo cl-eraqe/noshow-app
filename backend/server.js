@@ -19,7 +19,7 @@ const authRoutes      = require('./routes/auth');
 const flightRoutes    = require('./routes/flights');
 const reportRoutes    = require('./routes/reports');
 const analyticsRoutes = require('./routes/analytics');
-const exportRoutes    = require('./routes/export');
+const dataExportRoutes = require('./routes/data-export');
 const usersRoutes     = require('./routes/users');
 const airlineBrandsRoutes = require('./routes/airline-brands');
 const { requireAuth } = require('./middleware/auth');
@@ -81,9 +81,7 @@ app.use('/api/auth',      authRoutes);
 app.use('/api/flights',   requireAuth, flightRoutes);
 app.use('/api/reports',   requireAuth, reportRoutes);
 app.use('/api/analytics', requireAuth, analyticsRoutes);
-// Export router: token-management routes use per-route requireAuth+requireRole('supervisor');
-// external read endpoints (/live-state, /audit-log) use their own requireToken (export tokens).
-app.use('/api/export',    exportRoutes);
+app.use('/api/data-export', requireAuth, dataExportRoutes);   // supervisor-only, inside the router
 app.use('/api/users',     requireAuth, usersRoutes);
 // Airline brand assets: GET /file/* is public (used in <img> tags from PWA);
 // management endpoints inside the router run their own requireAuth/requireRole.

@@ -78,6 +78,9 @@ async function initDb() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_report ON audit_log(report_id)`);
 
+  // export_tokens held the "magic links" for live Excel feeds (the removed
+  // Access Management page). Nothing reads it now; it is kept, not dropped,
+  // so the migrations below still run on a fresh database.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS export_tokens (
       id          SERIAL PRIMARY KEY,
