@@ -4,7 +4,7 @@ import RegisterPage from './pages/RegisterPage';
 import Dashboard   from './pages/Dashboard';
 import NewReport   from './pages/NewReport';
 import Analytics   from './pages/Analytics';
-import AccessManagement from './pages/AccessManagement';
+import DataExport  from './pages/DataExport';
 import SharePicker from './pages/SharePicker';
 import UsersPage   from './pages/UsersPage';
 import PrivateRoute from './components/PrivateRoute';
@@ -32,8 +32,9 @@ export default function App() {
           <PrivateRoute supervisorOnly><Analytics /></PrivateRoute>
         } />
 
-        <Route path="/access-management" element={
-          <PrivateRoute supervisorOnly><AccessManagement /></PrivateRoute>
+        {/* Not linked from anywhere: reached by its address, supervisors only. */}
+        <Route path="/data-export" element={
+          <PrivateRoute supervisorOnly><DataExport /></PrivateRoute>
         } />
 
         <Route path="/users" element={

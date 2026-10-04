@@ -234,29 +234,15 @@ export async function getAuditLog(reportId) {
   return request(`/api/analytics/audit-log${q}`);
 }
 
-// ── Export tokens (supervisor management)
-export async function getExportTokens() {
-  return request('/api/export/tokens');
+// ── Data export (supervisor): rows for the Excel downloads
+export async function getExportCases(from, to) {
+  const q = new URLSearchParams();
+  if (from) q.set('from', from);
+  if (to) q.set('to', to);
+  return request(`/api/data-export/cases${q.toString() ? '?' + q : ''}`);
 }
-export async function createExportToken(email, role = 'view') {
-  return request('/api/export/tokens', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, role }),
-  });
-}
-export async function revokeExportToken(id, revoked) {
-  return request(`/api/export/tokens/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ revoked }),
-  });
-}
-export async function rotateExportToken(id) {
-  return request(`/api/export/tokens/${id}/rotate`, { method: 'POST' });
-}
-export async function deleteExportToken(id) {
-  return request(`/api/export/tokens/${id}`, { method: 'DELETE' });
+export async function getExportEdits(days = 10) {
+  return request(`/api/data-export/edits?days=${days}`);
 }
 
 // ── User management (supervisor)
