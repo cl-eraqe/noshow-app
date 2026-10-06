@@ -2,6 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const { getDb, jeddahNowStr } = require('../db');
 const { requireRole } = require('../middleware/auth');
+const { daysAtAirport } = require('../days-at-airport');
 
 function getShift(dtStr) {
   if (!dtStr) return null;
@@ -100,6 +101,9 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
        ORDER BY created_at ASC`,
       [fromDate, toDate]
     );
+    // Days at airport from the case's dates, not the stored column (see days-at-airport.js).
+    const now = Date.now();
+    rows.forEach(r => { r.days_at_airport = daysAtAirport(r, now); });
 
     const { shift, status, airline, nationality, destination, terminal, pax_type, daysBucket, resBucket, scope } = req.query;
     const { TERMINAL_MAP, getAirlineCode, needsBus } = require('./_terminal-helper');
@@ -148,7 +152,6 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
     const confirmedCases = confirmedList.length;
     const confirmedPax = confirmedList.reduce((s, r) => s + (r.pax_count || 0), 0);
 
-    const now = Date.now();
     const twelveHoursMs = 12 * 60 * 60 * 1000;
     const twentyFourHoursMs = 24 * 60 * 60 * 1000;
 
@@ -225,8 +228,11 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
     const avgRebookHrs = rebookMs.length ? (rebookMs.reduce((a,b)=>a+b,0) / rebookMs.length / 3600000) : null;
     const avgCloseHrs = closeMs.length ? (closeMs.reduce((a,b)=>a+b,0) / closeMs.length / 3600000) : null;
 
-    const daysAtAirport = filtered.map(r => r.days_at_airport).filter(d => d != null && !isNaN(d));
-    const avgDaysAtAirport = daysAtAirport.length ? daysAtAirport.reduce((a,b)=>a+b,0) / daysAtAirport.length : null;
+    // The average counts closed cases only, so it does not creep up by the
+    // hour while cases are open; the histogram shows every case.
+    const daysList = filtered.map(r => r.days_at_airport).filter(d => d != null);
+    const closedDays = filtered.filter(r => r.status === 'closed' && r.days_at_airport != null).map(r => r.days_at_airport);
+    const avgDaysAtAirport = closedDays.length ? closedDays.reduce((a,b)=>a+b,0) / closedDays.length : null;
 
     const busCount = filtered.filter(r => needsBus(r.new_flight)).length;
     const busPct = totalCases > 0 ? (busCount / totalCases) * 100 : 0;
@@ -262,7 +268,7 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
     const byTerminal = groupCount(null, r => TERMINAL_MAP[getAirlineCode(r.prev_flight)] || 'T1');
 
     const daysBuckets = { '0d': 0, '1d': 0, '2d': 0, '3d': 0, '4d+': 0 };
-    daysAtAirport.forEach(d => {
+    daysList.forEach(d => {
       if (d < 1) daysBuckets['0d']++;
       else if (d < 2) daysBuckets['1d']++;
       else if (d < 3) daysBuckets['2d']++;
@@ -318,7 +324,6 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
 
     const { rows: last7DaysRaw } = await pool.query(
       `SELECT LEFT(created_at, 10) as day, COUNT(*) as cases, SUM(pax_count) as pax,
-              AVG(days_at_airport) as avg_days,
               SUM(CASE WHEN status='closed' THEN 1 ELSE 0 END) as closed_count
        FROM reports
        WHERE LEFT(created_at, 10) >= $1
@@ -326,6 +331,22 @@ router.get('/dashboard', requireRole('supervisor'), async (req, res) => {
        ORDER BY day ASC`,
       [sixDaysAgo]
     );
+    // Average days per day, closed cases only, computed like the KPI above.
+    const { rows: last7Closed } = await pool.query(
+      `SELECT LEFT(created_at, 10) as day, prev_datetime, closed_at, status
+       FROM reports WHERE LEFT(created_at, 10) >= $1 AND status = 'closed'`,
+      [sixDaysAgo]
+    );
+    const daysByDay = {};
+    for (const r of last7Closed) {
+      const d = daysAtAirport(r, now);
+      if (d == null) continue;
+      (daysByDay[r.day] ??= []).push(d);
+    }
+    last7DaysRaw.forEach(r => {
+      const list = daysByDay[r.day];
+      r.avg_days = list ? list.reduce((a,b)=>a+b,0) / list.length : null;
+    });
 
     const sparkCases = [], sparkPax = [], sparkDays = [];
     for (let i = 6; i >= 0; i--) {

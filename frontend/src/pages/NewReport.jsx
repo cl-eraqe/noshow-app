@@ -137,9 +137,11 @@ const NATIONALITIES = [
   'Zambian','Zimbabwean',
 ];
 
-function calcDaysAtAirport(paxIdDatetime, newDatetime) {
-  if (!paxIdDatetime || !newDatetime) return '';
-  const diff = (new Date(newDatetime) - new Date(paxIdDatetime)) / (1000 * 60 * 60 * 24);
+// From the missed flight to the new one: what the case will show once it
+// closes (backend/days-at-airport.js counts to the close).
+function calcDaysAtAirport(prevDatetime, newDatetime) {
+  if (!prevDatetime || !newDatetime) return '';
+  const diff = (new Date(newDatetime) - new Date(prevDatetime)) / (1000 * 60 * 60 * 24);
   if (isNaN(diff)) return '';
   return Math.max(0, parseFloat(diff.toFixed(2)));
 }
@@ -431,7 +433,7 @@ export default function NewReport({ editMode }) {
     setTimeout(() => setPasteStatus('idle'), 2500);
   }
 
-  const daysAtAirport = calcDaysAtAirport(form.pax_id_datetime, form.new_datetime);
+  const daysAtAirport = calcDaysAtAirport(form.prev_datetime, form.new_datetime);
 
   // Show Nusuk badge when pax is Umrah AND new flight departs 24h+ from now
   const showNusuk = form.pax_type === 'Umrah' &&
@@ -828,7 +830,7 @@ export default function NewReport({ editMode }) {
               <label className="field-label">Days at Airport</label>
               <input type="text" className="field-input readonly" readOnly
                 value={daysAtAirport !== '' ? `${daysAtAirport} day(s)` : '—'} />
-              <p className="field-hint">Calculated from Pax ID date to New Flight date</p>
+              <p className="field-hint">From the missed flight to the new flight</p>
             </div>
 
             {showNusuk && (
