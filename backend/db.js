@@ -155,6 +155,13 @@ async function initDb() {
   // migration below can find the rows that were.
   await pool.query(`ALTER TABLE flights_custom ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'manual'`);
 
+  // A case registered already closed never got a closed_at, so its days at
+  // airport could not be worked out. It closed when it was registered.
+  // (days_at_airport itself is no longer read: see days-at-airport.js.)
+  await pool.query(`
+    UPDATE reports SET closed_at = created_at
+     WHERE status = 'closed' AND (closed_at IS NULL OR closed_at = '')`);
+
   // Add the CHECK constraints separately (idempotent — Postgres has no "ADD CONSTRAINT
   // IF NOT EXISTS", so guard with a catalog lookup instead of failing on re-run).
   await pool.query(`

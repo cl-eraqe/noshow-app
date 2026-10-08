@@ -32,10 +32,13 @@ function stdToDatetime(std) {
   return `${today}T${std}`;
 }
 
-// Calculate live days since prev_flight datetime
+// Live days since the missed flight, for open cases. Same count as
+// backend/days-at-airport.js. The stored time is Jeddah wall-clock, so it is
+// read as +03:00 whatever time zone the device is set to.
 function liveDays(prevDatetime) {
   if (!prevDatetime) return null;
-  const diff = (Date.now() - new Date(prevDatetime).getTime()) / (1000 * 60 * 60 * 24);
+  const start = Date.parse(String(prevDatetime).replace(' ', 'T').slice(0, 16) + ':00+03:00');
+  const diff = (Date.now() - start) / (1000 * 60 * 60 * 24);
   if (isNaN(diff) || diff < 0) return null;
   return parseFloat(diff.toFixed(1));
 }

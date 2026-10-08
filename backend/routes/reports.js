@@ -502,6 +502,10 @@ router.post('/', uploadFiles, async (req, res) => {
     if (reportStatus === 'flight_confirmed') {
       await pool.query('UPDATE reports SET confirmed_at = $1, confirmed_by = $2 WHERE id = $3', [jeddahNowStr(), req.username || req.role, id]);
     }
+    // Registered already closed (e.g. rejected at the gate): it closed now.
+    if (reportStatus === 'closed') {
+      await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), id]);
+    }
 
     const { rows: reportRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [id]);
     const report = reportRows[0];
@@ -579,7 +583,8 @@ router.put('/:id', uploadFiles, async (req, res) => {
     if (existing.status !== 'flight_confirmed' && reportStatus === 'flight_confirmed' && !existing.confirmed_at) {
       await pool.query('UPDATE reports SET confirmed_at = $1, confirmed_by = $2 WHERE id = $3', [jeddahNowStr(), req.username || req.role, req.params.id]);
     }
-    if (existing.status !== 'closed' && reportStatus === 'closed' && !existing.closed_at) {
+    // Closed again after a reopen: the case now ends at this close.
+    if (existing.status !== 'closed' && reportStatus === 'closed') {
       await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
       await purgeFiles(pool, req.params.id);
     }
@@ -628,11 +633,6 @@ router.patch('/:id', express.json(), async (req, res) => {
     if (comment !== undefined)         { updates.push(`comment = $${idx++}`);         values.push(comment); }
     if (pax_count !== undefined)       { updates.push(`pax_count = $${idx++}`);       values.push(parseInt(pax_count) || 0); }
 
-    if (report.prev_datetime) {
-      const diff = (Date.now() - jeddahDtMs(report.prev_datetime)) / (1000 * 60 * 60 * 24);
-      if (!isNaN(diff)) { updates.push(`days_at_airport = $${idx++}`); values.push(parseFloat(Math.max(0, diff).toFixed(2))); }
-    }
-
     if (updates.length === 0) return res.json(report);
 
     const finalNewFlight   = new_flight   !== undefined ? new_flight   : report.new_flight;
@@ -661,7 +661,8 @@ router.patch('/:id', express.json(), async (req, res) => {
     if (status && report.status !== 'flight_confirmed' && status === 'flight_confirmed' && !report.confirmed_at) {
       await pool.query('UPDATE reports SET confirmed_at = $1, confirmed_by = $2 WHERE id = $3', [jeddahNowStr(), req.username || req.role, req.params.id]);
     }
-    if (status && report.status !== 'closed' && status === 'closed' && !report.closed_at) {
+    // Closed again after a reopen: the case now ends at this close.
+    if (status && report.status !== 'closed' && status === 'closed') {
       await pool.query('UPDATE reports SET closed_at = $1 WHERE id = $2', [jeddahNowStr(), req.params.id]);
       await purgeFiles(pool, req.params.id);
     }

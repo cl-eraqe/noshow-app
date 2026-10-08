@@ -54,7 +54,7 @@ const CASE_COLUMNS = [
   { key: 'weekday', header: 'Weekday', width: 11, note: 'Day of the week of the missed flight.' },
   { key: 'hours_to_confirm', header: 'Hours to confirm', width: 10, num: '0.0', note: 'Hours from registering the case to confirming the new flight.' },
   { key: 'hours_to_close', header: 'Hours to close', width: 10, num: '0.0', note: 'Hours from registering the case to closing it.' },
-  { key: 'days_at_airport', header: 'Days at airport', width: 10, num: '0.0', note: 'Days the passenger spent at the airport, as recorded on the case.' },
+  { key: 'days_at_airport', header: 'Days at airport', width: 10, num: '0.0', note: 'Days from the missed flight to closing the case (to the download, while still open).' },
 ];
 
 const EDIT_COLUMNS = [

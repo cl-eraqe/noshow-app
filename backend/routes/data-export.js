@@ -6,6 +6,7 @@ const router  = express.Router();
 const { getDb } = require('../db');
 const { requireRole } = require('../middleware/auth');
 const { getTerminal } = require('./_terminal-helper');
+const { daysAtAirport } = require('../days-at-airport');
 const airports = require('../airports.json');
 
 router.use(requireRole('supervisor'));
@@ -86,7 +87,7 @@ router.get('/cases', async (req, res) => {
       weekday: weekdayOf(r.prev_datetime),
       hours_to_confirm: hoursBetween(r.created_at, r.confirmed_at),
       hours_to_close: hoursBetween(r.created_at, r.closed_at),
-      days_at_airport: r.days_at_airport ?? null,
+      days_at_airport: daysAtAirport(r),
     })));
   } catch (e) {
     console.error('[GET /data-export/cases]', e);
