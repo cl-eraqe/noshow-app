@@ -9,11 +9,6 @@
     "country": "Ivory Coast",
     "nationality": "Ivorian"
   },
-  "ABT": {
-    "city": "Al Baha",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "ABV": {
     "city": "Abuja",
     "country": "Nigeria",
@@ -53,16 +48,6 @@
     "city": "Agadir",
     "country": "Morocco",
     "nationality": "Moroccan"
-  },
-  "AHB": {
-    "city": "Abha",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
-  "AJF": {
-    "city": "Al Jouf",
-    "country": "Saudi Arabia",
-    "nationality": ""
   },
   "ALA": {
     "city": "Almaty",
@@ -193,11 +178,6 @@
     "city": "Bergamo (Milan)",
     "country": "Italy",
     "nationality": "Italian"
-  },
-  "BHH": {
-    "city": "Bisha",
-    "country": "Saudi Arabia",
-    "nationality": ""
   },
   "BHK": {
     "city": "Bukhara",
@@ -404,11 +384,6 @@
     "country": "Russia",
     "nationality": "Russian"
   },
-  "DMM": {
-    "city": "Dammam",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "DNZ": {
     "city": "Denizli",
     "country": "Turkey",
@@ -429,11 +404,6 @@
     "country": "Senegal",
     "nationality": "Senegalese"
   },
-  "DWD": {
-    "city": "Dawadmi",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "DXB": {
     "city": "Dubai",
     "country": "United Arab Emirates",
@@ -453,16 +423,6 @@
     "city": "Edremit",
     "country": "Turkey",
     "nationality": "Turkish"
-  },
-  "EJH": {
-    "city": "Al Wajh",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
-  "ELQ": {
-    "city": "Qassim",
-    "country": "Saudi Arabia",
-    "nationality": ""
   },
   "ELU": {
     "city": "El Oued",
@@ -534,11 +494,6 @@
     "country": "Somalia",
     "nationality": "Somali"
   },
-  "GIZ": {
-    "city": "Jazan",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "GNY": {
     "city": "Sanliurfa",
     "country": "Turkey",
@@ -589,11 +544,6 @@
     "country": "China",
     "nationality": "Chinese"
   },
-  "HAS": {
-    "city": "Hail",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "HBE": {
     "city": "Alexandria",
     "country": "Egypt",
@@ -623,11 +573,6 @@
     "city": "Sohag",
     "country": "Egypt",
     "nationality": "Egyptian"
-  },
-  "HOF": {
-    "city": "Al Ahsa",
-    "country": "Saudi Arabia",
-    "nationality": ""
   },
   "HRG": {
     "city": "Hurghada",
@@ -844,11 +789,6 @@
     "country": "Russia",
     "nationality": "Russian"
   },
-  "MED": {
-    "city": "Madinah",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "MGQ": {
     "city": "Mogadishu",
     "country": "Somalia",
@@ -1059,16 +999,6 @@
     "country": "Sudan",
     "nationality": "Sudanese"
   },
-  "RAE": {
-    "city": "Arar",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
-  "RAH": {
-    "city": "Rafha",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "RAK": {
     "city": "Marrakech",
     "country": "Morocco",
@@ -1103,11 +1033,6 @@
     "city": "Rotterdam",
     "country": "Netherlands",
     "nationality": "Dutch"
-  },
-  "RUH": {
-    "city": "Riyadh",
-    "country": "Saudi Arabia",
-    "nationality": ""
   },
   "RZV": {
     "city": "Rezvanshahr",
@@ -1259,11 +1184,6 @@
     "country": "Tunisia",
     "nationality": "Tunisian"
   },
-  "TUU": {
-    "city": "Tabuk",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "TZX": {
     "city": "Trabzon",
     "country": "Turkey",
@@ -1279,20 +1199,10 @@
     "country": "Uzbekistan",
     "nationality": "Uzbek"
   },
-  "ULH": {
-    "city": "AlUla",
-    "country": "Saudi Arabia",
-    "nationality": ""
-  },
   "UPG": {
     "city": "Makassar",
     "country": "Indonesia",
     "nationality": "Indonesian"
-  },
-  "URY": {
-    "city": "Qurayyat",
-    "country": "Saudi Arabia",
-    "nationality": ""
   },
   "VAN": {
     "city": "Van",
