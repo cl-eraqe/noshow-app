@@ -17,12 +17,12 @@ const TERMINAL_MAP = {
   RJ:'T1',ME:'T1',GF:'T1',EY:'T1',AT:'T1',EW:'T1',A3:'T1',MH:'T1',
   BA:'T1',MS:'T1',HU:'T1',TK:'T1',
   // North Terminal — bus
-  G9:'North',IY:'North','6E':'North',
+  G9:'North',IY:'North',
   SM:'North',J4:'North',AI:'North',ET:'North',NP:'North',HY:'North',
   SZ:'North',D3:'North',SD:'North',DV:'North',
   IX:'North',W9:'North',E5:'North',J9:'North',
   // Terminal 4 — bus (airlines moved there, Sep–Oct 2026)
-  OV:'T4',NE:'T4',W4:'T4','9P':'T4',
+  OV:'T4',NE:'T4',W4:'T4','9P':'T4','6E':'T4',
   VF:'T4',TU:'T4',J2:'T4',PC:'T4',QP:'T4',RB:'T4',
   // Hajj Terminal — bus. 3T (Tarco) moved here as a whole airline, Oct 2026.
   PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',AH:'Hajj','3T':'Hajj',
