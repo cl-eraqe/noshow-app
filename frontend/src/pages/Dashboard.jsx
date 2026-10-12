@@ -26,11 +26,11 @@ function fmtDayTime(dt) {
   return m ? `${m[3]} ${MONTHS_TITLE[+m[2] - 1]}, ${m[4]}:${m[5]}` : '';
 }
 
-function stdToDatetime(std) {
-  if (!std) return '';
-  const today = new Date().toISOString().slice(0, 10);
-  return `${today}T${std}`;
-}
+// A new flight is the next departure still to come: the server resolves which
+// day (direction 'future'). This used to glue the departure time to today's
+// date, so a flight leaving after midnight was saved a day early, before the
+// missed flight, and the case closed itself at once.
+const lookupNewFlightData = fn => lookupFlight(fn, { direction: 'future' });
 
 // Live days since the missed flight, for open cases. Same count as
 // backend/days-at-airport.js. The stored time is Jeddah wall-clock, so it is
@@ -261,10 +261,10 @@ export default function Dashboard() {
     if (!fn) return;
     setLookupStatus('loading');
     try {
-      const data = await lookupFlight(fn);
+      const data = await lookupNewFlightData(fn);
       setNewFlightForm(prev => ({
         ...prev,
-        new_datetime: stdToDatetime(data.std),
+        new_datetime: data.datetime || '',
         new_destination: `${data.city} (${data.destination})`,
         new_airline: airlineFromFlightNumber(fn),
       }));
@@ -375,10 +375,10 @@ export default function Dashboard() {
     if (!fn) return;
     setBulkSharedLookup('loading');
     try {
-      const data = await lookupFlight(fn);
+      const data = await lookupNewFlightData(fn);
       setBulkSharedFlight(prev => ({
         ...prev,
-        new_datetime: stdToDatetime(data.std),
+        new_datetime: data.datetime || '',
         new_destination: `${data.city} (${data.destination})`,
         new_airline: airlineFromFlightNumber(fn),
       }));
@@ -393,12 +393,12 @@ export default function Dashboard() {
     if (!fn) return;
     setBulkPerLookup(prev => ({ ...prev, [id]: 'loading' }));
     try {
-      const data = await lookupFlight(fn);
+      const data = await lookupNewFlightData(fn);
       setBulkPerReport(prev => ({
         ...prev,
         [id]: {
           ...prev[id],
-          new_datetime: stdToDatetime(data.std),
+          new_datetime: data.datetime || '',
           new_destination: `${data.city} (${data.destination})`,
           new_airline: airlineFromFlightNumber(fn),
         }

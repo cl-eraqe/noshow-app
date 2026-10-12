@@ -5,6 +5,7 @@ const path   = require('path');
 const fs     = require('fs');
 const { uploadFile, deleteFile } = require('../storage');
 const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
+const { checkReport, cleanFlight } = require('../validate-report');
 const { getAirlineCode, getTerminal, needsBus } = require('./_terminal-helper');
 const { requireRole } = require('../middleware/auth');
 
@@ -428,6 +429,10 @@ router.get('/:id', async (req, res) => {
 router.post('/', uploadFiles, async (req, res) => {
   try {
     const pool = getDb();
+    req.body.prev_flight = cleanFlight(req.body.prev_flight);
+    req.body.new_flight  = cleanFlight(req.body.new_flight);
+    const problem = checkReport(req.body);
+    if (problem) return res.status(400).json({ error: problem });
     const {
       pax_id_datetime,
       prev_flight, prev_datetime, prev_destination, prev_airline,
@@ -528,6 +533,11 @@ router.put('/:id', uploadFiles, async (req, res) => {
     if (!existingRows[0] || !ownsReport(req, existingRows[0])) return res.status(404).json({ error: 'Report not found' });
     const existing = existingRows[0];
 
+    req.body.prev_flight = cleanFlight(req.body.prev_flight);
+    req.body.new_flight  = cleanFlight(req.body.new_flight);
+    const problem = checkReport(req.body, { registeredAt: existing.created_at });
+    if (problem) return res.status(400).json({ error: problem });
+
     const {
       pax_id_datetime,
       prev_flight, prev_datetime, prev_destination, prev_airline,
@@ -612,6 +622,17 @@ router.patch('/:id', express.json(), async (req, res) => {
     const { rows: existing } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
     if (!existing[0] || !ownsReport(req, existing[0])) return res.status(404).json({ error: 'Report not found' });
     const report = existing[0];
+
+    // Only the new flight can change here; check it against the case's missed flight.
+    if (req.body.new_flight !== undefined || req.body.new_datetime !== undefined) {
+      req.body.new_flight = cleanFlight(req.body.new_flight);
+      const problem = checkReport({
+        prev_datetime: report.prev_datetime,
+        new_flight:    req.body.new_flight,
+        new_datetime:  req.body.new_datetime !== undefined ? req.body.new_datetime : report.new_datetime,
+      });
+      if (problem) return res.status(400).json({ error: problem });
+    }
 
     const { status, new_flight, new_datetime, new_destination, new_airline, comment, pax_count } = req.body;
     // owner_terminal is immutable — not accepted as a patchable field.
