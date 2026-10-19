@@ -90,18 +90,18 @@
     "terminal": "Hajj"
   },
   "3T203": {
-    "destination": "PZU",
+    "destination": "KRT",
     "std": "10:30",
     "terminal": "Hajj"
   },
   "3T205": {
     "destination": "PZU",
-    "std": "19:40",
+    "std": "17:30",
     "terminal": "Hajj"
   },
   "3T7203": {
-    "destination": "KRT",
-    "std": "04:10",
+    "destination": "PZU",
+    "std": "15:00",
     "terminal": "Hajj"
   },
   "4U2364": {
@@ -231,7 +231,7 @@
   },
   "9P587": {
     "destination": "LHE",
-    "std": "01:30",
+    "std": "00:50",
     "terminal": "T4"
   },
   "9P601": {
@@ -406,7 +406,7 @@
   },
   "AI2252": {
     "destination": "BOM",
-    "std": "17:35",
+    "std": "21:50",
     "terminal": "T4"
   },
   "AI2256": {
@@ -561,7 +561,7 @@
   },
   "BG332": {
     "destination": "DAC",
-    "std": "09:25",
+    "std": "06:10",
     "terminal": "Hajj"
   },
   "BG336": {
@@ -676,7 +676,7 @@
   },
   "C6322": {
     "destination": "TAS",
-    "std": "17:05",
+    "std": "10:20",
     "terminal": "Hajj"
   },
   "C6324": {
@@ -726,7 +726,7 @@
   },
   "C63322": {
     "destination": "TAS",
-    "std": "20:30",
+    "std": "03:55",
     "terminal": "Hajj"
   },
   "C63324": {
@@ -971,7 +971,7 @@
   },
   "E5322": {
     "destination": "ALY",
-    "std": "06:30",
+    "std": "05:55",
     "terminal": "T4"
   },
   "E5324": {
@@ -1516,7 +1516,12 @@
   },
   "EY616": {
     "destination": "AUH",
-    "std": "12:45",
+    "std": "14:15",
+    "terminal": "T1"
+  },
+  "F31661": {
+    "destination": "HYD",
+    "std": "22:50",
     "terminal": "T1"
   },
   "F31773": {
@@ -1526,7 +1531,7 @@
   },
   "F3701": {
     "destination": "DXB",
-    "std": "09:40",
+    "std": "14:15",
     "terminal": "T1"
   },
   "F37030": {
@@ -2055,8 +2060,8 @@
     "terminal": "Hajj"
   },
   "FG414": {
-    "destination": "KBL",
-    "std": "03:40",
+    "destination": "HEA",
+    "std": "21:00",
     "terminal": "Hajj"
   },
   "FG416": {
@@ -2206,7 +2211,7 @@
   },
   "FZ920": {
     "destination": "DXB",
-    "std": "04:40",
+    "std": "04:55",
     "terminal": "T1"
   },
   "G9146": {
@@ -2226,7 +2231,7 @@
   },
   "G9220": {
     "destination": "SHJ",
-    "std": "11:25",
+    "std": "12:40",
     "terminal": "T4"
   },
   "G9837": {
@@ -2651,7 +2656,7 @@
   },
   "GA991": {
     "destination": "CGK",
-    "std": "19:05",
+    "std": "16:35",
     "terminal": "Hajj"
   },
   "GA993": {
@@ -2681,7 +2686,7 @@
   },
   "GF182": {
     "destination": "BAH",
-    "std": "06:00",
+    "std": "05:50",
     "terminal": "T1"
   },
   "GF184": {
@@ -3501,7 +3506,7 @@
   },
   "IY513": {
     "destination": "ADE",
-    "std": "10:00",
+    "std": "11:00",
     "terminal": "Hajj"
   },
   "IY515": {
@@ -3531,12 +3536,12 @@
   },
   "IY525": {
     "destination": "SCT",
-    "std": "12:00",
+    "std": "11:00",
     "terminal": "Hajj"
   },
   "IY527": {
     "destination": "ADE",
-    "std": "23:55",
+    "std": "20:00",
     "terminal": "Hajj"
   },
   "IY529": {
@@ -3571,7 +3576,7 @@
   },
   "J4605": {
     "destination": "PZU",
-    "std": "14:10",
+    "std": "19:00",
     "terminal": "T4"
   },
   "J4607": {
@@ -3601,7 +3606,7 @@
   },
   "J4669": {
     "destination": "KRT",
-    "std": "08:20",
+    "std": "05:10",
     "terminal": "T4"
   },
   "J4675": {
@@ -3816,7 +3821,7 @@
   },
   "JT85": {
     "destination": "KNO",
-    "std": "20:00",
+    "std": "22:00",
     "terminal": "Hajj"
   },
   "JT87": {
@@ -3941,7 +3946,7 @@
   },
   "ME369": {
     "destination": "BEY",
-    "std": "13:40",
+    "std": "14:30",
     "terminal": "T1"
   },
   "ME375": {
@@ -4226,7 +4231,7 @@
   },
   "MS644": {
     "destination": "CAI",
-    "std": "00:45",
+    "std": "00:30",
     "terminal": "T1"
   },
   "MS646": {
@@ -4251,7 +4256,7 @@
   },
   "MS664": {
     "destination": "CAI",
-    "std": "03:40",
+    "std": "04:10",
     "terminal": "T1"
   },
   "MS666": {
@@ -4271,7 +4276,7 @@
   },
   "MS672": {
     "destination": "CAI",
-    "std": "19:20",
+    "std": "19:00",
     "terminal": "T1"
   },
   "MS674": {
@@ -4381,7 +4386,7 @@
   },
   "NE171": {
     "destination": "CAI",
-    "std": "16:00",
+    "std": "06:45",
     "terminal": "T4"
   },
   "NE173": {
@@ -4401,7 +4406,7 @@
   },
   "NE179": {
     "destination": "CAI",
-    "std": "06:40",
+    "std": "21:40",
     "terminal": "T4"
   },
   "NE351": {
@@ -4446,7 +4451,7 @@
   },
   "NP128": {
     "destination": "CAI",
-    "std": "16:15",
+    "std": "16:00",
     "terminal": "T4"
   },
   "NP228": {
@@ -4716,7 +4721,7 @@
   },
   "PC699": {
     "destination": "SAW",
-    "std": "05:10",
+    "std": "05:30",
     "terminal": "T4"
   },
   "PC9999": {
@@ -4736,17 +4741,17 @@
   },
   "PF717": {
     "destination": "LHE",
-    "std": "04:00",
+    "std": "02:50",
     "terminal": "Hajj"
   },
   "PF719": {
     "destination": "ISB",
-    "std": "04:00",
+    "std": "02:35",
     "terminal": "Hajj"
   },
   "PF721": {
     "destination": "SKT",
-    "std": "03:35",
+    "std": "03:25",
     "terminal": "Hajj"
   },
   "PF723": {
@@ -4761,7 +4766,7 @@
   },
   "PK732": {
     "destination": "KHI",
-    "std": "04:50",
+    "std": "02:30",
     "terminal": "Hajj"
   },
   "PK736": {
@@ -4781,12 +4786,12 @@
   },
   "PK760": {
     "destination": "LHE",
-    "std": "16:30",
+    "std": "18:30",
     "terminal": "Hajj"
   },
   "PK762": {
     "destination": "KHI",
-    "std": "00:20",
+    "std": "02:45",
     "terminal": "Hajj"
   },
   "PK764": {
@@ -4806,12 +4811,12 @@
   },
   "PK840": {
     "destination": "MUX",
-    "std": "02:30",
+    "std": "04:30",
     "terminal": "Hajj"
   },
   "PK842": {
     "destination": "ISB",
-    "std": "01:35",
+    "std": "03:50",
     "terminal": "Hajj"
   },
   "PK846": {
@@ -4821,7 +4826,7 @@
   },
   "PK860": {
     "destination": "LHE",
-    "std": "22:10",
+    "std": "06:30",
     "terminal": "Hajj"
   },
   "PK862": {
@@ -5376,7 +5381,7 @@
   },
   "RQ994": {
     "destination": "KBL",
-    "std": "01:30",
+    "std": "02:00",
     "terminal": "Hajj"
   },
   "SD215": {
@@ -5391,12 +5396,12 @@
   },
   "SD227": {
     "destination": "PZU",
-    "std": "20:30",
+    "std": "21:50",
     "terminal": "Hajj"
   },
   "SD229": {
-    "destination": "PZU",
-    "std": "11:30",
+    "destination": "KRT",
+    "std": "15:10",
     "terminal": "Hajj"
   },
   "SG34": {
@@ -5426,12 +5431,12 @@
   },
   "SM454": {
     "destination": "HMB",
-    "std": "18:50",
+    "std": "11:30",
     "terminal": "T4"
   },
   "SM456": {
     "destination": "ATZ",
-    "std": "21:15",
+    "std": "08:10",
     "terminal": "T4"
   },
   "SM458": {
@@ -5451,17 +5456,17 @@
   },
   "SM476": {
     "destination": "CAI",
-    "std": "13:40",
+    "std": "14:40",
     "terminal": "T4"
   },
   "SM478": {
     "destination": "CAI",
-    "std": "07:20",
+    "std": "07:40",
     "terminal": "T4"
   },
   "SM480": {
     "destination": "CAI",
-    "std": "22:15",
+    "std": "22:30",
     "terminal": "T4"
   },
   "SM484": {
@@ -5531,12 +5536,12 @@
   },
   "SM958": {
     "destination": "CAI",
-    "std": "19:15",
+    "std": "20:55",
     "terminal": "T4"
   },
   "SM960": {
-    "destination": "ALY",
-    "std": "08:30",
+    "destination": "CAI",
+    "std": "18:10",
     "terminal": "T4"
   },
   "SM962": {
@@ -5585,13 +5590,13 @@
     "terminal": "T4"
   },
   "SM980": {
-    "destination": "LXR",
-    "std": "00:10",
+    "destination": "HMB",
+    "std": "23:30",
     "terminal": "T4"
   },
   "SM982": {
     "destination": "ATZ",
-    "std": "22:10",
+    "std": "22:45",
     "terminal": "T4"
   },
   "SM984": {
@@ -5626,7 +5631,7 @@
   },
   "SV121": {
     "destination": "LHR",
-    "std": "08:05",
+    "std": "11:00",
     "terminal": "T1"
   },
   "SV123": {
@@ -5769,6 +5774,11 @@
     "std": "10:25",
     "terminal": "T1"
   },
+  "SV23": {
+    "destination": "JFK",
+    "std": "04:05",
+    "terminal": "T1"
+  },
   "SV233": {
     "destination": "ZRH",
     "std": "09:35",
@@ -5876,7 +5886,7 @@
   },
   "SV275": {
     "destination": "IST",
-    "std": "13:20",
+    "std": "13:25",
     "terminal": "T1"
   },
   "SV279": {
@@ -7201,7 +7211,7 @@
   },
   "SV588": {
     "destination": "DXB",
-    "std": "12:10",
+    "std": "12:05",
     "terminal": "T1"
   },
   "SV590": {
@@ -7296,7 +7306,7 @@
   },
   "SV704": {
     "destination": "KHI",
-    "std": "19:15",
+    "std": "19:20",
     "terminal": "T1"
   },
   "SV708": {
@@ -7376,7 +7386,7 @@
   },
   "SV774": {
     "destination": "COK",
-    "std": "03:30",
+    "std": "10:45",
     "terminal": "T1"
   },
   "SV784": {
@@ -7407,6 +7417,11 @@
   "SV802": {
     "destination": "DAC",
     "std": "15:20",
+    "terminal": "T1"
+  },
+  "SV804": {
+    "destination": "DAC",
+    "std": "13:10",
     "terminal": "T1"
   },
   "SV808": {
@@ -7996,7 +8011,7 @@
   },
   "VF1568": {
     "destination": "ESB",
-    "std": "22:00",
+    "std": "17:00",
     "terminal": "T4"
   },
   "VF190": {
@@ -8006,7 +8021,7 @@
   },
   "VF192": {
     "destination": "SAW",
-    "std": "06:35",
+    "std": "07:30",
     "terminal": "T4"
   },
   "VF194": {
@@ -8262,6 +8277,16 @@
   "XC9218": {
     "destination": "DNZ",
     "std": "13:00",
+    "terminal": "Hajj"
+  },
+  "XC9514": {
+    "destination": "ADB",
+    "std": "05:05",
+    "terminal": "Hajj"
+  },
+  "XC9516": {
+    "destination": "GZT",
+    "std": "17:00",
     "terminal": "Hajj"
   },
   "XC9612": {
@@ -9276,7 +9301,7 @@
   },
   "YI5521": {
     "destination": "MJI",
-    "std": "08:00",
+    "std": "07:30",
     "terminal": "Hajj"
   },
   "YI5531": {
