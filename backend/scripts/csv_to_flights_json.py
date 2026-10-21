@@ -29,6 +29,10 @@ same airline can fly from two terminals — most of all in Hajj season — so
 nothing here decides a terminal by airline, and nothing overrides the file.
 A row with a blank or unrecognised terminal is imported as UNKNOWN and
 listed at the end.
+
+Domestic flights are skipped: the app covers international departures only.
+A row counts as domestic when the file's Type column says so, or when its
+destination is a Saudi airport.
 """
 
 import csv
@@ -50,6 +54,14 @@ HEADERS = {
     "destination": ("الرمز", "destination", "iata", "code", "dest"),
     "std":         ("المجدول", "std", "scheduled", "time"),
     "terminal":    ("الصالة", "terminal"),
+    "type":        ("النوع", "type"),          # optional: International / Domestic
+}
+
+# Saudi airports, for files without a Type column.
+SAUDI_AIRPORTS = {
+    "ABT", "AHB", "AJF", "AQI", "BHH", "DMM", "DWD", "EAM", "EJH", "ELQ", "GIZ",
+    "HAS", "HOF", "JED", "KMC", "MED", "NUM", "RAE", "RAH", "RSI", "RUH", "SHW",
+    "TIF", "TUI", "TUU", "ULH", "URY", "WAE", "YNB",
 }
 
 
@@ -155,12 +167,17 @@ def main():
 
     added, updated, unchanged = [], [], 0
     unknown_terminal, unknown_airport = [], {}
+    domestic = 0
     for row in rows:
         fn = normalize_flight_number(row[cols["flight"]])
         if not fn:
             continue
 
         dest = str(row[cols["destination"]] or "").strip().upper()
+        kind = str(row[cols["type"]] or "").strip().lower() if "type" in cols else ""
+        if kind == "domestic" or dest in SAUDI_AIRPORTS:
+            domestic += 1
+            continue
         terminal = normalize_terminal(row[cols["terminal"]]) or "UNKNOWN"
         if terminal == "UNKNOWN":
             unknown_terminal.append((fn, row[cols["terminal"]]))
@@ -188,6 +205,8 @@ def main():
 
     kept = len(flights) - len(added) - len(updated) - unchanged
     print(f"{len(rows)} row(s) in the file -> {output_path}")
+    if domestic:
+        print(f"  skipped   {domestic:>5}   domestic (outside the app's scope)")
     print(f"  added     {len(added):>5}")
     print(f"  updated   {len(updated):>5}")
     print(f"  unchanged {unchanged:>5}")

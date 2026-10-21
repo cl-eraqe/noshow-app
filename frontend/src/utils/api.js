@@ -396,7 +396,7 @@ export const AIRLINE_CODES = {
   OV: 'SalamAir',
   IX: 'Air India Express',
   TU: 'Tunisair',
-  W9: 'Wizz Air Abu Dhabi',
+  W9: 'Wizz Air UK',
   E5: 'Air Arabia Egypt',
   // Hajj Terminal (22 airlines)
   PA: 'airblue',
@@ -466,24 +466,24 @@ export const AIRLINE_CODES = {
 const TERMINAL_MAP = {
   // Terminal 1 — no bus
   SV: 'T1', XY: 'T1', F3: 'T1', QR: 'T1', EK: 'T1', KU: 'T1',
-  WY: 'T1', FZ: 'T1', RJ: 'T1', ME: 'T1', GF: 'T1', EY: 'T1',
+  WY: 'T1', RJ: 'T1', ME: 'T1', GF: 'T1', EY: 'T1',
   AT: 'T1', EW: 'T1', A3: 'T1', MH: 'T1', BA: 'T1',
   MS: 'T1', HU: 'T1', TK: 'T1',
-  // North Terminal — bus needed 🚌
-  G9: 'North', IY: 'North',
-  SM: 'North', J4: 'North', AI: 'North', ET: 'North',
-  NP: 'North', HY: 'North', SZ: 'North', D3: 'North',
-  SD: 'North', DV: 'North', IX: 'North',
-  W9: 'North', E5: 'North', J9: 'North',
-  // Terminal 4 — bus needed 🚌 (airlines moved there, Sep–Oct 2026)
+  // Terminal 4 — bus needed 🚌. By mid-Oct 2026 every airline that flew from
+  // the North Terminal had moved here or to Hajj; North has no departures.
   OV: 'T4', NE: 'T4', W4: 'T4', '9P': 'T4', '6E': 'T4',
   VF: 'T4', TU: 'T4', J2: 'T4', PC: 'T4', QP: 'T4', RB: 'T4',
+  G9: 'T4', E5: 'T4', J9: 'T4', SM: 'T4', J4: 'T4', AI: 'T4',
+  IX: 'T4', ET: 'T4', NP: 'T4', W9: 'T4',
+  FZ: 'T4',   // flydubai, from 21 Oct 2026
   // Hajj Terminal — bus needed 🚌 (3T Tarco moved here, Oct 2026)
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
   GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '3T': 'Hajj',
   JT: 'Hajj', RQ: 'Hajj', C6: 'Hajj', D7: 'Hajj',
   '2S': 'Hajj', '7Q': 'Hajj', BJ: 'Hajj', BM: 'Hajj', FH: 'Hajj',
   UZ: 'Hajj', XC: 'Hajj', ER: 'Hajj', DH: 'Hajj',
+  // From the North Terminal, Oct 2026
+  IY: 'Hajj', SD: 'Hajj', D3: 'Hajj', DV: 'Hajj', HY: 'Hajj', SZ: 'Hajj',
 };
 
 // Cache of per-flight terminals from flights.json (loaded once after login)
