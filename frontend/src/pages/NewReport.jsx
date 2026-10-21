@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
 // The compressor runs in a worker it builds from this script. Left to itself
@@ -12,8 +12,6 @@ const compressionLibUrl = new URL(compressionLibPath, window.location.href).href
 import { jsPDF } from 'jspdf';
 import { lookupFlight, airlineFromFlightNumber, createReport, getReport, updateReportFull, getFilterOptions, AIRLINE_CODES, downloadFile, getFileObjectUrl, readSharedFiles, terminalName } from '../utils/api';
 import SearchableSelect from '../components/SearchableSelect';
-import DocumentScanner from '../components/DocumentScanner';
-import { createScanner } from '../scanner/scannerClient';
 import { getRole, getUsername, isSupervisor } from '../utils/auth';
 import { toLatinDigits } from '../utils/digits';
 
@@ -322,7 +320,6 @@ export default function NewReport({ editMode }) {
   });
 
   const [files, setFiles] = useState([]);
-  const [reviewing, setReviewing] = useState(null);   // photos waiting in the scanner review
   const [converting, setConverting] = useState(false);
   const [pasteStatus, setPasteStatus] = useState('idle'); // idle | pasting | done | error
   const [existingFiles, setExistingFiles] = useState([]);
@@ -355,28 +352,6 @@ export default function NewReport({ editMode }) {
   function addFiles(incoming) {
     if (!incoming.length) return;
     setFiles(prev => [...prev, ...incoming]);
-  }
-
-  // The scanner (and the OpenCV it carries) starts loading the moment
-  // "Choose File" is tapped, so it is usually ready by the time the photos
-  // are picked. It is released when the review ends, and when the form closes.
-  const scannerRef = useRef(null);
-  const getScanner = () => (scannerRef.current ||= createScanner());
-  const releaseScanner = () => { scannerRef.current?.close(); scannerRef.current = null; };
-  useEffect(() => releaseScanner, []);
-
-  // Photos picked with "Choose File" go through the scanner review first;
-  // anything else (a PDF, say) is added straight away.
-  function chooseFiles(picked) {
-    const photos = picked.filter(f => IMG_TYPES.test(f.type));
-    addFiles(picked.filter(f => !IMG_TYPES.test(f.type)));
-    if (photos.length) { getScanner(); setReviewing(photos); }
-    else releaseScanner();   // loaded on the tap, but no photo came of it
-  }
-  function endReview(result) {
-    if (result) addFiles(result);
-    setReviewing(null);
-    releaseScanner();
   }
 
   useEffect(() => {
@@ -873,8 +848,7 @@ export default function NewReport({ editMode }) {
             <label className="field-label">{isEdit ? 'Add More Files' : 'File Attachments'}</label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
               <input type="file" className="field-input" multiple style={{ flex: 1, minWidth: 0, marginBottom: 0 }}
-                onClick={getScanner}
-                onChange={e => { chooseFiles(Array.from(e.target.files)); e.target.value = ''; }} />
+                onChange={e => { addFiles(Array.from(e.target.files)); e.target.value = ''; }} />
               <button
                 type="button"
                 className={`btn btn-sm ${pasteStatus === 'done' ? 'btn-success' : pasteStatus === 'error' ? 'btn-danger' : 'btn-secondary'}`}
@@ -886,10 +860,6 @@ export default function NewReport({ editMode }) {
                 {pasteStatus === 'pasting' ? '…' : pasteStatus === 'done' ? '✓ Pasted' : pasteStatus === 'error' ? 'Nothing to paste' : '📋 Paste'}
               </button>
             </div>
-            {reviewing && (
-              <DocumentScanner files={reviewing} scanner={getScanner()}
-                onDone={endReview} onCancel={() => endReview(null)} />
-            )}
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 6px' }}>
               Tip: Copy a scan in CamScanner, then tap Paste here — no need to save the file first.
             </p>
