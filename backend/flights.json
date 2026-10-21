@@ -1487,17 +1487,17 @@
   "EW1157": {
     "destination": "CGN",
     "std": "15:30",
-    "terminal": "T1"
+    "terminal": "T4"
   },
   "EW1159": {
     "destination": "BER",
     "std": "15:40",
-    "terminal": "T1"
+    "terminal": "T4"
   },
   "EW1171": {
     "destination": "STR",
     "std": "15:25",
-    "terminal": "T1"
+    "terminal": "T4"
   },
   "EY2247": {
     "destination": "AUH",
@@ -8012,12 +8012,12 @@
   "UJ906": {
     "destination": "CAI",
     "std": "07:00",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "UJ910": {
     "destination": "CAI",
     "std": "14:00",
-    "terminal": "North"
+    "terminal": "T4"
   },
   "UY3546": {
     "destination": "SKO",
