@@ -466,7 +466,7 @@ export const AIRLINE_CODES = {
 const TERMINAL_MAP = {
   // Terminal 1 — no bus
   SV: 'T1', XY: 'T1', F3: 'T1', QR: 'T1', EK: 'T1', KU: 'T1',
-  WY: 'T1', FZ: 'T1', RJ: 'T1', ME: 'T1', GF: 'T1', EY: 'T1',
+  WY: 'T1', RJ: 'T1', ME: 'T1', GF: 'T1', EY: 'T1',
   AT: 'T1', EW: 'T1', A3: 'T1', MH: 'T1', BA: 'T1',
   MS: 'T1', HU: 'T1', TK: 'T1',
   // Terminal 4 — bus needed 🚌. By mid-Oct 2026 every airline that flew from
@@ -475,6 +475,7 @@ const TERMINAL_MAP = {
   VF: 'T4', TU: 'T4', J2: 'T4', PC: 'T4', QP: 'T4', RB: 'T4',
   G9: 'T4', E5: 'T4', J9: 'T4', SM: 'T4', J4: 'T4', AI: 'T4',
   IX: 'T4', ET: 'T4', NP: 'T4', W9: 'T4',
+  FZ: 'T4',   // flydubai, from 21 Oct 2026
   // Hajj Terminal — bus needed 🚌 (3T Tarco moved here, Oct 2026)
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
   GA: 'Hajj', FG: 'Hajj', BS: 'Hajj', '3T': 'Hajj',
