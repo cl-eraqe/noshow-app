@@ -6,6 +6,7 @@ import SearchableSelect from '../components/SearchableSelect';
 
 import { getRole, isSupervisor, logout as clearLocalAuth } from '../utils/auth';
 import { toLatinDigits } from '../utils/digits';
+import { flagUrl } from '../utils/flags';
 
 function fmt(dt) {
   if (!dt) return '—';
@@ -24,6 +25,11 @@ const CLOSED_PAGE = 50;
 function fmtDayTime(dt) {
   const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(dt || '').trim());
   return m ? `${m[3]} ${MONTHS_TITLE[+m[2] - 1]}, ${m[4]}:${m[5]}` : '';
+}
+
+// "Lahore (LHE)" → "LHE"
+function iataOf(dest) {
+  return (String(dest || '').match(/\(([A-Z]{3})\)/) || [])[1] || dest || '—';
 }
 
 // A new flight is the next departure still to come: the server resolves which
@@ -874,13 +880,13 @@ export default function Dashboard() {
                       </th>
                     )}
                     <th style={{ width: '1%', whiteSpace: 'nowrap' }}>#</th>
-                    <th>Prev Flight</th>
-                    <th>Destination</th>
+                    <th>Pax</th>
                     <th>Nationality</th>
                     <th>Pax Type</th>
-                    <th>Pax</th>
-                    {activeTab !== 'closed' && <th>Days</th>}
+                    <th>Destination</th>
+                    <th>Prev Flight</th>
                     {activeTab !== 'under_process' && <th>New Flight</th>}
+                    {activeTab !== 'closed' && <th>Days</th>}
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -891,6 +897,26 @@ export default function Dashboard() {
                     const bus = needsBus(r.new_flight);
                     const showNusuk = r.pax_type === 'Umrah' && r.new_datetime &&
                       (new Date(r.new_datetime) - Date.now()) >= 24 * 60 * 60 * 1000;
+                    const paxEl = editingPax === r.id ? (
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              autoComplete="off"
+                              maxLength={3}
+                              className="pax-inline-edit"
+                              value={editPaxValue}
+                              onChange={e => setEditPaxValue(toLatinDigits(e.target.value))}
+                              onBlur={() => savePax(r.id)}
+                              onKeyDown={e => { if (e.key === 'Enter') savePax(r.id); if (e.key === 'Escape') setEditingPax(null); }}
+                              autoFocus
+                              onClick={e => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="pax-editable" onClick={e => startEditPax(r, e)} title="Click to edit">
+                              {r.pax_count ?? '—'}
+                            </span>
+                          );
                     return (
                       <tr key={r.id}
                         className={`clickable-row ${urgent && activeTab === 'under_process' ? 'row-urgent' : ''} ${bus && activeTab === 'flight_confirmed' ? 'row-bus' : ''}`}
@@ -941,56 +967,72 @@ export default function Dashboard() {
                             </div>
                           )}
                         </td>
-                        <td data-label="Prev Flight" className="col-flight">
+                        {/* Phone: the case as one short card, in the handover's order —
+                            who (pax · nationality · type), the missed flight, the new one.
+                            The table cells beside it are the laptop view. */}
+                        <td className="mobile-summary">
+                          <div className="ms-line ms-who">
+                            <span className="ms-pax">👥 {paxEl}</span>
+                            <span className="ms-sep">·</span>
+                            <span className="ms-nat">
+                              {flagUrl(r.nationality, 40) && <img src={flagUrl(r.nationality, 40)} alt="" className="ms-flag" onError={e => { e.currentTarget.style.display = 'none'; }} />}
+                              {r.nationality || '—'}
+                            </span>
+                            <span className="ms-sep">·</span>
+                            <span className="pax-type-badge">{r.pax_type || '—'}</span>
+                            {showNusuk && <img src="/nusuk-logo.svg" alt="Nusuk" className="nusuk-inline" title="Nusuk notification required" />}
+                          </div>
+                          <div className="ms-line">
+                            <span className="ms-icon">✈️</span>
+                            <span className="ms-code">{iataOf(r.prev_destination)}</span>
+                            <span className="flight-badge">{r.prev_flight || '—'}</span>
+                            {r.prev_datetime && <span className="ms-when">{fmtDayTime(r.prev_datetime)}</span>}
+                            <span className="ms-grow" />
+                            {activeTab !== 'closed' && days !== null && (
+                              <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>{days}d</span>
+                            )}
+                          </div>
+                          {r.new_flight ? (
+                            <div className="ms-line">
+                              <span className="ms-icon">✅</span>
+                              <span className="ms-code">{iataOf(r.new_destination)}</span>
+                              <span className="flight-badge">{r.new_flight}</span>
+                              {r.new_datetime && <span className="ms-when">{fmtDayTime(r.new_datetime)}</span>}
+                              {bus && <span className="bus-badge" title={`Bus to ${terminalName(getTerminal(r.new_flight))}`}>🚌 {getTerminal(r.new_flight)}</span>}
+                            </div>
+                          ) : (r.status || 'under_process') === 'under_process' && (
+                            <div className="ms-line ms-waiting"><span className="ms-icon">⏳</span>No new flight yet</div>
+                          )}
+                        </td>
+                        <td data-label="Pax" className="col-center col-detail">{paxEl}</td>
+                        <td data-label="Nationality" className="col-detail">{r.nationality || '—'}</td>
+                        <td data-label="Pax Type" className="col-detail">
+                          <span className="pax-type-badge">{r.pax_type || '—'}</span>
+                          {showNusuk && <img src="/nusuk-logo.svg" alt="Nusuk" className="nusuk-inline" title="Nusuk notification required" />}
+                        </td>
+                        <td data-label="Destination" className="col-detail">{r.prev_destination || '—'}</td>
+                        <td data-label="Prev Flight" className="col-flight col-detail">
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             <span className="flight-badge">{r.prev_flight || '—'}</span>
                             {r.prev_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtDayTime(r.prev_datetime)}</span>}
                           </span>
                         </td>
-                        <td data-label="Destination">{r.prev_destination || '—'}</td>
-                        <td data-label="Nationality">{r.nationality || '—'}</td>
-                        <td data-label="Pax Type">
-                          <span className="pax-type-badge">{r.pax_type || '—'}</span>
-                          {showNusuk && <img src="/nusuk-logo.svg" alt="Nusuk" className="nusuk-inline" title="Nusuk notification required" />}
-                        </td>
-                        <td data-label="Pax" className="col-center">
-                          {editingPax === r.id ? (
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              autoComplete="off"
-                              maxLength={3}
-                              className="pax-inline-edit"
-                              value={editPaxValue}
-                              onChange={e => setEditPaxValue(toLatinDigits(e.target.value))}
-                              onBlur={() => savePax(r.id)}
-                              onKeyDown={e => { if (e.key === 'Enter') savePax(r.id); if (e.key === 'Escape') setEditingPax(null); }}
-                              autoFocus
-                              onClick={e => e.stopPropagation()}
-                            />
-                          ) : (
-                            <span className="pax-editable" onClick={e => startEditPax(r, e)} title="Click to edit">
-                              {r.pax_count ?? '—'}
-                            </span>
-                          )}
-                        </td>
-                        {activeTab !== 'closed' && (
-                          <td data-label="Days" className="col-center">
-                            {days !== null ? (
-                              <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>
-                                {days}d
-                              </span>
-                            ) : '—'}
-                          </td>
-                        )}
                         {activeTab !== 'under_process' && (
-                          <td data-label="New Flight" className="col-flight">
+                          <td data-label="New Flight" className="col-flight col-detail">
                             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                               <span className="flight-badge">{r.new_flight || '—'}</span>
                               {bus && <span className="bus-badge" title={`Bus to ${terminalName(getTerminal(r.new_flight))}`}>🚌 {getTerminal(r.new_flight)}</span>}
                               {r.new_datetime && <span style={{ fontSize: '0.75rem', color: '#666' }}>{fmtDayTime(r.new_datetime)}</span>}
                             </span>
+                          </td>
+                        )}
+                        {activeTab !== 'closed' && (
+                          <td data-label="Days" className="col-center col-detail">
+                            {days !== null ? (
+                              <span className={`days-badge ${days >= 1 ? 'days-urgent' : ''}`}>
+                                {days}d
+                              </span>
+                            ) : '—'}
                           </td>
                         )}
                         <td data-label="" className="col-actions">

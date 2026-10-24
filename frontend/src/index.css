@@ -285,6 +285,7 @@ html, body, #root {
 }
 
 .report-table tbody tr:last-child td { border-bottom: none; }
+.report-table td.mobile-summary { display: none; }   /* phone only, below */
 .report-table tbody tr:hover { background: #f5f9ff; }
 
 .col-id      { font-weight: 700; color: var(--navy); white-space: nowrap; width: 1%; }
@@ -1126,6 +1127,22 @@ html, body, #root {
     gap: 6px;
     padding-top: 8px;
   }
+
+  /* The phone card: one summary cell instead of a row per field */
+  .report-table td.col-detail { display: none; }
+  .report-table td.mobile-summary { display: block; padding: 4px 0 2px; }
+  .report-table td.mobile-summary::before { display: none; }
+  .ms-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 3px 0; font-size: 0.9rem; }
+  .ms-who { font-weight: 600; }
+  .ms-pax { font-weight: 800; display: inline-flex; align-items: center; gap: 2px; }
+  .ms-sep { color: var(--text-muted); }
+  .ms-nat { display: inline-flex; align-items: center; gap: 5px; }
+  .ms-flag { width: 20px; height: 14px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0,0,0,0.08); }
+  .ms-icon { width: 1.3em; text-align: center; }
+  .ms-code { font-weight: 800; letter-spacing: 0.03em; }
+  .ms-when { color: var(--text-muted); font-size: 0.8rem; }
+  .ms-grow { flex: 1; }
+  .ms-waiting { color: var(--text-muted); }
 
   /* Reset text alignment overrides */
   .report-table td.col-center { text-align: right; }
