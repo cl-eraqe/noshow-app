@@ -442,6 +442,7 @@ export const AIRLINE_CODES = {
   UJ: 'AlMasria Universal Airlines',
   Q2: 'Maldivian',
   TR: 'Scoot',
+  UF: 'Petroleum Air Services',
   HH: 'Qanot Sharq',
   // Other (kept for reference)
   LH: 'Lufthansa',
@@ -476,6 +477,7 @@ const TERMINAL_MAP = {
   G9: 'T4', E5: 'T4', J9: 'T4', SM: 'T4', J4: 'T4', AI: 'T4',
   IX: 'T4', ET: 'T4', NP: 'T4', W9: 'T4',
   FZ: 'T4',   // flydubai, from 21 Oct 2026
+  UF: 'T4',   // Petroleum Air Services (PAS)
   EW: 'T4', UJ: 'T4',
   // Hajj Terminal — bus needed 🚌 (3T Tarco moved here, Oct 2026)
   PA: 'Hajj', PF: 'Hajj', BG: 'Hajj', PK: 'Hajj', AH: 'Hajj',
@@ -485,6 +487,7 @@ const TERMINAL_MAP = {
   UZ: 'Hajj', XC: 'Hajj', ER: 'Hajj', DH: 'Hajj',
   // From the North Terminal, Oct 2026
   IY: 'Hajj', SD: 'Hajj', D3: 'Hajj', DV: 'Hajj', HY: 'Hajj', SZ: 'Hajj',
+  HH: 'Hajj',   // Qanot Sharq
 };
 
 // Cache of per-flight terminals from flights.json (loaded once after login)
@@ -525,6 +528,8 @@ export function getTerminal(flightNumber) {
   if (cached && VALID_TERMINALS.has(cached)) return cached;
   // Fallback: airline-code mapping (used when cache miss or not yet loaded)
   const code = getAirlineCode(upper);
+  // AJet's charters (VF6xxx) leave from the Hajj terminal; its scheduled flights from T4.
+  if (/^VF6\d{3}$/.test(upper)) return 'Hajj';
   return TERMINAL_MAP[code] || 'T1';
 }
 
