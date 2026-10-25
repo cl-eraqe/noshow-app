@@ -22,6 +22,7 @@ const TERMINAL_MAP = {
   VF:'T4',TU:'T4',J2:'T4',PC:'T4',QP:'T4',RB:'T4',
   G9:'T4',E5:'T4',J9:'T4',SM:'T4',J4:'T4',AI:'T4',IX:'T4',ET:'T4',NP:'T4',W9:'T4',
   FZ:'T4',   // flydubai, from 21 Oct 2026
+  UF:'T4',   // Petroleum Air Services (PAS)
   EW:'T4',UJ:'T4',
   // Hajj Terminal — bus. 3T (Tarco) moved here as a whole airline, Oct 2026.
   PA:'Hajj',PF:'Hajj',BG:'Hajj',PK:'Hajj',AH:'Hajj','3T':'Hajj',
@@ -30,6 +31,7 @@ const TERMINAL_MAP = {
   UZ:'Hajj',XC:'Hajj',ER:'Hajj',DH:'Hajj',
   // From the North Terminal, Oct 2026
   IY:'Hajj',SD:'Hajj',D3:'Hajj',DV:'Hajj',HY:'Hajj',SZ:'Hajj',
+  HH:'Hajj',   // Qanot Sharq
 };
 
 const BUS_TERMINALS = new Set(['North', 'Hajj', 'T4']);
@@ -44,6 +46,8 @@ function getTerminal(flight) {
   const key = normalizeFlightNumber(flight);   // SV0309 -> SV309, as stored
   const known = flights[key]?.terminal;
   if (KNOWN_TERMINALS.has(known)) return known;
+  // AJet's charters (VF6xxx) leave from the Hajj terminal; its scheduled flights from T4.
+  if (/^VF6\d{3}$/.test(key)) return 'Hajj';
   return TERMINAL_MAP[getAirlineCode(key)] || 'T1';
 }
 
