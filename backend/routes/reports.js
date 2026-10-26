@@ -89,35 +89,51 @@ function visaWord(paxType) {
   return VISA_WORDS[paxType] || String(paxType || 'UNKNOWN').toUpperCase();
 }
 
-// ── WhatsApp confirmation message ─────────────────────────────────────
+// ── A case's lines, shared by the handover and the WhatsApp message ─────
+// Both print a case the same way, so staff read one layout everywhere:
+//   2  🇵🇰 PAK  UMRAH  LHE
+//   ✈️ SV738 25OCT 17:15
+//   ✅ SV738 27OCT 17:15  T4 🚌
+// Two spaces separate fields.
+const GAP = '  ';
 
-const MONTHS_TITLE = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-// "2026-08-31T01:05" or "2026-08-31 01:05:00" → "31 Aug, 01:05". No year.
-// Read straight off the string rather than through Date, so the stored Jeddah
-// wall-clock is reproduced exactly whatever timezone the server runs in.
-function fmtDayTime(dt) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(dt || '').trim());
-  return m ? `${m[3]} ${MONTHS_TITLE[+m[2] - 1]}, ${m[4]}:${m[5]}` : '';
+// Who and where to.
+function caseHeadLine(r) {
+  return [r.pax_count || 1, nationalityLabel(r.nationality), visaWord(r.pax_type), iataCode(r.prev_destination)].join(GAP);
 }
 
-// One builder for all three write paths (create / full update / patch) so the
-// message cannot drift between them.
+// The missed flight.
+function missedFlightLine(r) {
+  return `✈️ ${r.prev_flight || '???'} ${fmtWhen(r.prev_datetime)}`;
+}
+
+// The new flight, with its destination only when it differs from the missed
+// one, and the terminal when the passengers need a bus to it.
+function newFlightLine(r) {
+  const newDest = iataCode(r.new_destination);
+  const where   = r.new_destination && newDest !== iataCode(r.prev_destination) ? `${newDest} ` : '';
+  const bus     = needsBus(r.new_flight) ? `${GAP}${getTerminal(r.new_flight)} 🚌` : '';
+  return `✅ ${where}${r.new_flight} ${fmtWhen(r.new_datetime)}${bus}`;
+}
+
+// ── WhatsApp confirmation message ─────────────────────────────────────
+
+// One builder for all three write paths (create / full update / patch), and
+// for every read, so the message cannot drift between them and an old case
+// copies in the current layout.
 function whatsappText(r) {
-  const when = dt => { const s = fmtDayTime(dt); return s ? ` on ${s}` : ''; };
-  const lines = [
-    `No-Show Report #${r.id}`,
-    `Flight: ${r.prev_flight || '—'}${when(r.prev_datetime)} → ${r.prev_destination || '—'}`,
-    `Pax: ${r.pax_count} × ${r.pax_type || '—'}`,
-    `Nationality: ${r.nationality || '—'}`,
-  ];
+  const lines = [`No-Show #${r.id}`, caseHeadLine(r), missedFlightLine(r)];
   // Blank line, then the new flight. Both are omitted when no new flight is
   // booked yet: the ✅ reads as "confirmed", so it must not show on a case
   // that is still under process.
-  if (r.new_flight) {
-    lines.push('', `✅ New Flight: ${r.new_flight}${when(r.new_datetime)} → ${r.new_destination || '—'}`);
-  }
+  if (r.new_flight) lines.push('', newFlightLine(r));
   return lines.join('\n');
+}
+
+// A report row as sent to the app, its message built fresh rather than read
+// from the stored column (which keeps whatever layout it was written in).
+function withWhatsApp(r) {
+  return r && { ...r, whatsapp_text: whatsappText(r) };
 }
 
 // ── Multer (memory storage — files uploaded to cloud/local via storage.js) ──
@@ -247,9 +263,8 @@ router.get('/handover', async (req, res) => {
     //      ✈️ SV738 25OCT 17:15               the missed flight
     //      ✅ SV738 27OCT 17:15  T4 🚌  ⏰     the new flight, once booked
     //      💬 comment
-    // Two spaces separate fields; one blank line separates cases. No case
-    // number — the team asked to drop it.
-    const GAP = '  ';
+    // Two spaces separate fields (GAP); one blank line separates cases. No
+    // case number — the team asked to drop it.
 
     // A comment may contain newlines. Indent the continuation lines so the
     // whole note stays visually attached to its case instead of breaking out
@@ -264,23 +279,15 @@ router.get('/handover', async (req, res) => {
     }
 
     function fmtReport(r) {
-      const dest = iataCode(r.prev_destination);
       // Whole days at the airport, flagged from the first full day — the
       // same point the dashboard card turns red.
       const days = daysAtAirport(r);
       const stay = days >= 1 ? `${GAP}⚠️ ${Math.floor(days)} day` : '';
-      const lines = [
-        [r.pax_count || 1, nationalityLabel(r.nationality), visaWord(r.pax_type), dest].join(GAP) + stay,
-        `   ✈️ ${r.prev_flight || '???'} ${fmtWhen(r.prev_datetime)}`,
-      ];
+      const lines = [caseHeadLine(r) + stay, `   ${missedFlightLine(r)}`];
       if (r.status === 'flight_confirmed' && r.new_flight) {
-        // The new destination only when it differs from the missed one.
-        const newDest = iataCode(r.new_destination);
-        const where   = r.new_destination && newDest !== dest ? `${newDest} ` : '';
-        const bus     = needsBus(r.new_flight) ? `${GAP}${getTerminal(r.new_flight)} 🚌` : '';
-        const soon    = r.new_datetime && r.new_datetime > nowJeddah && r.new_datetime <= threeHoursFromNow
+        const soon = r.new_datetime && r.new_datetime > nowJeddah && r.new_datetime <= threeHoursFromNow
           ? `${GAP}⏰` : '';
-        lines.push(`   ✅ ${where}${r.new_flight} ${fmtWhen(r.new_datetime)}${bus}${soon}`);
+        lines.push(`   ${newFlightLine(r)}${soon}`);
       }
       if (r.comment) lines.push(commentBlock(r.comment));
       return lines.join('\n');
@@ -385,7 +392,7 @@ router.get('/', async (req, res) => {
     const { rows } = scope
       ? await pool.query('SELECT * FROM reports WHERE owner_terminal = $1 ORDER BY created_at DESC', [scope])
       : await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
-    res.json(rows);
+    res.json(rows.map(withWhatsApp));
   } catch (e) {
     console.error('[GET /reports]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -399,7 +406,7 @@ router.get('/:id', async (req, res) => {
     const pool = getDb();
     const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
     if (!rows[0] || !ownsReport(req, rows[0])) return res.status(404).json({ error: 'Report not found' });
-    res.json(rows[0]);
+    res.json(withWhatsApp(rows[0]));
   } catch (e) {
     console.error('[GET /reports/:id]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -499,7 +506,7 @@ router.post('/', uploadFiles, async (req, res) => {
 
     await logAudit({ user: req.username || req.role, action: 'create', reportId: id, snapshot: report });
 
-    res.status(201).json(report);
+    res.status(201).json(withWhatsApp(report));
   } catch (e) {
     console.error('[POST /reports]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -589,7 +596,7 @@ router.put('/:id', uploadFiles, async (req, res) => {
       await logAudit({ user: req.username || req.role, action: 'edit', reportId: updated.id, changes });
     }
 
-    res.json(updated);
+    res.json(withWhatsApp(updated));
   } catch (e) {
     console.error('[PUT /reports/:id]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -636,7 +643,7 @@ router.patch('/:id', express.json(), async (req, res) => {
     if (comment !== undefined)         { updates.push(`comment = $${idx++}`);         values.push(comment); }
     if (pax_count !== undefined)       { updates.push(`pax_count = $${idx++}`);       values.push(parseInt(pax_count) || 0); }
 
-    if (updates.length === 0) return res.json(report);
+    if (updates.length === 0) return res.json(withWhatsApp(report));
 
     const finalNewFlight   = new_flight   !== undefined ? new_flight   : report.new_flight;
     const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
@@ -682,7 +689,7 @@ router.patch('/:id', express.json(), async (req, res) => {
       await logAudit({ user: req.username || req.role, action, reportId: updated.id, changes });
     }
 
-    res.json(updated);
+    res.json(withWhatsApp(updated));
   } catch (e) {
     console.error('[PATCH /reports/:id]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -782,7 +789,7 @@ router.post('/:id/nusuk', express.json(), async (req, res) => {
     });
 
     const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
-    res.json(updatedRows[0]);
+    res.json(withWhatsApp(updatedRows[0]));
   } catch (e) {
     console.error('[POST /reports/:id/nusuk]', e);
     res.status(500).json({ error: 'Internal server error' });
