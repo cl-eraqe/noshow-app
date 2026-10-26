@@ -73,7 +73,8 @@ function fmtWhen(dt) {
   return m ? `${m[3]}${MONTHS_UPPER[+m[2] - 1]} ${m[4]}:${m[5]}` : '??';
 }
 
-// The visa as one word in the handover, so the case's first line stays short.
+// The visa in the handover, shortened where it's long so the case's first
+// line stays short. Family Visit and Final Exit stay in full, as the team asked.
 const VISA_WORDS = {
   'Umrah': 'UMRAH',
   'Hajj Group': 'HAJJ',
@@ -81,8 +82,8 @@ const VISA_WORDS = {
   'Resident': 'RESIDENT',
   'Transit': 'TRANSIT',
   'Transit Visa 3-day': 'TRANSIT 3D',
-  'Family Visit': 'VISIT',
-  'Final Exit': 'EXIT',
+  'Family Visit': 'FAMILY VISIT',
+  'Final Exit': 'FINAL EXIT',
 };
 function visaWord(paxType) {
   return VISA_WORDS[paxType] || String(paxType || 'UNKNOWN').toUpperCase();
