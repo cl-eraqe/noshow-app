@@ -196,29 +196,14 @@ export default function Dashboard() {
 
   const airlines = [...new Set(reports.map(r => r.prev_airline).filter(Boolean))].sort();
 
+  // The server builds whatsapp_text fresh on every report it sends
+  // (whatsappText() in backend/routes/reports.js), so old cases copy in the
+  // current layout too.
   function copyWhatsApp(report) {
-    const text = report.whatsapp_text || buildWhatsApp(report);
-    navigator.clipboard.writeText(text).then(() => {
+    navigator.clipboard.writeText(report.whatsapp_text || '').then(() => {
       setCopied(report.id);
       setTimeout(() => setCopied(null), 2000);
     });
-  }
-
-  // Kept byte-for-byte in step with whatsappText() in backend/routes/reports.js —
-  // the backend stores this text on the report, this rebuilds it for the Copy
-  // button, and the two must produce identical output.
-  function buildWhatsApp(r) {
-    const when = dt => { const s = fmtDayTime(dt); return s ? ` on ${s}` : ''; };
-    const lines = [
-      `No-Show Report #${r.id}`,
-      `Flight: ${r.prev_flight || '—'}${when(r.prev_datetime)} → ${r.prev_destination || '—'}`,
-      `Pax: ${r.pax_count} × ${r.pax_type || '—'}`,
-      `Nationality: ${r.nationality || '—'}`,
-    ];
-    if (r.new_flight) {
-      lines.push('', `✅ New Flight: ${r.new_flight}${when(r.new_datetime)} → ${r.new_destination || '—'}`);
-    }
-    return lines.join('\n');
   }
 
   function duplicate(report) {
