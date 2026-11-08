@@ -46,8 +46,9 @@ function getTerminal(flight) {
   const key = normalizeFlightNumber(flight);   // SV0309 -> SV309, as stored
   const known = flights[key]?.terminal;
   if (KNOWN_TERMINALS.has(known)) return known;
-  // AJet's charters (VF6xxx) leave from the Hajj terminal; its scheduled flights from T4.
-  if (/^VF6\d{3}$/.test(key)) return 'Hajj';
+  // AJet's and Pegasus's charters (VF6xxx, PC6xxx) leave from the Hajj terminal;
+  // their scheduled flights from T4.
+  if (/^(VF|PC)6\d{3}$/.test(key)) return 'Hajj';
   return TERMINAL_MAP[getAirlineCode(key)] || 'T1';
 }
 

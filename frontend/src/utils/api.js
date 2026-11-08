@@ -528,8 +528,9 @@ export function getTerminal(flightNumber) {
   if (cached && VALID_TERMINALS.has(cached)) return cached;
   // Fallback: airline-code mapping (used when cache miss or not yet loaded)
   const code = getAirlineCode(upper);
-  // AJet's charters (VF6xxx) leave from the Hajj terminal; its scheduled flights from T4.
-  if (/^VF6\d{3}$/.test(upper)) return 'Hajj';
+  // AJet's and Pegasus's charters (VF6xxx, PC6xxx) leave from the Hajj terminal;
+  // their scheduled flights from T4.
+  if (/^(VF|PC)6\d{3}$/.test(upper)) return 'Hajj';
   return TERMINAL_MAP[code] || 'T1';
 }
 
