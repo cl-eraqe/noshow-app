@@ -6,7 +6,9 @@ const fs     = require('fs');
 const { uploadFile, deleteFile } = require('../storage');
 const { getDb, autoCloseReports, logAudit, diffFields, jeddahNowStr } = require('../db');
 const { checkReport, cleanFlight } = require('../validate-report');
-const { getAirlineCode, getTerminal, needsBus } = require('./_terminal-helper');
+const { getTerminal, needsBus } = require('./_terminal-helper');
+const { daysAtAirport } = require('../days-at-airport');
+const { nationalityLabel } = require('../nationality-codes');
 const { requireRole } = require('../middleware/auth');
 
 // ── Jeddah time helpers ────────────────────────────────────────────────
@@ -62,47 +64,76 @@ function iataCode(dest) {
   const match = dest.match(/\(([A-Z]{3})\)/);
   return match ? match[1] : dest.slice(0, 3).toUpperCase();
 }
-function fmtDateShort(dt) {
-  if (!dt) return '??';
-  const d = new Date(String(dt).replace(' ', 'T'));
-  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  return String(d.getDate()).padStart(2, '0') + months[d.getMonth()];
+// "2026-10-25T08:35" or "2026-10-25 08:35:00" → "25OCT 08:35", read straight
+// off the string so the stored Jeddah wall-clock is kept whatever timezone the
+// server runs in.
+const MONTHS_UPPER = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function fmtWhen(dt) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(dt || '').trim());
+  return m ? `${m[3]}${MONTHS_UPPER[+m[2] - 1]} ${m[4]}:${m[5]}` : '??';
 }
-function fmtTimeShort(dt) {
-  if (!dt) return '????';
-  const d = new Date(String(dt).replace(' ', 'T'));
-  return String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0');
+
+// The visa in the handover, shortened where it's long so the case's first
+// line stays short. Family Visit and Final Exit stay in full, as the team asked.
+const VISA_WORDS = {
+  'Umrah': 'UMRAH',
+  'Hajj Group': 'HAJJ',
+  'Tourist': 'TOURIST',
+  'Resident': 'RESIDENT',
+  'Transit': 'TRANSIT',
+  'Transit Visa 3-day': 'TRANSIT 3D',
+  'Family Visit': 'FAMILY VISIT',
+  'Final Exit': 'FINAL EXIT',
+};
+function visaWord(paxType) {
+  return VISA_WORDS[paxType] || String(paxType || 'UNKNOWN').toUpperCase();
+}
+
+// ── A case's lines, shared by the handover and the WhatsApp message ─────
+// Both print a case the same way, so staff read one layout everywhere:
+//   2  🇵🇰 PAK  UMRAH  LHE
+//   ✈️ SV738 25OCT 17:15
+//   ✅ SV738 27OCT 17:15  T4 🚌
+// Two spaces separate fields.
+const GAP = '  ';
+
+// Who and where to.
+function caseHeadLine(r) {
+  return [r.pax_count || 1, nationalityLabel(r.nationality), visaWord(r.pax_type), iataCode(r.prev_destination)].join(GAP);
+}
+
+// The missed flight.
+function missedFlightLine(r) {
+  return `✈️ ${r.prev_flight || '???'} ${fmtWhen(r.prev_datetime)}`;
+}
+
+// The new flight, with its destination only when it differs from the missed
+// one, and the terminal when the passengers need a bus to it.
+function newFlightLine(r) {
+  const newDest = iataCode(r.new_destination);
+  const where   = r.new_destination && newDest !== iataCode(r.prev_destination) ? `${newDest} ` : '';
+  const bus     = needsBus(r.new_flight) ? `${GAP}${getTerminal(r.new_flight)} 🚌` : '';
+  return `✅ ${where}${r.new_flight} ${fmtWhen(r.new_datetime)}${bus}`;
 }
 
 // ── WhatsApp confirmation message ─────────────────────────────────────
 
-const MONTHS_TITLE = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-// "2026-08-31T01:05" or "2026-08-31 01:05:00" → "31 Aug, 01:05". No year.
-// Read straight off the string rather than through Date, so the stored Jeddah
-// wall-clock is reproduced exactly whatever timezone the server runs in.
-function fmtDayTime(dt) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(dt || '').trim());
-  return m ? `${m[3]} ${MONTHS_TITLE[+m[2] - 1]}, ${m[4]}:${m[5]}` : '';
-}
-
-// One builder for all three write paths (create / full update / patch) so the
-// message cannot drift between them.
+// One builder for all three write paths (create / full update / patch), and
+// for every read, so the message cannot drift between them and an old case
+// copies in the current layout.
 function whatsappText(r) {
-  const when = dt => { const s = fmtDayTime(dt); return s ? ` on ${s}` : ''; };
-  const lines = [
-    `No-Show Report #${r.id}`,
-    `Flight: ${r.prev_flight || '—'}${when(r.prev_datetime)} → ${r.prev_destination || '—'}`,
-    `Pax: ${r.pax_count} × ${r.pax_type || '—'}`,
-    `Nationality: ${r.nationality || '—'}`,
-  ];
+  const lines = [`No-Show #${r.id}`, caseHeadLine(r), missedFlightLine(r)];
   // Blank line, then the new flight. Both are omitted when no new flight is
   // booked yet: the ✅ reads as "confirmed", so it must not show on a case
   // that is still under process.
-  if (r.new_flight) {
-    lines.push('', `✅ New Flight: ${r.new_flight}${when(r.new_datetime)} → ${r.new_destination || '—'}`);
-  }
+  if (r.new_flight) lines.push('', newFlightLine(r));
   return lines.join('\n');
+}
+
+// A report row as sent to the app, its message built fresh rather than read
+// from the stored column (which keeps whatever layout it was written in).
+function withWhatsApp(r) {
+  return r && { ...r, whatsapp_text: whatsappText(r) };
 }
 
 // ── Multer (memory storage — files uploaded to cloud/local via storage.js) ──
@@ -220,24 +251,20 @@ router.get('/handover', async (req, res) => {
     const nowJeddah          = jeddahISO();
     const threeHoursFromNow  = jeddahISO(3 * 60 * 60 * 1000);
 
-    const upSV    = underProcess.filter(r => getAirlineCode(r.prev_flight) === 'SV');
-    const upOther = underProcess.filter(r => getAirlineCode(r.prev_flight) !== 'SV');
-    const fuSV    = flightConfirmed.filter(r => getAirlineCode(r.prev_flight) === 'SV');
-    const fuOther = flightConfirmed.filter(r => getAirlineCode(r.prev_flight) !== 'SV');
-
-    const departingSoon = flightConfirmed.filter(r =>
-      r.new_datetime && r.new_datetime <= threeHoursFromNow && r.new_datetime > nowJeddah
-    );
-    const busTransfers = flightConfirmed.filter(r => needsBus(r.new_flight));
+    // Bus transfers lead the confirmed list — they need arranging before the
+    // flight — then everything by the new flight's time (the query's order;
+    // Array.prototype.sort is stable).
+    flightConfirmed.sort((a, b) => needsBus(b.new_flight) - needsBus(a.new_flight));
 
     // ── Text formatting ──────────────────────────────────────────────────
-    // Punctuation is consistent throughout:
-    //   " · "  separates fields on the same line
-    //   "   ↳" introduces the alternative flight
-    //   "   →" introduces the free-text note
-    // Every case ends with its "#id" on the FIRST line so it can be found at
-    // a glance, and consecutive cases are separated by one blank line.
-    const SEP = ' · ';
+    // Each case is a short block, one fact per line, so no line is wider
+    // than a phone's WhatsApp bubble:
+    //   2  🇵🇰 PAK  UMRAH  LHE  ⚠️ 1 day      who and where to
+    //      ✈️ SV738 25OCT 17:15               the missed flight
+    //      ✅ SV738 27OCT 17:15  T4 🚌  ⏰     the new flight, once booked
+    //      💬 comment
+    // Two spaces separate fields (GAP); one blank line separates cases. No
+    // case number — the team asked to drop it.
 
     // A comment may contain newlines. Indent the continuation lines so the
     // whole note stays visually attached to its case instead of breaking out
@@ -248,44 +275,33 @@ router.get('/handover', async (req, res) => {
         .map(s => s.trim())
         .filter(Boolean)
         .join('\n     ');
-      return `   → ${body}`;
+      return `   💬 ${body}`;
     }
 
-    function paxLabel(r) {
-      return `${String(r.pax_count || 1).padStart(2, '0')}PAX`;
-    }
-
-    function fmtReport(r, showNewFlight = false) {
-      const paxType  = (r.pax_type || 'Unknown').toUpperCase();
-      const dest     = iataCode(r.prev_destination);
-      const airline  = getAirlineCode(r.prev_flight);
-      const prevDate = fmtDateShort(r.prev_datetime);
-      const prevTime = fmtTimeShort(r.prev_datetime);
-      const bus      = needsBus(r.new_flight) ? ' 🚌' : '';
-      let line = [
-        paxLabel(r), paxType, `${airline} ${dest}`,
-        `${prevDate} STD ${prevTime}`, `#${r.id}`,
-      ].join(SEP);
-      if (showNewFlight && r.status === 'flight_confirmed' && r.new_flight) {
-        const newDate  = fmtDateShort(r.new_datetime);
-        const newTime  = fmtTimeShort(r.new_datetime);
-        const terminal = getTerminal(r.new_flight);
-        const termNote = terminal !== 'T1' ? `${SEP}(${terminal})` : '';
-        line += `\n   ↳ ALT FLT ${r.new_flight}${SEP}STD ${newTime} ${newDate} ✅${termNote}${bus}`;
+    function fmtReport(r) {
+      // Whole days at the airport, flagged from the first full day — the
+      // same point the dashboard card turns red.
+      const days = daysAtAirport(r);
+      const stay = days >= 1 ? `${GAP}⚠️ ${Math.floor(days)} day` : '';
+      const lines = [caseHeadLine(r) + stay, `   ${missedFlightLine(r)}`];
+      if (r.status === 'flight_confirmed' && r.new_flight) {
+        const soon = r.new_datetime && r.new_datetime > nowJeddah && r.new_datetime <= threeHoursFromNow
+          ? `${GAP}⏰` : '';
+        lines.push(`   ${newFlightLine(r)}${soon}`);
       }
-      if (r.comment) line += `\n${commentBlock(r.comment)}`;
-      return line;
+      if (r.comment) lines.push(commentBlock(r.comment));
+      return lines.join('\n');
     }
 
     const lines = [];
     // Emits a section: header, blank, then each case separated by a blank line.
-    function section(title, list, render) {
+    function section(title, list) {
       if (!list.length) return;
       lines.push(`━━ ${title} ━━`);
       lines.push('');
       list.forEach((r, i) => {
         if (i > 0) lines.push('');
-        lines.push(render(r));
+        lines.push(fmtReport(r));
       });
       lines.push('');
     }
@@ -294,45 +310,18 @@ router.get('/handover', async (req, res) => {
     const totalFu = flightConfirmed.reduce((s, r) => s + (r.pax_count || 0), 0);
 
     lines.push(`📋 SHIFT HANDOVER ${currentShift} → ${nextShift}`);
-    lines.push(`${fmtDateShort(nowJeddah)} ${fmtTimeShort(nowJeddah)}`);
+    lines.push(fmtWhen(nowJeddah));
     lines.push('');
 
     // Summary leads the message so the incoming shift sees the shape of the
     // handover before scrolling through the detail.
     lines.push('━━ SUMMARY ━━');
-    lines.push('');
     lines.push(`Under Process: ${underProcess.length} cases (${totalUp} PAX)`);
     lines.push(`Flight Confirmed: ${flightConfirmed.length} cases (${totalFu} PAX)`);
-    lines.push(`Total Active: ${underProcess.length + flightConfirmed.length} cases (${totalUp + totalFu} PAX)`);
     lines.push('');
 
-    section('⏰ DEPARTING SOON (< 3hrs)', departingSoon, r => {
-      const bus      = needsBus(r.new_flight) ? ' 🚌' : '';
-      const terminal = getTerminal(r.new_flight);
-      const termNote = terminal !== 'T1' ? `${SEP}(${terminal})` : '';
-      let line = [
-        paxLabel(r), `${r.new_flight} ${iataCode(r.new_destination)}`,
-        `STD ${fmtTimeShort(r.new_datetime)} TODAY`, `#${r.id}`,
-      ].join(SEP) + termNote + bus;
-      if (r.comment) line += `\n${commentBlock(r.comment)}`;
-      return line;
-    });
-
-    section('🚌 BUS TRANSFER NEEDED', busTransfers, r => {
-      const terminal = getTerminal(r.new_flight);
-      let line = [
-        paxLabel(r), `${r.new_flight} ${iataCode(r.new_destination)}`,
-        `STD ${fmtTimeShort(r.new_datetime)} ${fmtDateShort(r.new_datetime)}`,
-        `(${terminal})`, `#${r.id}`,
-      ].join(SEP);
-      if (r.comment) line += `\n${commentBlock(r.comment)}`;
-      return line;
-    });
-
-    section('UNDER PROCESS SV',             upSV,    r => fmtReport(r));
-    section('UNDER PROCESS OTHER AIRLINES', upOther, r => fmtReport(r));
-    section('FOLLOW UP SV',                 fuSV,    r => fmtReport(r, true));
-    section('FOLLOW UP OTHER AIRLINES',     fuOther, r => fmtReport(r, true));
+    section('UNDER PROCESS',    underProcess);
+    section('FLIGHT CONFIRMED', flightConfirmed);
 
     // Trailing blank from the last section — drop it so the message ends clean.
     while (lines.length && lines[lines.length - 1] === '') lines.pop();
@@ -403,7 +392,7 @@ router.get('/', async (req, res) => {
     const { rows } = scope
       ? await pool.query('SELECT * FROM reports WHERE owner_terminal = $1 ORDER BY created_at DESC', [scope])
       : await pool.query('SELECT * FROM reports ORDER BY created_at DESC');
-    res.json(rows);
+    res.json(rows.map(withWhatsApp));
   } catch (e) {
     console.error('[GET /reports]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -417,7 +406,7 @@ router.get('/:id', async (req, res) => {
     const pool = getDb();
     const { rows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
     if (!rows[0] || !ownsReport(req, rows[0])) return res.status(404).json({ error: 'Report not found' });
-    res.json(rows[0]);
+    res.json(withWhatsApp(rows[0]));
   } catch (e) {
     console.error('[GET /reports/:id]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -517,7 +506,7 @@ router.post('/', uploadFiles, async (req, res) => {
 
     await logAudit({ user: req.username || req.role, action: 'create', reportId: id, snapshot: report });
 
-    res.status(201).json(report);
+    res.status(201).json(withWhatsApp(report));
   } catch (e) {
     console.error('[POST /reports]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -607,7 +596,7 @@ router.put('/:id', uploadFiles, async (req, res) => {
       await logAudit({ user: req.username || req.role, action: 'edit', reportId: updated.id, changes });
     }
 
-    res.json(updated);
+    res.json(withWhatsApp(updated));
   } catch (e) {
     console.error('[PUT /reports/:id]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -654,7 +643,7 @@ router.patch('/:id', express.json(), async (req, res) => {
     if (comment !== undefined)         { updates.push(`comment = $${idx++}`);         values.push(comment); }
     if (pax_count !== undefined)       { updates.push(`pax_count = $${idx++}`);       values.push(parseInt(pax_count) || 0); }
 
-    if (updates.length === 0) return res.json(report);
+    if (updates.length === 0) return res.json(withWhatsApp(report));
 
     const finalNewFlight   = new_flight   !== undefined ? new_flight   : report.new_flight;
     const finalNewDatetime = new_datetime !== undefined ? new_datetime : report.new_datetime;
@@ -700,7 +689,7 @@ router.patch('/:id', express.json(), async (req, res) => {
       await logAudit({ user: req.username || req.role, action, reportId: updated.id, changes });
     }
 
-    res.json(updated);
+    res.json(withWhatsApp(updated));
   } catch (e) {
     console.error('[PATCH /reports/:id]', e);
     res.status(500).json({ error: 'Internal server error' });
@@ -800,7 +789,7 @@ router.post('/:id/nusuk', express.json(), async (req, res) => {
     });
 
     const { rows: updatedRows } = await pool.query('SELECT * FROM reports WHERE id = $1', [req.params.id]);
-    res.json(updatedRows[0]);
+    res.json(withWhatsApp(updatedRows[0]));
   } catch (e) {
     console.error('[POST /reports/:id/nusuk]', e);
     res.status(500).json({ error: 'Internal server error' });
