@@ -194,6 +194,11 @@
     "country": "Gambia",
     "nationality": "Gambian"
   },
+  "BJV": {
+    "city": "Bodrum",
+    "country": "Turkey",
+    "nationality": "Turkish"
+  },
   "BKK": {
     "city": "Bangkok",
     "country": "Thailand",
@@ -441,6 +446,11 @@
   },
   "ESB": {
     "city": "Ankara",
+    "country": "Turkey",
+    "nationality": "Turkish"
+  },
+  "EZS": {
+    "city": "Elazığ",
     "country": "Turkey",
     "nationality": "Turkish"
   },
@@ -710,9 +720,9 @@
     "nationality": "Russian"
   },
   "KZR": {
-    "city": "Kozhikode (Calicut)",
-    "country": "India",
-    "nationality": "Indian"
+    "city": "Kütahya (Zafer)",
+    "country": "Turkey",
+    "nationality": "Turkish"
   },
   "LAQ": {
     "city": "AL Abraq",
